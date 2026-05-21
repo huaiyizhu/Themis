@@ -1,0 +1,49 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/themis-core",
+    "crates/themis-audio",
+    "crates/themis-azure",
+    "crates/themis-ipc",
+    "crates/themis-service",
+    "crates/themis-cli",
+    "apps/themis-tray/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/themis/themis"
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+futures = "0.3"
+prost = "0.13"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tonic = "0.12"
+tonic-build = "0.12"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+themis-core = { path = "crates/themis-core" }
+themis-audio = { path = "crates/themis-audio" }
+themis-azure = { path = "crates/themis-azure" }
+themis-ipc = { path = "crates/themis-ipc" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

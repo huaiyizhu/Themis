@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package themis.v1;
+
+service ThemisService {
+  rpc StartCapture(StartCaptureRequest) returns (StartCaptureResponse);
+  rpc StopCapture(StopCaptureRequest) returns (StopCaptureResponse);
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc SubscribeTranscripts(SubscribeTranscriptsRequest)
+      returns (stream TranscriptMessage);
+}
+
+message StartCaptureRequest {}
+
+message StartCaptureResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message StopCaptureRequest {}
+
+message StopCaptureResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  string state = 1;
+  string message = 2;
+  uint64 transcripts_received = 3;
+}
+
+message SubscribeTranscriptsRequest {}
+
+message TranscriptMessage {
+  string text = 1;
+  bool is_final = 2;
+  string feedback = 3;
+  int64 timestamp_unix_ms = 4;
+}

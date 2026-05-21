@@ -1,0 +1,22 @@
+[package]
+name = "themis-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "themis-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+themis-azure.workspace = true
+themis-core.workspace = true
+themis-ipc.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.7"

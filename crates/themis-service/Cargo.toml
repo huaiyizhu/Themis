@@ -1,0 +1,21 @@
+[package]
+name = "themis-service"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "themis-service"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+async-trait = { workspace = true }
+themis-audio.workspace = true
+themis-azure.workspace = true
+themis-core.workspace = true
+themis-ipc.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true

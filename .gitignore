@@ -1,0 +1,27 @@
+/target/
+**/*.rs.bk
+.env
+.env.local
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Tauri / Node
+apps/themis-tray/node_modules/
+apps/themis-tray/dist/
+apps/themis-tray/src-tauri/target/
+apps/themis-tray/src-tauri/gen/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

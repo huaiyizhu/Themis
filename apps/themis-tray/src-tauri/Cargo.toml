@@ -1,0 +1,26 @@
+[package]
+name = "themis-tray"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "themis_tray_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+themis-core.workspace = true
+themis-ipc.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2"

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Reference configuration for Windows Service registration.
+     Prefer: themis-cli service install
+     Or sc.exe with the paths below updated for your install directory. -->
+<service>
+  <id>ThemisService</id>
+  <name>Themis Audio Capture Service</name>
+  <description>Captures system audio and streams transcripts via Azure Speech.</description>
+  <executable>C:\Program Files\Themis\themis-service.exe</executable>
+  <logpath>%LOCALAPPDATA%\Themis\logs</logpath>
+  <startmode>Automatic</startmode>
+</service>

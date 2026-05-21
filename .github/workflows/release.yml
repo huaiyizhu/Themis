@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  THEMIS_USE_MOCK_SPEECH: "true"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-aarch64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build Rust release
+        run: |
+          cargo build --release -p themis-service -p themis-cli --target ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build Tauri bundle
+        working-directory: apps/themis-tray
+        run: |
+          npm install
+          npm run tauri build -- --target ${{ matrix.target }}
+        env:
+          CI: "true"
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/themis-service* dist/ 2>/dev/null || cp target/release/themis-service* dist/ || true
+          cp target/${{ matrix.target }}/release/themis-cli* dist/ 2>/dev/null || cp target/release/themis-cli* dist/ || true
+          if [ -d "apps/themis-tray/src-tauri/target/${{ matrix.target }}/release/bundle" ]; then
+            cp -r apps/themis-tray/src-tauri/target/${{ matrix.target }}/release/bundle dist/tauri-bundle
+          fi
+          cd dist && zip -r ../themis-${{ matrix.name }}.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: themis-${{ matrix.name }}
+          path: themis-${{ matrix.name }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Flatten artifacts
+        run: find artifacts -name '*.zip' -exec cp {} . \;
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
+          generate_release_notes: true

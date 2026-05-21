@@ -1,0 +1,241 @@
+use serde::Serialize;
+use std::sync::Arc;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Emitter, Manager, State,
+};
+use themis_core::ThemisConfig;
+use themis_ipc::client::connect;
+use tokio::sync::Mutex;
+use tracing::info;
+
+#[derive(Clone, Serialize)]
+struct StatusDto {
+    state: String,
+    message: String,
+}
+
+#[derive(Clone, Serialize)]
+struct TranscriptPayload {
+    text: String,
+    is_final: bool,
+    feedback: Option<String>,
+}
+
+#[derive(Clone)]
+struct AppState {
+    config: ThemisConfig,
+    capturing: Arc<Mutex<bool>>,
+    stream_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+}
+
+#[tauri::command]
+async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
+    let mut client = connect(state.config.grpc_port)
+        .await
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get_status(())
+        .await
+        .map_err(|e| e.to_string())?
+        .into_inner();
+    Ok(StatusDto {
+        state: resp.state,
+        message: resp.message,
+    })
+}
+
+#[tauri::command]
+async fn toggle_capture(app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+    let capturing = *state.capturing.lock().await;
+    let mut client = connect(state.config.grpc_port)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if capturing {
+        client.stop_capture(()).await.map_err(|e| e.to_string())?;
+        *state.capturing.lock().await = false;
+        stop_transcript_stream(&state).await;
+        let _ = app.emit("capture-stopped", ());
+        Ok(false)
+    } else {
+        client.start_capture(()).await.map_err(|e| e.to_string())?;
+        *state.capturing.lock().await = true;
+        start_transcript_stream(app.clone(), state.inner().clone()).await;
+        let _ = app.emit("capture-started", ());
+        Ok(true)
+    }
+}
+
+async fn start_transcript_stream(app: AppHandle, state: AppState) {
+    let port = state.config.grpc_port;
+    let handle = tokio::spawn(async move {
+        loop {
+            match connect(port).await {
+                Ok(mut client) => {
+                    if let Ok(mut stream) = client.subscribe_transcripts(()).await {
+                        use tokio_stream::StreamExt;
+                        while let Some(Ok(msg)) = stream.message().await.transpose() {
+                            let _ = app.emit(
+                                "transcript",
+                                TranscriptPayload {
+                                    text: msg.text,
+                                    is_final: msg.is_final,
+                                    feedback: if msg.feedback.is_empty() {
+                                        None
+                                    } else {
+                                        Some(msg.feedback)
+                                    },
+                                },
+                            );
+                        }
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, "grpc connect failed"),
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        }
+    });
+    *state.stream_task.lock().await = Some(handle);
+}
+
+async fn stop_transcript_stream(state: &AppState) {
+    if let Some(h) = state.stream_task.lock().await.take() {
+        h.abort();
+    }
+}
+
+fn spawn_service_if_needed(config: &ThemisConfig) {
+    let port = config.grpc_port;
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        if rt.block_on(connect(port)).is_ok() {
+            return;
+        }
+        if let Some(path) = find_service_binary() {
+            info!(path = %path.display(), "spawning themis-service");
+            let _ = std::process::Command::new(path).spawn();
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    });
+}
+
+fn find_service_binary() -> Option<std::path::PathBuf> {
+    std::env::current_exe().ok().and_then(|p| {
+        let name = if cfg!(windows) {
+            "themis-service.exe"
+        } else {
+            "themis-service"
+        };
+        p.parent()
+            .map(|d| d.join(name))
+            .filter(|p| p.exists())
+    }).or_else(|| {
+        std::env::current_dir().ok().map(|d| {
+            if cfg!(windows) {
+                d.join("target/release/themis-service.exe")
+            } else {
+                d.join("target/release/themis-service")
+            }
+        })
+    })
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tracing_subscriber::fmt()
+        .with_env_filter("info")
+        .init();
+
+    let config = ThemisConfig::from_env();
+    spawn_service_if_needed(&config);
+
+    let hotkey = if cfg!(target_os = "macos") {
+        "Command+Shift+T"
+    } else {
+        "Ctrl+Shift+T"
+    };
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .setup(move |app| {
+            use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+            app.global_shortcut().on_shortcut(hotkey, {
+                let app = app.handle().clone();
+                move |_app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Some(state) = app.try_state::<AppState>() {
+                                let _ = toggle_capture(app, state).await;
+                            }
+                        });
+                    }
+                }
+            })?;
+
+            let show_i = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
+            let toggle_i = MenuItem::with_id(app, "toggle", "Toggle capture", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &quit_i])?;
+
+            let icon = app
+                .default_window_icon()
+                .cloned()
+                .expect("default window icon");
+
+            let _tray = TrayIconBuilder::new()
+                .icon(icon)
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("overlay") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "toggle" => {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            if let Some(state) = app.try_state::<AppState>() {
+                                let _ = toggle_capture(app, state).await;
+                            }
+                        });
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(w) = app.get_webview_window("overlay") {
+                            let visible = w.is_visible().unwrap_or(false);
+                            if visible {
+                                let _ = w.hide();
+                            } else {
+                                let _ = w.show();
+                                let _ = w.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
+        .manage(AppState {
+            config: config.clone(),
+            capturing: Arc::new(Mutex::new(false)),
+            stream_task: Arc::new(Mutex::new(None)),
+        })
+        .invoke_handler(tauri::generate_handler![get_status, toggle_capture])
+        .run(tauri::generate_context!())
+        .expect("error running Themis tray");
+}
