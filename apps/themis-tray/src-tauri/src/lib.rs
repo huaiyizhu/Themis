@@ -7,6 +7,9 @@ use tauri::{
 };
 use themis_core::ThemisConfig;
 use themis_ipc::client::connect;
+use themis_ipc::{
+    GetStatusRequest, StartCaptureRequest, StopCaptureRequest, SubscribeTranscriptsRequest,
+};
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -36,7 +39,7 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
         .await
         .map_err(|e| e.to_string())?;
     let resp = client
-        .get_status(())
+        .get_status(GetStatusRequest {})
         .await
         .map_err(|e| e.to_string())?
         .into_inner();
@@ -47,20 +50,27 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
 }
 
 #[tauri::command]
-async fn toggle_capture(app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
+    let state = app.state::<AppState>();
     let capturing = *state.capturing.lock().await;
     let mut client = connect(state.config.grpc_port)
         .await
         .map_err(|e| e.to_string())?;
 
     if capturing {
-        client.stop_capture(()).await.map_err(|e| e.to_string())?;
+        client
+            .stop_capture(StopCaptureRequest {})
+            .await
+            .map_err(|e| e.to_string())?;
         *state.capturing.lock().await = false;
         stop_transcript_stream(&state).await;
         let _ = app.emit("capture-stopped", ());
         Ok(false)
     } else {
-        client.start_capture(()).await.map_err(|e| e.to_string())?;
+        client
+            .start_capture(StartCaptureRequest {})
+            .await
+            .map_err(|e| e.to_string())?;
         *state.capturing.lock().await = true;
         start_transcript_stream(app.clone(), state.inner().clone()).await;
         let _ = app.emit("capture-started", ());
@@ -74,9 +84,13 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
         loop {
             match connect(port).await {
                 Ok(mut client) => {
-                    if let Ok(mut stream) = client.subscribe_transcripts(()).await {
+                    if let Ok(mut stream) = client
+                        .subscribe_transcripts(SubscribeTranscriptsRequest {})
+                        .await
+                        .map(|r| r.into_inner())
+                    {
                         use tokio_stream::StreamExt;
-                        while let Some(Ok(msg)) = stream.message().await.transpose() {
+                        while let Some(Ok(msg)) = stream.next().await {
                             let _ = app.emit(
                                 "transcript",
                                 TranscriptPayload {
@@ -122,60 +136,66 @@ fn spawn_service_if_needed(config: &ThemisConfig) {
 }
 
 fn find_service_binary() -> Option<std::path::PathBuf> {
-    std::env::current_exe().ok().and_then(|p| {
-        let name = if cfg!(windows) {
-            "themis-service.exe"
-        } else {
-            "themis-service"
-        };
-        p.parent()
-            .map(|d| d.join(name))
-            .filter(|p| p.exists())
-    }).or_else(|| {
-        std::env::current_dir().ok().map(|d| {
-            if cfg!(windows) {
-                d.join("target/release/themis-service.exe")
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| {
+            let name = if cfg!(windows) {
+                "themis-service.exe"
             } else {
-                d.join("target/release/themis-service")
-            }
+                "themis-service"
+            };
+            p.parent()
+                .map(|d| d.join(name))
+                .filter(|path| path.exists())
         })
-    })
+        .or_else(|| {
+            std::env::current_dir().ok().map(|d| {
+                if cfg!(windows) {
+                    d.join("target/release/themis-service.exe")
+                } else {
+                    d.join("target/release/themis-service")
+                }
+            })
+        })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
-        .with_env_filter("info")
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .init();
 
     let config = ThemisConfig::from_env();
     spawn_service_if_needed(&config);
 
     let hotkey = if cfg!(target_os = "macos") {
-        "Command+Shift+T"
+        "Command+Shift+KeyT"
     } else {
-        "Ctrl+Shift+T"
+        "Ctrl+Shift+KeyT"
     };
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .setup(move |app| {
-            use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-
-            app.global_shortcut().on_shortcut(hotkey, {
-                let app = app.handle().clone();
-                move |_app, _shortcut, event| {
-                    if event.state == ShortcutState::Pressed {
-                        let app = app.clone();
-                        tauri::async_runtime::spawn(async move {
-                            if let Some(state) = app.try_state::<AppState>() {
-                                let _ = toggle_capture(app, state).await;
-                            }
-                        });
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_shortcuts([hotkey])
+                .unwrap_or_else(|e| panic!("invalid hotkey {hotkey}: {e}"))
+                .with_handler({
+                    move |app, _shortcut, event| {
+                        use tauri_plugin_global_shortcut::ShortcutState;
+                        if event.state == ShortcutState::Pressed {
+                            let app = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let _ = toggle_capture(app).await;
+                            });
+                        }
                     }
-                }
-            })?;
-
+                })
+                .build(),
+        )
+        .setup(move |app| {
             let show_i = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Toggle capture", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -199,9 +219,7 @@ pub fn run() {
                     "toggle" => {
                         let app = app.clone();
                         tauri::async_runtime::spawn(async move {
-                            if let Some(state) = app.try_state::<AppState>() {
-                                let _ = toggle_capture(app, state).await;
-                            }
+                            let _ = toggle_capture(app).await;
                         });
                     }
                     "quit" => app.exit(0),

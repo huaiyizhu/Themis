@@ -36,7 +36,9 @@ impl ThemisConfig {
     pub fn from_env() -> Self {
         let _ = dotenvy::dotenv();
 
-        let key = std::env::var("AZURE_SPEECH_KEY").ok().filter(|s| !s.is_empty());
+        let key = std::env::var("AZURE_SPEECH_KEY")
+            .ok()
+            .filter(|s| !s.is_empty());
         let region = std::env::var("AZURE_SPEECH_REGION")
             .ok()
             .filter(|s| !s.is_empty());

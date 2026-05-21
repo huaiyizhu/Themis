@@ -17,6 +17,7 @@ tracing.workspace = true
 
 [build-dependencies]
 tonic-build.workspace = true
+protoc-bin-vendored = "3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

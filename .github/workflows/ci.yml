@@ -9,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   THEMIS_USE_MOCK_SPEECH: "true"
+  RUST_BACKTRACE: 1
 
 jobs:
   rust:
@@ -39,6 +40,7 @@ jobs:
         run: cargo build --release -p themis-service -p themis-cli
 
   tray:
+    needs: rust
     strategy:
       fail-fast: false
       matrix:
@@ -50,8 +52,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/themis-tray/src-tauri
 
       - uses: actions/setup-node@v4
         with:
@@ -59,12 +59,13 @@ jobs:
           cache: npm
           cache-dependency-path: apps/themis-tray/package-lock.json
 
-      - name: Install frontend deps
+      - name: Install frontend deps and build dist
         working-directory: apps/themis-tray
-        run: npm install
+        run: |
+          npm ci
+          npm run build
 
-      - name: Build Tauri (no bundle in CI)
-        working-directory: apps/themis-tray
+      - name: Build tray (Rust / Tauri, no installer bundle)
         env:
           CI: "true"
-        run: npm run tauri build -- --no-bundle
+        run: cargo build --release -p themis-tray

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use themis_audio::AudioSource;
-use themis_azure::{create_recognizer, SpeechRecognizer};
+use themis_azure::create_recognizer;
 use themis_core::{
     AnalysisProvider, AudioFrame, CaptureState, NoopAnalysis, StateMachine, ThemisConfig,
     TranscriptEvent,
@@ -24,6 +24,15 @@ struct RunningCapture {
 struct RunningTasks {
     speech: tokio::task::JoinHandle<()>,
     events: tokio::task::JoinHandle<()>,
+}
+
+impl RunningTasks {
+    async fn join_all(self) {
+        let RunningTasks { speech, events } = self;
+        let _ = speech.await;
+        events.abort();
+        let _ = events.await;
+    }
 }
 
 impl CaptureEngine {
@@ -50,10 +59,8 @@ impl CaptureEngine {
         let (frame_tx, frame_rx) = mpsc::channel::<AudioFrame>(256);
         let (stop_tx, stop_rx) = mpsc::channel::<()>(1);
 
-        let mut audio = themis_audio::create_loopback(
-            self.config.sample_rate,
-            self.config.channels,
-        )?;
+        let mut audio =
+            themis_audio::create_loopback(self.config.sample_rate, self.config.channels)?;
         audio.start(frame_tx)?;
 
         let mut speech = create_recognizer(&self.config);
@@ -88,23 +95,18 @@ impl CaptureEngine {
         });
 
         let event_handle = tokio::spawn(async move {
-            loop {
-                match speech_events.recv().await {
-                    Ok(ev) => {
-                        state.record_transcript();
-                        let feedback = if ev.is_final {
-                            analysis.analyze(&ev.text).await.ok().flatten()
-                        } else {
-                            None
-                        };
-                        let _ = transcript_tx.send(TranscriptEvent {
-                            text: ev.text,
-                            is_final: ev.is_final,
-                            feedback,
-                        });
-                    }
-                    Err(_) => break,
-                }
+            while let Ok(ev) = speech_events.recv().await {
+                state.record_transcript();
+                let feedback = if ev.is_final {
+                    analysis.analyze(&ev.text).await.ok().flatten()
+                } else {
+                    None
+                };
+                let _ = transcript_tx.send(TranscriptEvent {
+                    text: ev.text,
+                    is_final: ev.is_final,
+                    feedback,
+                });
             }
         });
 
@@ -125,10 +127,9 @@ impl CaptureEngine {
 
     pub async fn stop(&self) -> anyhow::Result<()> {
         let mut guard = self.inner.lock().await;
-        if let Some(running) = guard.take() {
+        if let Some(mut running) = guard.take() {
             let _ = running.stop_tx.send(()).await;
-            let _ = running._tasks.speech.await;
-            let _ = running._tasks.events.await;
+            running._tasks.join_all().await;
             running._audio.stop()?;
         }
         self.state.set_state(CaptureState::Idle, "capture stopped");

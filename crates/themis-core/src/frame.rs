@@ -64,7 +64,10 @@ fn resample_linear(input: &[i16], from_rate: u32, to_rate: u32) -> Vec<i16> {
             let idx = src_pos.floor() as usize;
             let frac = src_pos - idx as f64;
             let a = input.get(idx).copied().unwrap_or(0) as f64;
-            let b = input.get(idx + 1).copied().unwrap_or(*input.last().unwrap()) as f64;
+            let b = input
+                .get(idx + 1)
+                .copied()
+                .unwrap_or(*input.last().unwrap()) as f64;
             (a + (b - a) * frac).round() as i16
         })
         .collect()

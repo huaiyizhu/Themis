@@ -1,7 +1,7 @@
 use crate::proto::{
-    themis_service_server::ThemisService, GetStatusRequest, GetStatusResponse,
-    StartCaptureRequest, StartCaptureResponse, StopCaptureRequest, StopCaptureResponse,
-    SubscribeTranscriptsRequest, TranscriptMessage,
+    themis_service_server::ThemisService, GetStatusRequest, GetStatusResponse, StartCaptureRequest,
+    StartCaptureResponse, StopCaptureRequest, StopCaptureResponse, SubscribeTranscriptsRequest,
+    TranscriptMessage,
 };
 use std::pin::Pin;
 use std::sync::Arc;
@@ -13,6 +13,7 @@ use tracing::info;
 
 pub struct CaptureService {
     pub state: Arc<StateMachine>,
+    /// Subscribers attach here; engine publishes via the cloned sender.
     pub transcript_tx: broadcast::Sender<TranscriptEvent>,
     pub engine: Arc<dyn CaptureEngineHandle + Send + Sync>,
 }

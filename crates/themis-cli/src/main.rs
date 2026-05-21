@@ -69,7 +69,10 @@ async fn main() -> anyhow::Result<()> {
 
 async fn cmd_status(config: &ThemisConfig) -> anyhow::Result<()> {
     let mut client = connect(config.grpc_port).await?;
-    let resp = client.get_status(()).await?.into_inner();
+    let resp = client
+        .get_status(themis_ipc::GetStatusRequest {})
+        .await?
+        .into_inner();
     println!("state: {}", resp.state);
     println!("message: {}", resp.message);
     println!("transcripts: {}", resp.transcripts_received);

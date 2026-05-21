@@ -39,15 +39,12 @@ impl SpeechRecognizer for MockSpeechRecognizer {
         }
 
         let n = self.chunk_count.fetch_add(1, Ordering::SeqCst);
-        if n % 50 != 0 {
+        if !n.is_multiple_of(50) {
             return Ok(());
         }
 
-        let energy: f64 = pcm16
-            .iter()
-            .map(|&s| (s as f64).powi(2))
-            .sum::<f64>()
-            / pcm16.len().max(1) as f64;
+        let energy: f64 =
+            pcm16.iter().map(|&s| (s as f64).powi(2)).sum::<f64>() / pcm16.len().max(1) as f64;
 
         let partial = format!("[mock] audio level {:.0}", energy.sqrt());
         let _ = self.tx.send(SpeechEvent {
@@ -55,7 +52,7 @@ impl SpeechRecognizer for MockSpeechRecognizer {
             is_final: false,
         });
 
-        if n % 150 == 0 {
+        if n.is_multiple_of(150) {
             let _ = self.tx.send(SpeechEvent {
                 text: format!("{partial} — mock transcript segment {}", n / 150),
                 is_final: true,
