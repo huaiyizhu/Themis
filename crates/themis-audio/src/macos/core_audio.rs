@@ -8,7 +8,7 @@
 use crate::stub::StubAudioSource;
 use crate::AudioSource;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{SampleFormat, SampleRate, Stream};
+use cpal::{SampleFormat, SampleRate};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::thread::{self, JoinHandle};
