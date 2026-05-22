@@ -8,11 +8,12 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, warn};
 
-const CHUNK_SAMPLES: usize = 16_000 * 3; // ~3 seconds at 16 kHz mono
+const CHUNK_SAMPLES: usize = 16_000; // ~1 second at 16 kHz mono (MVP chunk size)
 
 pub struct AzureRestRecognizer {
     key: String,
     region: String,
+    language: String,
     tx: broadcast::Sender<SpeechEvent>,
     buffer: Arc<Mutex<VecDeque<i16>>>,
     running: Arc<Mutex<bool>>,
@@ -20,11 +21,12 @@ pub struct AzureRestRecognizer {
 }
 
 impl AzureRestRecognizer {
-    pub fn new(key: String, region: String) -> Self {
+    pub fn new(key: String, region: String, language: String) -> Self {
         let (tx, _) = broadcast::channel(64);
         Self {
             key,
             region,
+            language,
             tx,
             buffer: Arc::new(Mutex::new(VecDeque::new())),
             running: Arc::new(Mutex::new(false)),
@@ -55,8 +57,8 @@ impl AzureRestRecognizer {
 
     async fn recognize_chunk(&self, pcm: Vec<i16>) -> anyhow::Result<Option<String>> {
         let url = format!(
-            "https://{}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language=en-US",
-            self.region
+            "https://{}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language={}",
+            self.region, self.language
         );
         let wav = Self::wav_bytes(&pcm, 16_000);
         let resp = self
@@ -89,6 +91,13 @@ impl AzureRestRecognizer {
 impl SpeechRecognizer for AzureRestRecognizer {
     async fn start(&mut self) -> anyhow::Result<()> {
         *self.running.lock().await = true;
+        let _ = self.tx.send(SpeechEvent {
+            text: format!(
+                "正在采集系统播放音频 → Azure ({})，约 1 秒出一段结果",
+                self.language
+            ),
+            is_final: false,
+        });
         Ok(())
     }
 
@@ -125,8 +134,22 @@ impl SpeechRecognizer for AzureRestRecognizer {
                         is_final: true,
                     });
                 }
-                Ok(None) => {}
-                Err(e) => warn!(error = %e, "azure rest recognition failed"),
+                Ok(None) => {
+                    let _ = this.tx.send(SpeechEvent {
+                        text: format!(
+                            "(本段未识别到语音：播放内容需含对白，且 AZURE_SPEECH_LANGUAGE={} 与视频语言一致)",
+                            this.language
+                        ),
+                        is_final: false,
+                    });
+                }
+                Err(e) => {
+                    warn!(error = %e, "azure rest recognition failed");
+                    let _ = this.tx.send(SpeechEvent {
+                        text: format!("Azure error: {e}"),
+                        is_final: true,
+                    });
+                }
             }
         });
 
@@ -143,6 +166,7 @@ impl AzureRestRecognizer {
         Self {
             key: self.key.clone(),
             region: self.region.clone(),
+            language: self.language.clone(),
             tx: self.tx.clone(),
             buffer: Arc::clone(&self.buffer),
             running: Arc::clone(&self.running),

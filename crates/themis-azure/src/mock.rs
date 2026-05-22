@@ -25,6 +25,10 @@ impl MockSpeechRecognizer {
 impl SpeechRecognizer for MockSpeechRecognizer {
     async fn start(&mut self) -> anyhow::Result<()> {
         self.running = true;
+        let _ = self.tx.send(SpeechEvent {
+            text: "Listening (mock)… generating sample transcripts from audio level".into(),
+            is_final: false,
+        });
         Ok(())
     }
 
@@ -39,7 +43,7 @@ impl SpeechRecognizer for MockSpeechRecognizer {
         }
 
         let n = self.chunk_count.fetch_add(1, Ordering::SeqCst);
-        if !n.is_multiple_of(50) {
+        if !n.is_multiple_of(10) {
             return Ok(());
         }
 
@@ -52,9 +56,9 @@ impl SpeechRecognizer for MockSpeechRecognizer {
             is_final: false,
         });
 
-        if n.is_multiple_of(150) {
+        if n.is_multiple_of(30) {
             let _ = self.tx.send(SpeechEvent {
-                text: format!("{partial} — mock transcript segment {}", n / 150),
+                text: format!("{partial} — mock transcript segment {}", n / 30),
                 is_final: true,
             });
         }

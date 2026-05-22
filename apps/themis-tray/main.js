@@ -9,6 +9,11 @@ async function refreshStatus() {
   try {
     const s = await invoke("get_status");
     statusEl.textContent = `Status: ${s.state} — ${s.message}`;
+    if (s.state === "capturing" && !transcriptEl.textContent.trim()) {
+      transcriptEl.textContent =
+        "Capturing… play system audio or speech. Text appears here when STT returns.";
+      transcriptEl.style.opacity = "0.6";
+    }
   } catch (e) {
     statusEl.textContent = `Service offline (${e})`;
   }

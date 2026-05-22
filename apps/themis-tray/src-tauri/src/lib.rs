@@ -67,12 +67,13 @@ async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
         let _ = app.emit("capture-stopped", ());
         Ok(false)
     } else {
+        *state.capturing.lock().await = true;
+        // Subscribe before StartCapture so we do not miss early transcript events.
+        start_transcript_stream(app.clone(), state.inner().clone()).await;
         client
             .start_capture(StartCaptureRequest {})
             .await
             .map_err(|e| e.to_string())?;
-        *state.capturing.lock().await = true;
-        start_transcript_stream(app.clone(), state.inner().clone()).await;
         let _ = app.emit("capture-started", ());
         Ok(true)
     }
@@ -136,27 +137,26 @@ fn spawn_service_if_needed(config: &ThemisConfig) {
 }
 
 fn find_service_binary() -> Option<std::path::PathBuf> {
-    std::env::current_exe()
-        .ok()
-        .and_then(|p| {
-            let name = if cfg!(windows) {
-                "themis-service.exe"
-            } else {
-                "themis-service"
-            };
-            p.parent()
-                .map(|d| d.join(name))
-                .filter(|path| path.exists())
-        })
-        .or_else(|| {
-            std::env::current_dir().ok().map(|d| {
-                if cfg!(windows) {
-                    d.join("target/release/themis-service.exe")
-                } else {
-                    d.join("target/release/themis-service")
-                }
-            })
-        })
+    let name = if cfg!(windows) {
+        "themis-service.exe"
+    } else {
+        "themis-service"
+    };
+
+    let mut candidates = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join(name));
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        for sub in ["target/debug", "target/release", "../../target/debug", "../../target/release"]
+        {
+            candidates.push(cwd.join(sub).join(name));
+        }
+    }
+
+    candidates.into_iter().find(|p| p.exists())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

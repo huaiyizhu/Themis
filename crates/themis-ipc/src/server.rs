@@ -46,7 +46,7 @@ impl ThemisService for ThemisGrpcServer {
             Ok(()) => {
                 self.service
                     .state
-                    .set_state(CaptureState::Capturing, "capturing via gRPC");
+                    .set_state(CaptureState::Capturing, "listening for audio");
                 info!("StartCapture RPC");
                 Ok(Response::new(StartCaptureResponse {
                     ok: true,

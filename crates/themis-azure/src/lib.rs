@@ -14,7 +14,11 @@ pub fn create_recognizer(config: &ThemisConfig) -> Box<dyn SpeechRecognizer + Se
     } else if let (Some(key), Some(region)) =
         (&config.azure_speech_key, &config.azure_speech_region)
     {
-        Box::new(AzureRestRecognizer::new(key.clone(), region.clone()))
+        Box::new(AzureRestRecognizer::new(
+            key.clone(),
+            region.clone(),
+            config.speech_language.clone(),
+        ))
     } else {
         Box::new(MockSpeechRecognizer::new())
     }

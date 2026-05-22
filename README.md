@@ -53,11 +53,34 @@ npm run tauri dev
 
 ### 3. Run
 
-**Portable mode (recommended for first run)**
+**Development (two terminals)**
 
-1. Start the service: `cargo run -p themis-service` (or `target/release/themis-service.exe`)
-2. Start the tray: `cd apps/themis-tray && npm run tauri dev`  
-   The tray auto-spawns the service if gRPC is down.
+```bash
+# Terminal 1 — backend (keep running)
+cd D:\learning\Themis   # project root
+cargo run -p themis-service
+
+# Terminal 2 — tray UI
+cd apps/themis-tray
+npm run tauri dev
+```
+
+The overlay should show `Status: idle — …` (not `Service offline`).  
+If you only run `tauri dev` without the service, the dark overlay correctly shows **Service offline** — that is expected.
+
+**No transcript text while “capturing”?**
+
+- You configured **Azure Speech** in `.env`: the app captures **speaker output** (loopback), not the microphone.
+- Set **`AZURE_SPEECH_LANGUAGE`** to match the video: `en-US` for English, `zh-CN` for Chinese.
+- After fixing audio format on Windows, restart `themis-service` so loopback PCM is correct.
+- For a quick UI test without Azure, set `THEMIS_USE_MOCK_SPEECH=true` in `.env` and restart `themis-service`.
+- After `Ctrl+Shift+T` to start capture, wait a few seconds; partial text should appear under the status line.
+
+**Portable mode (release build)**
+
+1. `cargo build --release -p themis-service`
+2. `cd apps/themis-tray && npm run tauri dev`  
+   The tray tries to spawn `target/debug` or `target/release/themis-service` automatically.
 
 **Windows Service (admin)**
 
