@@ -4319,6 +4319,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "themis-analysis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "themis-core",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "themis-audio"
 version = "0.1.0"
 dependencies = [
@@ -4408,6 +4423,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "themis-analysis",
  "themis-audio",
  "themis-azure",
  "themis-core",
