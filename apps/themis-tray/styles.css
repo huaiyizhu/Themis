@@ -6,26 +6,27 @@
 
 html,
 body {
-  background: transparent;
+  background: transparent !important;
   font-family: "Segoe UI", system-ui, sans-serif;
   height: 100%;
   overflow: hidden;
-  /* Leave a thin margin so native edge hit-test can coexist with custom chrome */
-  padding: 3px;
 }
 
 #overlay {
-  border-radius: 12px;
+  border: none;
+  border-radius: 10px;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  outline: none;
   padding: 8px 12px 12px;
   position: relative;
   transition:
     background 0.2s ease,
     color 0.2s ease,
-    border-color 0.2s ease;
+    box-shadow 0.2s ease;
 }
 
 /* Resize handles live inside the panel, below the drag header in z-order */
@@ -43,16 +44,16 @@ body {
 
 .resize-n {
   top: 0;
-  left: 16px;
-  right: 16px;
+  left: 0;
+  right: 0;
   height: 5px;
   cursor: ns-resize;
 }
 
 .resize-s {
   bottom: 0;
-  left: 16px;
-  right: 16px;
+  left: 0;
+  right: 0;
   height: 6px;
   cursor: ns-resize;
 }
@@ -106,36 +107,36 @@ body {
   cursor: nesw-resize;
 }
 
-/* --- Theme presets --- */
+/* --- Theme presets (borderless; depth via shadow only) --- */
 .theme-dark-glass {
-  background: rgba(18, 18, 24, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(10px);
+  background: rgba(18, 18, 24, 0.9);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
   color: #f0f0f5;
 }
 
 .theme-light-glass {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
   color: #121218;
 }
 
 .theme-high-contrast-dark {
-  background: rgba(0, 0, 0, 0.96);
-  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.94);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
   color: #fff;
 }
 
 .theme-high-contrast-light {
-  background: rgba(255, 255, 255, 0.98);
-  border: 2px solid #000;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
   color: #000;
 }
 
 .theme-outline {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px dashed rgba(255, 255, 255, 0.45);
+  background: rgba(8, 8, 12, 0.55);
+  box-shadow: none;
   color: #fff;
 }
 

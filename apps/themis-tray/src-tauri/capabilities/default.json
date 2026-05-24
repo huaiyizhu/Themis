@@ -10,6 +10,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-is-visible",
     "core:window:allow-set-always-on-top",
+    "core:window:allow-set-background-color",
+    "core:window:allow-set-shadow",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
     "global-shortcut:allow-register",

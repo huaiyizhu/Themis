@@ -538,6 +538,8 @@ pub fn run() {
 
             if let Some(w) = app.get_webview_window("overlay") {
                 let _ = w.set_always_on_top(true);
+                let _ = w.set_shadow(false);
+                let _ = w.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
             }
 
             let icon = app
