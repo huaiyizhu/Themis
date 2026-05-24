@@ -39,18 +39,25 @@
         <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
           <div id="transcript" class="transcript-body"></div>
         </div>
+        <aside id="questions-panel" class="questions-panel" aria-label="Questions">
+          <h2 class="questions-title">Questions</h2>
+          <p id="questions-empty" class="questions-empty">
+            ??????????????????????
+          </p>
+          <div id="questions-list" class="question-cards"></div>
+        </aside>
         <div
           id="split-divider"
           class="split-divider"
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize panels"
-          title="Drag to resize"
+          aria-label="Resize terms panel"
+          title="Drag to resize terms panel"
         ></div>
-        <aside id="insights-panel" class="insights-panel" aria-label="Terms and answers">
-          <h2 class="insights-title">Insights</h2>
+        <aside id="insights-panel" class="insights-panel" aria-label="Keywords and terms">
+          <h2 class="insights-title">Terms</h2>
           <p id="insights-empty" class="insights-empty">
-            Keywords, terms &amp; questions appear here after each phrase.
+            Keywords and terms appear here after each phrase.
           </p>
           <section id="insights-keywords" class="insights-section hidden">
             <h3>Keywords</h3>
@@ -59,10 +66,6 @@
           <section id="insights-terms" class="insights-section hidden">
             <h3>Terms</h3>
             <div id="insights-terms-list" class="insight-cards"></div>
-          </section>
-          <section id="insights-questions" class="insights-section hidden">
-            <h3>Questions</h3>
-            <div id="insights-questions-list" class="insight-cards"></div>
           </section>
         </aside>
       </div>

@@ -14,8 +14,9 @@ const insightsKeywordsSec = document.getElementById("insights-keywords");
 const insightsKeywordsList = document.getElementById("insights-keywords-list");
 const insightsTermsSec = document.getElementById("insights-terms");
 const insightsTermsList = document.getElementById("insights-terms-list");
-const insightsQuestionsSec = document.getElementById("insights-questions");
-const insightsQuestionsList = document.getElementById("insights-questions-list");
+const questionsEmptyEl = document.getElementById("questions-empty");
+const questionsListEl = document.getElementById("questions-list");
+const questionsPanelEl = document.getElementById("questions-panel");
 const contentSplitEl = document.getElementById("content-split");
 const splitDividerEl = document.getElementById("split-divider");
 const insightsPanelEl = document.getElementById("insights-panel");
@@ -67,7 +68,9 @@ setupWindowDrag();
 
 function clampInsightsWidth(widthPx) {
   if (!contentSplitEl || !insightsPanelEl) return widthPx;
-  const max = contentSplitEl.clientWidth - TRANSCRIPT_PANEL_MIN - SPLIT_DIVIDER_WIDTH;
+  const questionsW = questionsPanelEl?.offsetWidth ?? 0;
+  const max =
+    contentSplitEl.clientWidth - TRANSCRIPT_PANEL_MIN - questionsW - SPLIT_DIVIDER_WIDTH;
   return Math.round(Math.max(INSIGHTS_PANEL_MIN, Math.min(widthPx, max)));
 }
 
@@ -280,7 +283,7 @@ function pruneExpiredInsights() {
   const termsChanged = pruneEntryList(termEntries);
   const questionsChanged = pruneEntryList(questionEntries);
   if (termsChanged || questionsChanged) {
-    renderTermAndQuestionPanels();
+    renderInsightPanels();
   }
 }
 
@@ -334,12 +337,31 @@ function appendQuestionEntries(questions) {
   return added;
 }
 
-function renderTermAndQuestionPanels() {
+function renderInsightPanels() {
   const hasTerms = termEntries.length > 0;
   const hasQuestions = questionEntries.length > 0;
   const hasKeywords = insightsKeywordsList.childElementCount > 0;
 
-  if (hasTerms || hasQuestions || hasKeywords) {
+  questionsEmptyEl.classList.toggle("hidden", hasQuestions);
+  questionsListEl.replaceChildren();
+  for (const item of questionEntries) {
+    const card = document.createElement("div");
+    card.className = "question-card";
+    card.dataset.id = item.id;
+    const meta = document.createElement("div");
+    meta.className = "insight-meta";
+    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}`;
+    const q = document.createElement("div");
+    q.className = "q";
+    q.textContent = item.question;
+    const a = document.createElement("div");
+    a.className = "a";
+    a.textContent = item.answer;
+    card.append(meta, q, a);
+    questionsListEl.appendChild(card);
+  }
+
+  if (hasTerms || hasKeywords) {
     insightsEmptyEl.classList.add("hidden");
   } else {
     insightsEmptyEl.classList.remove("hidden");
@@ -363,24 +385,6 @@ function renderTermAndQuestionPanels() {
     insightsTermsList.appendChild(card);
   }
 
-  insightsQuestionsSec.classList.toggle("hidden", !hasQuestions);
-  insightsQuestionsList.replaceChildren();
-  for (const item of questionEntries) {
-    const card = document.createElement("div");
-    card.className = "insight-card";
-    card.dataset.id = item.id;
-    const meta = document.createElement("div");
-    meta.className = "insight-meta";
-    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}`;
-    const q = document.createElement("div");
-    q.className = "q";
-    q.textContent = item.question;
-    const a = document.createElement("div");
-    a.className = "a";
-    a.textContent = item.answer;
-    card.append(meta, q, a);
-    insightsQuestionsList.appendChild(card);
-  }
 }
 
 function resetInsightDwellState() {
@@ -417,7 +421,7 @@ function renderInsights(insights) {
 
   if (changed) {
     ensureInsightPruneTimer();
-    renderTermAndQuestionPanels();
+    renderInsightPanels();
   }
 }
 
@@ -473,13 +477,13 @@ listen("capture-started", () => {
   followLatest = true;
   scrollLatestBtn.classList.add("hidden");
   resetInsightDwellState();
+  questionsEmptyEl.classList.remove("hidden");
   insightsEmptyEl.classList.remove("hidden");
   insightsKeywordsSec.classList.add("hidden");
   insightsTermsSec.classList.add("hidden");
-  insightsQuestionsSec.classList.add("hidden");
   insightsKeywordsList.replaceChildren();
   insightsTermsList.replaceChildren();
-  insightsQuestionsList.replaceChildren();
+  questionsListEl.replaceChildren();
   setPlaceholder("Capture started — transcript builds below…");
 });
 
