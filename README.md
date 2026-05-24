@@ -119,8 +119,15 @@ npm run tauri dev
 |------|---------|-------|
 | 开始/停止采集 | `Ctrl+Shift+T` | `Cmd+Shift+T` |
 | 延迟诊断窗口 | `Ctrl+Shift+D` | `Cmd+Shift+D` |
+| 浮层透明度 − / + | `Ctrl+Shift+[` / `]` | `Cmd+Shift+[` / `]` |
+| 切换浮层风格 | `Ctrl+Shift+S` | `Cmd+Shift+S` |
+| 背景自适应对比 | `Ctrl+Shift+A` | `Cmd+Shift+A` |
+| 退出托盘应用 | `Ctrl+Shift+Q` | `Cmd+Shift+Q` |
 | 显示/隐藏浮层 | 左键托盘图标 | 同左 |
-| 退出 | 托盘菜单 Quit | 同左 |
+| 移动浮层 | 拖动标题栏 | 同左 |
+| 调整大小 | 拖动窗口边缘/角 | 同左 |
+
+浮层**始终置顶**。风格预设：`dark-glass`、`light-glass`、`high-contrast-dark`、`high-contrast-light`、`outline`。**自适应**（`Ctrl+Shift+A`）会采样浮层下方的桌面亮度，自动在深浅面板间切换（Windows）。
 
 **诊断窗口**会显示当前浮层文字、最近短语的延迟分解（**Buffer** ≈ REST 分块累积时长、**Azure** = 网络 + 识别、**STT wall** = 多语言并行时的墙钟时间、**E2E est.** ≈ 从语音结束到文字就绪的估计、**UI** = 服务发出到浮层显示的间隔）。托盘菜单也可选 **Diagnostics**。
 

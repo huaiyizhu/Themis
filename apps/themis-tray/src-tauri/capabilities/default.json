@@ -9,6 +9,9 @@
     "core:window:allow-hide",
     "core:window:allow-set-focus",
     "core:window:allow-is-visible",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister"
   ]

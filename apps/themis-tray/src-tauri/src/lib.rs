@@ -1,3 +1,6 @@
+mod overlay_ui;
+
+use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{
@@ -85,6 +88,47 @@ struct AppState {
     capturing: Arc<Mutex<bool>>,
     stream_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     overlay: Arc<Mutex<OverlayMirror>>,
+}
+
+#[tauri::command]
+fn get_overlay_ui(ui: State<'_, Arc<OverlayUiState>>) -> OverlayUiSettings {
+    ui.get()
+}
+
+#[tauri::command]
+fn adjust_overlay_opacity(
+    app: AppHandle,
+    ui: State<'_, Arc<OverlayUiState>>,
+    delta: f64,
+) -> Result<OverlayUiSettings, String> {
+    let settings = ui.adjust_opacity(delta);
+    apply_overlay_ui(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn cycle_overlay_theme(
+    app: AppHandle,
+    ui: State<'_, Arc<OverlayUiState>>,
+) -> Result<OverlayUiSettings, String> {
+    let settings = ui.cycle_theme();
+    apply_overlay_ui(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn toggle_overlay_adaptive(
+    app: AppHandle,
+    ui: State<'_, Arc<OverlayUiState>>,
+) -> Result<OverlayUiSettings, String> {
+    let settings = ui.toggle_adaptive();
+    apply_overlay_ui(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
 }
 
 #[tauri::command]
@@ -374,6 +418,31 @@ pub fn run() {
     } else {
         "Ctrl+Shift+KeyD"
     };
+    let hotkey_quit = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyQ"
+    } else {
+        "Ctrl+Shift+KeyQ"
+    };
+    let hotkey_opacity_down = if cfg!(target_os = "macos") {
+        "Command+Shift+BracketLeft"
+    } else {
+        "Ctrl+Shift+BracketLeft"
+    };
+    let hotkey_opacity_up = if cfg!(target_os = "macos") {
+        "Command+Shift+BracketRight"
+    } else {
+        "Ctrl+Shift+BracketRight"
+    };
+    let hotkey_style = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyS"
+    } else {
+        "Ctrl+Shift+KeyS"
+    };
+    let hotkey_adaptive = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyA"
+    } else {
+        "Ctrl+Shift+KeyA"
+    };
 
     let sc_toggle: tauri_plugin_global_shortcut::Shortcut = hotkey_toggle
         .parse()
@@ -381,13 +450,39 @@ pub fn run() {
     let sc_diagnose: tauri_plugin_global_shortcut::Shortcut = hotkey_diagnose
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_diagnose}: {e}"));
+    let sc_quit: tauri_plugin_global_shortcut::Shortcut = hotkey_quit
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_quit}: {e}"));
+    let sc_opacity_down: tauri_plugin_global_shortcut::Shortcut = hotkey_opacity_down
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_opacity_down}: {e}"));
+    let sc_opacity_up: tauri_plugin_global_shortcut::Shortcut = hotkey_opacity_up
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_opacity_up}: {e}"));
+    let sc_style: tauri_plugin_global_shortcut::Shortcut = hotkey_style
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_style}: {e}"));
+    let sc_adaptive: tauri_plugin_global_shortcut::Shortcut = hotkey_adaptive
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_adaptive}: {e}"));
+
+    let ui_state = Arc::new(OverlayUiState::new());
 
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts([hotkey_toggle, hotkey_diagnose])
+                .with_shortcuts([
+                    hotkey_toggle,
+                    hotkey_diagnose,
+                    hotkey_quit,
+                    hotkey_opacity_down,
+                    hotkey_opacity_up,
+                    hotkey_style,
+                    hotkey_adaptive,
+                ])
                 .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
                 .with_handler({
+                    let ui_state = Arc::clone(&ui_state);
                     move |app, shortcut, event| {
                         use tauri_plugin_global_shortcut::ShortcutState;
                         if event.state != ShortcutState::Pressed {
@@ -400,12 +495,35 @@ pub fn run() {
                             });
                         } else if shortcut == &sc_diagnose {
                             let _ = toggle_diagnose_window(app.clone());
+                        } else if shortcut == &sc_quit {
+                            app.exit(0);
+                        } else if shortcut == &sc_opacity_down {
+                            let s = ui_state.adjust_opacity(-overlay_ui::OPACITY_STEP);
+                            let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_opacity_up {
+                            let s = ui_state.adjust_opacity(overlay_ui::OPACITY_STEP);
+                            let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_style {
+                            let s = ui_state.cycle_theme();
+                            let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_adaptive {
+                            let s = ui_state.toggle_adaptive();
+                            let _ = apply_overlay_ui(app, &s);
                         }
                     }
                 })
                 .build(),
         )
-        .setup(move |app| {
+        .setup({
+            let ui_state = Arc::clone(&ui_state);
+            move |app| {
+            if let Ok(dir) = app.path().app_data_dir() {
+                let _ = std::fs::create_dir_all(&dir);
+                ui_state.init_path(dir.join("overlay-ui.json"));
+            }
+            let settings = ui_state.get();
+            let _ = apply_overlay_ui(&app.handle(), &settings);
+            spawn_adaptive_poll(app.handle().clone(), Arc::clone(&ui_state));
             let show_i = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Toggle capture", true, None::<&str>)?;
             let diag_i = MenuItem::with_id(
@@ -415,8 +533,12 @@ pub fn run() {
                 true,
                 None::<&str>,
             )?;
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit (Ctrl+Shift+Q)", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &toggle_i, &diag_i, &quit_i])?;
+
+            if let Some(w) = app.get_webview_window("overlay") {
+                let _ = w.set_always_on_top(true);
+            }
 
             let icon = app
                 .default_window_icon()
@@ -467,7 +589,9 @@ pub fn run() {
                 .build(app)?;
 
             Ok(())
+        }
         })
+        .manage(ui_state)
         .manage(AppState {
             config: config.clone(),
             capturing: Arc::new(Mutex::new(false)),
@@ -478,7 +602,12 @@ pub fn run() {
             get_status,
             toggle_capture,
             get_diagnostics,
-            toggle_diagnose_window
+            toggle_diagnose_window,
+            get_overlay_ui,
+            adjust_overlay_opacity,
+            cycle_overlay_theme,
+            toggle_overlay_adaptive,
+            quit_app
         ])
         .run(tauri::generate_context!())
         .expect("error running Themis tray");

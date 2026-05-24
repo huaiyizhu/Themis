@@ -7,9 +7,21 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div id="overlay">
-      <header class="overlay-header">
-        <span class="brand">Themis</span>
+    <div class="resize-edge resize-n" data-tauri-resize="north"></div>
+    <div class="resize-edge resize-s" data-tauri-resize="south"></div>
+    <div class="resize-edge resize-e" data-tauri-resize="east"></div>
+    <div class="resize-edge resize-w" data-tauri-resize="west"></div>
+    <div class="resize-edge resize-ne" data-tauri-resize="northeast"></div>
+    <div class="resize-edge resize-nw" data-tauri-resize="northwest"></div>
+    <div class="resize-edge resize-se" data-tauri-resize="southeast"></div>
+    <div class="resize-edge resize-sw" data-tauri-resize="southwest"></div>
+
+    <div id="overlay" class="theme-dark-glass">
+      <header class="overlay-header" data-tauri-drag-region>
+        <div class="header-left" data-tauri-drag-region>
+          <span class="brand">Themis</span>
+          <span id="theme-badge" class="theme-badge" title="Style preset">dark</span>
+        </div>
         <button
           type="button"
           id="scroll-latest"

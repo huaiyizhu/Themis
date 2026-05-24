@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+const overlayEl = document.getElementById("overlay");
+const themeBadgeEl = document.getElementById("theme-badge");
 const statusEl = document.getElementById("status");
 const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
@@ -163,5 +165,40 @@ listen("capture-started", () => {
   setPlaceholder("Capture started — transcript builds below…");
 });
 
+function applyOverlayUi(payload) {
+  const theme = payload.effective_theme || payload.theme || "dark-glass";
+  overlayEl.className = `theme-${theme}`;
+  const opacity =
+    typeof payload.opacity === "number"
+      ? Math.min(1, Math.max(0.35, payload.opacity))
+      : 0.92;
+  overlayEl.style.opacity = String(opacity);
+  document.body.classList.toggle("adaptive-on", Boolean(payload.adaptive));
+  const short = theme.replace(/-glass$/, "").replace("high-contrast-", "hc-");
+  themeBadgeEl.textContent = short;
+  themeBadgeEl.title = payload.adaptive
+    ? `${theme} (auto contrast on)`
+    : `${theme} — Ctrl+Shift+S cycle`;
+}
+
+listen("overlay-ui", (event) => {
+  applyOverlayUi(event.payload);
+});
+
+async function loadOverlayUi() {
+  try {
+    const s = await invoke("get_overlay_ui");
+    applyOverlayUi({
+      theme: s.theme,
+      effective_theme: s.theme,
+      adaptive: s.adaptive,
+      opacity: s.opacity,
+    });
+  } catch {
+    /* not in tauri shell */
+  }
+}
+
+loadOverlayUi();
 refreshStatus();
 setInterval(refreshStatus, 5000);
