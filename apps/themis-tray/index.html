@@ -31,14 +31,22 @@
           class="scroll-latest hidden"
           title="Jump to latest transcript"
         >
-          ↓ Latest
+          ? Latest
         </button>
       </header>
-      <p id="status" class="status-line">Connecting…</p>
-      <div class="content-split">
+      <p id="status" class="status-line">Connecting?</p>
+      <div class="content-split" id="content-split">
         <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
           <div id="transcript" class="transcript-body"></div>
         </div>
+        <div
+          id="split-divider"
+          class="split-divider"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize panels"
+          title="Drag to resize"
+        ></div>
         <aside id="insights-panel" class="insights-panel" aria-label="Terms and answers">
           <h2 class="insights-title">Insights</h2>
           <p id="insights-empty" class="insights-empty">

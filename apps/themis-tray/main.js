@@ -16,6 +16,9 @@ const insightsTermsSec = document.getElementById("insights-terms");
 const insightsTermsList = document.getElementById("insights-terms-list");
 const insightsQuestionsSec = document.getElementById("insights-questions");
 const insightsQuestionsList = document.getElementById("insights-questions-list");
+const contentSplitEl = document.getElementById("content-split");
+const splitDividerEl = document.getElementById("split-divider");
+const insightsPanelEl = document.getElementById("insights-panel");
 
 /** @type {string[]} Final lines (one per Azure REST phrase). */
 let committedLines = [];
@@ -27,7 +30,24 @@ let partialText = "";
 /** User scrolled up — pause auto-follow until they click Latest or scroll to bottom. */
 let followLatest = true;
 
+/** Minimum visible time for each term/question card (ms). */
+const INSIGHT_DWELL_MS = 10_000;
+
+let termSeq = 0;
+let questionSeq = 0;
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, term: string, explanation: string}>} */
+const termEntries = [];
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, question: string, answer: string}>} */
+const questionEntries = [];
+/** @type {ReturnType<typeof setInterval> | null} */
+let insightPruneTimer = null;
+
 const SCROLL_BOTTOM_THRESHOLD = 48;
+
+const SPLIT_WIDTH_STORAGE_KEY = "themis-insights-panel-width";
+const INSIGHTS_PANEL_MIN = 120;
+const TRANSCRIPT_PANEL_MIN = 100;
+const SPLIT_DIVIDER_WIDTH = 8;
 
 /** Programmatic drag avoids Windows WM_NCHITTEST fighting resize after data-tauri-drag-region. */
 function setupWindowDrag() {
@@ -44,6 +64,67 @@ function setupWindowDrag() {
 }
 
 setupWindowDrag();
+
+function clampInsightsWidth(widthPx) {
+  if (!contentSplitEl || !insightsPanelEl) return widthPx;
+  const max = contentSplitEl.clientWidth - TRANSCRIPT_PANEL_MIN - SPLIT_DIVIDER_WIDTH;
+  return Math.round(Math.max(INSIGHTS_PANEL_MIN, Math.min(widthPx, max)));
+}
+
+function applyInsightsWidth(widthPx) {
+  if (!insightsPanelEl) return;
+  const clamped = clampInsightsWidth(widthPx);
+  insightsPanelEl.style.flex = `0 0 ${clamped}px`;
+  insightsPanelEl.style.width = `${clamped}px`;
+  insightsPanelEl.style.maxWidth = "none";
+}
+
+function initSplitDivider() {
+  if (!contentSplitEl || !splitDividerEl || !insightsPanelEl) return;
+
+  const saved = localStorage.getItem(SPLIT_WIDTH_STORAGE_KEY);
+  if (saved) {
+    const parsed = Number(saved);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      applyInsightsWidth(parsed);
+    }
+  }
+
+  let dragging = false;
+
+  splitDividerEl.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragging = true;
+    splitDividerEl.classList.add("is-dragging");
+    document.body.classList.add("split-dragging");
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const rect = contentSplitEl.getBoundingClientRect();
+    applyInsightsWidth(rect.right - e.clientX);
+  });
+
+  const stopDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    splitDividerEl.classList.remove("is-dragging");
+    document.body.classList.remove("split-dragging");
+    localStorage.setItem(SPLIT_WIDTH_STORAGE_KEY, String(insightsPanelEl.offsetWidth));
+  };
+
+  window.addEventListener("mouseup", stopDrag);
+  window.addEventListener("blur", stopDrag);
+
+  window.addEventListener("resize", () => {
+    if (insightsPanelEl.offsetWidth > 0) {
+      applyInsightsWidth(insightsPanelEl.offsetWidth);
+    }
+  });
+}
+
+initSplitDivider();
 
 function isNearBottom() {
   return (
@@ -153,11 +234,171 @@ async function refreshStatus() {
   }
 }
 
+function formatInsightTime(ms) {
+  return new Date(ms).toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function ensureInsightPruneTimer() {
+  if (insightPruneTimer !== null) return;
+  insightPruneTimer = setInterval(pruneExpiredInsights, 500);
+}
+
+function supersedeHeadEntry(entries, now) {
+  const prev = entries[0];
+  if (!prev) return;
+  prev.pinned = false;
+  prev.expiresAt = now + INSIGHT_DWELL_MS;
+}
+
+function pruneEntryList(entries) {
+  const now = Date.now();
+  let changed = false;
+  if (entries.length > 0) {
+    const head = entries[0];
+    if (!head.pinned && now - head.addedAt >= INSIGHT_DWELL_MS) {
+      head.pinned = true;
+      changed = true;
+    }
+  }
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const item = entries[i];
+    if (item.pinned) continue;
+    if (item.expiresAt <= now) {
+      entries.splice(i, 1);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function pruneExpiredInsights() {
+  const termsChanged = pruneEntryList(termEntries);
+  const questionsChanged = pruneEntryList(questionEntries);
+  if (termsChanged || questionsChanged) {
+    renderTermAndQuestionPanels();
+  }
+}
+
+function appendTermEntries(terms) {
+  if (!terms?.length) return false;
+  const now = Date.now();
+  let added = false;
+  for (let i = terms.length - 1; i >= 0; i -= 1) {
+    const t = terms[i];
+    const key = String(t.term || "").trim().toLowerCase();
+    if (!key) continue;
+    if (termEntries.some((e) => e.term.trim().toLowerCase() === key)) continue;
+    supersedeHeadEntry(termEntries, now);
+    termSeq += 1;
+    termEntries.unshift({
+      id: `${now}-t${termSeq}`,
+      seq: termSeq,
+      addedAt: now,
+      expiresAt: now + INSIGHT_DWELL_MS,
+      pinned: false,
+      term: t.term,
+      explanation: t.explanation,
+    });
+    added = true;
+  }
+  return added;
+}
+
+function appendQuestionEntries(questions) {
+  if (!questions?.length) return false;
+  const now = Date.now();
+  let added = false;
+  for (let i = questions.length - 1; i >= 0; i -= 1) {
+    const q = questions[i];
+    const key = String(q.question || "").trim();
+    if (!key) continue;
+    if (questionEntries.some((e) => e.question.trim() === key)) continue;
+    supersedeHeadEntry(questionEntries, now);
+    questionSeq += 1;
+    questionEntries.unshift({
+      id: `${now}-q${questionSeq}`,
+      seq: questionSeq,
+      addedAt: now,
+      expiresAt: now + INSIGHT_DWELL_MS,
+      pinned: false,
+      question: q.question,
+      answer: q.answer,
+    });
+    added = true;
+  }
+  return added;
+}
+
+function renderTermAndQuestionPanels() {
+  const hasTerms = termEntries.length > 0;
+  const hasQuestions = questionEntries.length > 0;
+  const hasKeywords = insightsKeywordsList.childElementCount > 0;
+
+  if (hasTerms || hasQuestions || hasKeywords) {
+    insightsEmptyEl.classList.add("hidden");
+  } else {
+    insightsEmptyEl.classList.remove("hidden");
+  }
+
+  insightsTermsSec.classList.toggle("hidden", !hasTerms);
+  insightsTermsList.replaceChildren();
+  for (const item of termEntries) {
+    const card = document.createElement("div");
+    card.className = "insight-card";
+    card.dataset.id = item.id;
+    const meta = document.createElement("div");
+    meta.className = "insight-meta";
+    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}`;
+    const term = document.createElement("div");
+    term.className = "term";
+    term.textContent = item.term;
+    const body = document.createElement("div");
+    body.textContent = item.explanation;
+    card.append(meta, term, body);
+    insightsTermsList.appendChild(card);
+  }
+
+  insightsQuestionsSec.classList.toggle("hidden", !hasQuestions);
+  insightsQuestionsList.replaceChildren();
+  for (const item of questionEntries) {
+    const card = document.createElement("div");
+    card.className = "insight-card";
+    card.dataset.id = item.id;
+    const meta = document.createElement("div");
+    meta.className = "insight-meta";
+    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}`;
+    const q = document.createElement("div");
+    q.className = "q";
+    q.textContent = item.question;
+    const a = document.createElement("div");
+    a.className = "a";
+    a.textContent = item.answer;
+    card.append(meta, q, a);
+    insightsQuestionsList.appendChild(card);
+  }
+}
+
+function resetInsightDwellState() {
+  termSeq = 0;
+  questionSeq = 0;
+  termEntries.length = 0;
+  questionEntries.length = 0;
+  if (insightPruneTimer !== null) {
+    clearInterval(insightPruneTimer);
+    insightPruneTimer = null;
+  }
+}
+
 function renderInsights(insights) {
   if (!insights || (!insights.keywords?.length && !insights.terms?.length && !insights.questions?.length)) {
     return;
   }
-  insightsEmptyEl.classList.add("hidden");
+  let changed = false;
 
   if (insights.keywords?.length) {
     insightsKeywordsSec.classList.remove("hidden");
@@ -168,37 +409,16 @@ function renderInsights(insights) {
       tag.textContent = kw;
       insightsKeywordsList.appendChild(tag);
     }
+    changed = true;
   }
 
-  if (insights.terms?.length) {
-    insightsTermsSec.classList.remove("hidden");
-    insightsTermsList.replaceChildren();
-    for (const t of insights.terms) {
-      const card = document.createElement("div");
-      card.className = "insight-card";
-      card.innerHTML = `<div class="term">${escapeHtml(t.term)}</div><div>${escapeHtml(t.explanation)}</div>`;
-      insightsTermsList.appendChild(card);
-    }
-  }
+  if (appendTermEntries(insights.terms)) changed = true;
+  if (appendQuestionEntries(insights.questions)) changed = true;
 
-  if (insights.questions?.length) {
-    insightsQuestionsSec.classList.remove("hidden");
-    insightsQuestionsList.replaceChildren();
-    for (const q of insights.questions) {
-      const card = document.createElement("div");
-      card.className = "insight-card";
-      card.innerHTML = `<div class="q">${escapeHtml(q.question)}</div><div class="a">${escapeHtml(q.answer)}</div>`;
-      insightsQuestionsList.appendChild(card);
-    }
+  if (changed) {
+    ensureInsightPruneTimer();
+    renderTermAndQuestionPanels();
   }
-}
-
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function isSystemMessage(text) {
@@ -252,6 +472,7 @@ listen("capture-started", () => {
   lineInsights.clear();
   followLatest = true;
   scrollLatestBtn.classList.add("hidden");
+  resetInsightDwellState();
   insightsEmptyEl.classList.remove("hidden");
   insightsKeywordsSec.classList.add("hidden");
   insightsTermsSec.classList.add("hidden");

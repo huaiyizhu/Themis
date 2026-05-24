@@ -55,11 +55,14 @@ Kubernetes). EXCLUDE generic daily words, sports/entertainment, people's names, 
 business buzzwords without technical meaning. \
 \
 TERMS (max 6): Only jargon that a general audience would NOT already understand well — e.g. RLHF, MoE, \
-KV cache, embedding space, retrieval reranking. Give concise explanations (bilingual zh/en when helpful). \
+KV cache, embedding space, retrieval reranking. \
+Each explanation MUST be in Chinese (简体中文), 1-3 short sentences, covering when possible: \
+主要用途、核心作用、常见用法/场景、一个简短例子. Be fast to read — no English-first phrasing, \
+no long definitions. English term name may appear in parentheses only if needed. \
 EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
 \
 QUESTIONS (max 3): Only REAL technical or conceptual questions that need expertise — mechanisms, \
-tradeoffs, comparisons, failure modes, architecture, edge cases. Answers: 2-4 sentences, factual. \
+tradeoffs, comparisons, failure modes, architecture, edge cases. Answers: 2-4 sentences in Chinese, factual. \
 EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk, and trivial \
 one-liner definitions. \
 If nothing meets this bar, return empty arrays.";

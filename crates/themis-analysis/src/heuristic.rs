@@ -360,11 +360,10 @@ fn answer_for_question(question: &str) -> String {
     }
 
     if q.contains("rag") {
-        return "RAG 通过检索外部知识再生成回答，常用于减少幻觉、接入私有文档。".into();
+        return "检索增强生成：先查知识库再让模型回答。作用：减少幻觉、接入私有资料。例：企业 wiki 问答先搜文档再生成。".into();
     }
     if q.contains("embedding") {
-        return "Embedding 把文本映射为向量，用于语义相似度搜索、聚类，是 RAG 与推荐系统的常见基础。"
-            .into();
+        return "嵌入向量：把文本映射为数值向量。用途：语义搜索与 RAG 检索。例：「机器学习」与「ML」向量相近。".into();
     }
     if question.contains("什么") || q.contains("what is") || q.contains("what's") {
         return "这是概念/定义类问题。若已配置 FOUNDRY_*，LLM 会给出更完整的解释。".into();
