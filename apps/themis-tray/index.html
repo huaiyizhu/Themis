@@ -8,10 +8,22 @@
   </head>
   <body>
     <div id="overlay">
-      <header>Themis</header>
-      <p id="status">Connecting…</p>
-      <div id="transcript"></div>
-      <div id="feedback"></div>
+      <header class="overlay-header">
+        <span class="brand">Themis</span>
+        <button
+          type="button"
+          id="scroll-latest"
+          class="scroll-latest hidden"
+          title="Jump to latest transcript"
+        >
+          ↓ Latest
+        </button>
+      </header>
+      <p id="status" class="status-line">Connecting…</p>
+      <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
+        <div id="transcript" class="transcript-body"></div>
+      </div>
+      <div id="feedback" class="feedback-line"></div>
     </div>
     <script type="module" src="/main.js"></script>
   </body>
