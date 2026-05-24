@@ -7,7 +7,9 @@ edition.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 futures.workspace = true
+futures-util = "0.3"
 reqwest.workspace = true
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
 serde.workspace = true
 serde_json.workspace = true
 themis-core = { workspace = true }

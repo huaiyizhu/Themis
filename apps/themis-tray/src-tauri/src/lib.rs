@@ -17,6 +17,10 @@ use tracing::info;
 struct StatusDto {
     state: String,
     message: String,
+    audio_peak: u32,
+    audio_frames: u64,
+    capture_mode: String,
+    audio_sessions: u32,
 }
 
 #[derive(Clone, Serialize)]
@@ -46,6 +50,10 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
     Ok(StatusDto {
         state: resp.state,
         message: resp.message,
+        audio_peak: resp.audio_peak,
+        audio_frames: resp.audio_frames,
+        capture_mode: resp.capture_mode,
+        audio_sessions: resp.audio_sessions,
     })
 }
 

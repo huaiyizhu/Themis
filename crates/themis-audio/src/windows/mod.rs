@@ -1,3 +1,7 @@
-mod wasapi;
+mod endpoint;
+mod pcm;
+mod process;
+mod sessions;
+mod system_output;
 
-pub use wasapi::WasapiLoopback;
+pub use system_output::WasapiSystemOutput;

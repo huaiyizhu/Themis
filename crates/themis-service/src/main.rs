@@ -2,7 +2,7 @@ mod engine;
 
 use engine::CaptureEngine;
 use std::sync::Arc;
-use themis_core::{StateMachine, ThemisConfig};
+use themis_core::{CaptureDiagnostics, StateMachine, ThemisConfig};
 use themis_ipc::server::{CaptureEngineHandle, CaptureService, ThemisGrpcServer};
 use themis_ipc::ThemisServiceServer;
 use tonic::transport::Server;
@@ -26,12 +26,27 @@ async fn main() -> anyhow::Result<()> {
     let config = ThemisConfig::from_env();
     init_logging(&config)?;
 
+    let speech_mode = std::env::var("AZURE_SPEECH_MODE").unwrap_or_else(|_| "streaming".into());
+    info!(
+        speech_language = %config.speech_language,
+        speech_mode = %speech_mode,
+        mock = config.use_mock_speech,
+        grpc_port = config.grpc_port,
+        "themis-service starting"
+    );
+
     let state = Arc::new(StateMachine::new());
-    let engine = Arc::new(CaptureEngine::new(config.clone(), Arc::clone(&state)));
+    let capture_diag = Arc::new(CaptureDiagnostics::new());
+    let engine = Arc::new(CaptureEngine::new(
+        config.clone(),
+        Arc::clone(&state),
+        Arc::clone(&capture_diag),
+    ));
 
     let service = CaptureService {
         state: Arc::clone(&state),
         transcript_tx: engine.transcript_sender(),
+        capture_diag,
         engine: Arc::new(EngineHandle(Arc::clone(&engine))),
     };
 

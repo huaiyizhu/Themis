@@ -2,7 +2,7 @@
 
 ## Windows
 
-- **Loopback**: Uses CPAL/WASAPI against the default render device. If loopback is unavailable, the engine falls back to a stub tone source (for dev/CI).
+- **System audio output**: WASAPI **loopback** on the default **playback (render)** endpoint — the digital mix of all apps Windows sends to that output (headphones, HDMI, USB audio, virtual devices). Not the microphone; not tied to physical speakers or volume sliders. Optional `THEMIS_AUDIO_OUTPUT_DEVICE` in `.env` (friendly name substring or endpoint ID) if you route audio through a specific virtual device. Falls back to a stub tone when loopback is unavailable (dev/CI).
 - **Service**: Install with `themis-cli service install` (Administrator). See [packaging/windows/themis-service.md](../packaging/windows/themis-service.md).
 - **Hotkey**: `Ctrl+Shift+T` toggles capture.
 

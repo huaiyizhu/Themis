@@ -1,9 +1,9 @@
 use std::sync::Arc;
-use themis_audio::AudioSource;
+use themis_audio::{AudioSource, SystemAudioOptions};
 use themis_azure::create_recognizer;
 use themis_core::{
-    AnalysisProvider, AudioFrame, CaptureState, NoopAnalysis, StateMachine, ThemisConfig,
-    TranscriptEvent,
+    normalize_pcm16, AnalysisProvider, AudioFrame, CaptureDiagnostics, CaptureState,
+    NoopAnalysis, StateMachine, ThemisConfig, TranscriptEvent,
 };
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tracing::{error, info};
@@ -12,6 +12,7 @@ pub struct CaptureEngine {
     config: ThemisConfig,
     state: Arc<StateMachine>,
     transcript_tx: broadcast::Sender<TranscriptEvent>,
+    capture_diag: Arc<CaptureDiagnostics>,
     inner: Mutex<Option<RunningCapture>>,
 }
 
@@ -36,12 +37,17 @@ impl RunningTasks {
 }
 
 impl CaptureEngine {
-    pub fn new(config: ThemisConfig, state: Arc<StateMachine>) -> Self {
+    pub fn new(
+        config: ThemisConfig,
+        state: Arc<StateMachine>,
+        capture_diag: Arc<CaptureDiagnostics>,
+    ) -> Self {
         let (transcript_tx, _) = broadcast::channel(256);
         Self {
             config,
             state,
             transcript_tx,
+            capture_diag,
             inner: Mutex::new(None),
         }
     }
@@ -50,27 +56,42 @@ impl CaptureEngine {
         self.transcript_tx.clone()
     }
 
+    pub fn capture_diagnostics(&self) -> Arc<CaptureDiagnostics> {
+        Arc::clone(&self.capture_diag)
+    }
+
     pub async fn start(&self) -> anyhow::Result<()> {
         let mut guard = self.inner.lock().await;
         if guard.is_some() {
             anyhow::bail!("capture already running");
         }
 
+        self.capture_diag.reset_session_peak();
+
         let (frame_tx, frame_rx) = mpsc::channel::<AudioFrame>(256);
         let (stop_tx, stop_rx) = mpsc::channel::<()>(1);
 
-        let mut audio =
-            themis_audio::create_loopback(self.config.sample_rate, self.config.channels)?;
+        let mut audio = themis_audio::create_loopback(
+            self.config.sample_rate,
+            self.config.channels,
+            SystemAudioOptions {
+                output_device: self.config.audio_output_device.clone(),
+                capture_mode: self.config.audio_capture_mode.clone(),
+                gain_max: self.config.audio_gain_max,
+                diagnostics: Some(Arc::clone(&self.capture_diag)),
+            },
+        )?;
         audio.start(frame_tx)?;
 
+        const STT_SAMPLE_RATE: u32 = 16_000;
+        let gain_max = self.config.audio_gain_max;
         let mut speech = create_recognizer(&self.config);
+        let mut speech_events = speech.subscribe();
         speech.start().await?;
 
-        let sample_rate = self.config.sample_rate;
         let state = Arc::clone(&self.state);
         let transcript_tx = self.transcript_tx.clone();
         let analysis: Arc<dyn AnalysisProvider> = Arc::new(NoopAnalysis);
-        let mut speech_events = speech.subscribe();
 
         let speech_handle = tokio::spawn(async move {
             let mut frame_rx = frame_rx;
@@ -81,7 +102,8 @@ impl CaptureEngine {
                     frame = frame_rx.recv() => {
                         match frame {
                             Some(f) => {
-                                let pcm = f.to_mono_pcm16(sample_rate);
+                                let mut pcm = f.to_mono_pcm16(STT_SAMPLE_RATE);
+                                normalize_pcm16(&mut pcm, 12_000, gain_max);
                                 if let Err(e) = speech.push_audio(&pcm).await {
                                     error!(error = %e, "push_audio failed");
                                 }

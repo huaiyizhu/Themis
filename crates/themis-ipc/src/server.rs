@@ -5,7 +5,7 @@ use crate::proto::{
 };
 use std::pin::Pin;
 use std::sync::Arc;
-use themis_core::{CaptureState, StateMachine, TranscriptEvent};
+use themis_core::{CaptureDiagnostics, CaptureState, StateMachine, TranscriptEvent};
 use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tonic::{Request, Response, Status};
@@ -15,6 +15,7 @@ pub struct CaptureService {
     pub state: Arc<StateMachine>,
     /// Subscribers attach here; engine publishes via the cloned sender.
     pub transcript_tx: broadcast::Sender<TranscriptEvent>,
+    pub capture_diag: Arc<CaptureDiagnostics>,
     pub engine: Arc<dyn CaptureEngineHandle + Send + Sync>,
 }
 
@@ -34,6 +35,22 @@ impl ThemisGrpcServer {
             service: Arc::new(service),
         }
     }
+}
+
+fn format_capture_status(base: &str, diag: &themis_core::CaptureDiagnosticsSnapshot) -> String {
+    let signal = if diag.peak >= 2000 {
+        "strong"
+    } else if diag.peak >= 200 {
+        "ok"
+    } else if diag.frames > 0 {
+        "quiet"
+    } else {
+        "silent"
+    };
+    format!(
+        "{base} | capture={} sessions={} peak={} frames={} signal={}",
+        diag.mode, diag.sessions, diag.peak, diag.frames, signal
+    )
 }
 
 #[tonic::async_trait]
@@ -87,15 +104,26 @@ impl ThemisService for ThemisGrpcServer {
         _request: Request<GetStatusRequest>,
     ) -> Result<Response<GetStatusResponse>, Status> {
         let status = self.service.state.status();
+        let diag = self.service.capture_diag.snapshot();
         let state_str = match status.state {
             CaptureState::Idle => "idle",
             CaptureState::Capturing => "capturing",
             CaptureState::Error => "error",
         };
+        let message = if status.state == CaptureState::Capturing {
+            format_capture_status(&status.message, &diag)
+        } else {
+            status.message
+        };
         Ok(Response::new(GetStatusResponse {
             state: state_str.into(),
-            message: status.message,
+            message,
             transcripts_received: status.transcripts_received,
+            audio_peak: diag.peak,
+            audio_frames: diag.frames,
+            capture_mode: diag.mode,
+            audio_sessions: diag.sessions,
+            capture_detail: diag.detail,
         }))
     }
 

@@ -30,6 +30,15 @@ message GetStatusResponse {
   string state = 1;
   string message = 2;
   uint64 transcripts_received = 3;
+  /// Recent PCM peak (0–32767) from loopback capture.
+  uint32 audio_peak = 4;
+  /// Audio frames received since service start / last reset.
+  uint64 audio_frames = 5;
+  /// Capture backend: process | endpoint | process+endpoint
+  string capture_mode = 6;
+  /// Active Windows audio sessions (process loopback).
+  uint32 audio_sessions = 7;
+  string capture_detail = 8;
 }
 
 message SubscribeTranscriptsRequest {}

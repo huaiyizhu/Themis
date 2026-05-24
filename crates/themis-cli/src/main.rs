@@ -14,6 +14,19 @@ struct Cli {
 enum Commands {
     /// Query service status via gRPC
     Status,
+    /// Capture system audio for N seconds and print diagnostics (no Azure)
+    #[cfg(windows)]
+    AudioProbe {
+        /// Seconds to listen (default 5)
+        #[arg(short, long, default_value = "5")]
+        seconds: u64,
+    },
+    /// Record system audio and run one Azure REST recognition (validates STT)
+    #[cfg(windows)]
+    SttProbe {
+        #[arg(short, long, default_value = "6")]
+        seconds: u64,
+    },
     /// Health checks (Azure, gRPC)
     Doctor,
     /// Manage background service (Windows)
@@ -57,6 +70,10 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Status => cmd_status(&config).await?,
+        #[cfg(windows)]
+        Commands::AudioProbe { seconds } => cmd_audio_probe(seconds).await?,
+        #[cfg(windows)]
+        Commands::SttProbe { seconds } => cmd_stt_probe(&config, seconds).await?,
         Commands::Doctor => cmd_doctor(&config).await?,
         #[cfg(windows)]
         Commands::Service { action } => cmd_service(action)?,
@@ -76,6 +93,131 @@ async fn cmd_status(config: &ThemisConfig) -> anyhow::Result<()> {
     println!("state: {}", resp.state);
     println!("message: {}", resp.message);
     println!("transcripts: {}", resp.transcripts_received);
+    println!("capture_mode: {}", resp.capture_mode);
+    println!("audio_sessions: {}", resp.audio_sessions);
+    println!("audio_peak: {}", resp.audio_peak);
+    println!("audio_frames: {}", resp.audio_frames);
+    if !resp.capture_detail.is_empty() {
+        println!("capture_detail: {}", resp.capture_detail);
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+    use themis_audio::{create_loopback, SystemAudioOptions};
+    use themis_core::CaptureDiagnostics;
+    use tokio::sync::mpsc;
+
+    println!("Themis audio probe ({seconds}s)");
+    println!("Play sound on your PC (e.g. YouTube). Mute speakers to test process loopback.\n");
+
+    let diag = Arc::new(CaptureDiagnostics::new());
+    let (tx, mut rx) = mpsc::channel(512);
+    let mut source = create_loopback(
+        16_000,
+        1,
+        SystemAudioOptions {
+            capture_mode: std::env::var("THEMIS_AUDIO_CAPTURE_MODE")
+                .unwrap_or_else(|_| "auto".into()),
+            gain_max: ThemisConfig::from_env().audio_gain_max,
+            diagnostics: Some(Arc::clone(&diag)),
+            ..SystemAudioOptions::default()
+        },
+    )?;
+    source.start(tx)?;
+
+    let deadline = Instant::now() + Duration::from_secs(seconds);
+    while Instant::now() < deadline {
+        let _ = tokio::time::timeout(Duration::from_millis(100), rx.recv()).await;
+    }
+    source.stop()?;
+
+    let snap = diag.snapshot();
+    println!("--- results ---");
+    println!("mode:     {}", snap.mode);
+    println!("detail:   {}", snap.detail);
+    println!("sessions: {}", snap.sessions);
+    println!("frames:   {}", snap.frames);
+    println!("peak:     {} (0 = silent, >200 ok, >2000 strong)", snap.peak);
+
+    if snap.frames == 0 {
+        println!("\nFAIL: no audio frames captured.");
+        println!("  - Is any app playing sound?");
+        println!("  - Try THEMIS_AUDIO_CAPTURE_MODE=process or endpoint");
+        std::process::exit(1);
+    } else if snap.peak < 200 {
+        println!("\nWARN: signal very weak. Speech recognition may fail.");
+        println!("  - Process loopback usually works when endpoint loopback is silent.");
+        std::process::exit(2);
+    } else {
+        println!("\nOK: capture pipeline is receiving audio.");
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+async fn cmd_stt_probe(config: &ThemisConfig, seconds: u64) -> anyhow::Result<()> {
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+    use themis_audio::{create_loopback, SystemAudioOptions};
+    use themis_core::{normalize_pcm16, CaptureDiagnostics};
+    use themis_azure::AzureRestRecognizer;
+    use tokio::sync::mpsc;
+
+    let (key, region) = match (&config.azure_speech_key, &config.azure_speech_region) {
+        (Some(k), Some(r)) => (k.clone(), r.clone()),
+        _ => anyhow::bail!("Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION in .env"),
+    };
+
+    println!("STT probe ({seconds}s) — play speech (e.g. YouTube) now.\n");
+
+    let diag = Arc::new(CaptureDiagnostics::new());
+    let (tx, mut rx) = mpsc::channel(512);
+    let mut source = create_loopback(
+        16_000,
+        1,
+        SystemAudioOptions {
+            capture_mode: config.audio_capture_mode.clone(),
+            gain_max: config.audio_gain_max,
+            diagnostics: Some(Arc::clone(&diag)),
+            ..SystemAudioOptions::default()
+        },
+    )?;
+    source.start(tx)?;
+
+    let mut pcm: Vec<i16> = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(seconds);
+    while Instant::now() < deadline {
+        if let Ok(Some(frame)) =
+            tokio::time::timeout(Duration::from_millis(200), rx.recv()).await
+        {
+            let mut chunk = frame.to_mono_pcm16(16_000);
+            normalize_pcm16(&mut chunk, 12_000, config.audio_gain_max);
+            pcm.extend(chunk);
+        }
+    }
+    source.stop()?;
+
+    let snap = diag.snapshot();
+    println!("capture: mode={} peak={} samples={}", snap.mode, snap.peak, pcm.len());
+    if snap.peak < 200 {
+        anyhow::bail!("capture too quiet — fix audio before testing STT");
+    }
+
+    let recognizer = AzureRestRecognizer::new(key, region, config.speech_language.clone());
+    println!("calling Azure REST dictation...");
+    let text = recognizer.recognize_pcm(pcm).await?;
+    match text {
+        Some(t) => {
+            println!("\nOK — Azure heard:\n  {t}");
+        }
+        None => {
+            println!("\nWARN — Azure returned no speech in this chunk (try longer / louder audio)");
+        }
+    }
     Ok(())
 }
 

@@ -29,7 +29,7 @@ flowchart TB
 | Crate | Role |
 |-------|------|
 | `themis-core` | Config, state machine, transcript types, analysis trait |
-| `themis-audio` | Platform loopback / input capture (`AudioSource`) |
+| `themis-audio` | Platform system-audio output capture (`AudioSource`, WASAPI loopback on Windows) |
 | `themis-azure` | Speech recognizer (REST chunks + mock for dev/CI) |
 | `themis-ipc` | gRPC proto and server/client |
 | `themis-service` | Headless daemon: capture + Azure + gRPC |

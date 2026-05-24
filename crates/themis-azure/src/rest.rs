@@ -1,5 +1,5 @@
-//! Azure Speech recognition via short-form REST (chunked).
-//! For production latency, migrate to the official Speech SDK / WebSocket streaming.
+//! Azure Speech recognition via REST with longer overlapping chunks.
+//! Fallback when WebSocket streaming is unavailable.
 
 use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
@@ -8,7 +8,9 @@ use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, warn};
 
-const CHUNK_SAMPLES: usize = 16_000; // ~1 second at 16 kHz mono (MVP chunk size)
+/// ~4 seconds at 16 kHz mono — balance latency vs sentence context.
+const CHUNK_SAMPLES: usize = 16_000 * 4;
+const OVERLAP_SAMPLES: usize = 16_000;
 
 pub struct AzureRestRecognizer {
     key: String,
@@ -41,8 +43,8 @@ impl AzureRestRecognizer {
         wav.extend_from_slice(&(36 + data_size).to_le_bytes());
         wav.extend_from_slice(b"WAVEfmt ");
         wav.extend_from_slice(&16u32.to_le_bytes());
-        wav.extend_from_slice(&1u16.to_le_bytes()); // PCM
-        wav.extend_from_slice(&1u16.to_le_bytes()); // mono
+        wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&1u16.to_le_bytes());
         wav.extend_from_slice(&sample_rate.to_le_bytes());
         wav.extend_from_slice(&(sample_rate * 2).to_le_bytes());
         wav.extend_from_slice(&2u16.to_le_bytes());
@@ -55,9 +57,27 @@ impl AzureRestRecognizer {
         wav
     }
 
+    fn parse_response(json: &serde_json::Value) -> Option<String> {
+        if let Some(t) = json.get("DisplayText").and_then(|v| v.as_str()) {
+            if !t.is_empty() {
+                return Some(t.to_string());
+            }
+        }
+        json.get("NBest")
+            .and_then(|v| v.get(0))
+            .and_then(|b| b.get("Display").and_then(|v| v.as_str()))
+            .filter(|t| !t.is_empty())
+            .map(|s| s.to_string())
+    }
+
+    /// One-shot recognition (used by CLI probe).
+    pub async fn recognize_pcm(&self, pcm: Vec<i16>) -> anyhow::Result<Option<String>> {
+        self.recognize_chunk(pcm).await
+    }
+
     async fn recognize_chunk(&self, pcm: Vec<i16>) -> anyhow::Result<Option<String>> {
         let url = format!(
-            "https://{}.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1?language={}",
+            "https://{}.stt.speech.microsoft.com/speech/recognition/dictation/cognitiveservices/v1?language={}&format=detailed&punctuation=implicit",
             self.region, self.language
         );
         let wav = Self::wav_bytes(&pcm, 16_000);
@@ -65,7 +85,7 @@ impl AzureRestRecognizer {
             .client
             .post(&url)
             .header("Ocp-Apim-Subscription-Key", &self.key)
-            .header("Content-Type", "audio/wav")
+            .header("Content-Type", "audio/wav; codecs=audio/pcm; samplerate=16000")
             .body(wav)
             .send()
             .await?;
@@ -77,13 +97,7 @@ impl AzureRestRecognizer {
         }
 
         let json: serde_json::Value = resp.json().await?;
-        let text = json
-            .get("DisplayText")
-            .or_else(|| json.get("display"))
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-
-        Ok(text.filter(|t| !t.is_empty()))
+        Ok(Self::parse_response(&json))
     }
 }
 
@@ -93,7 +107,7 @@ impl SpeechRecognizer for AzureRestRecognizer {
         *self.running.lock().await = true;
         let _ = self.tx.send(SpeechEvent {
             text: format!(
-                "正在采集系统播放音频 → Azure ({})，约 1 秒出一段结果",
+                "Azure REST ({}) — transcribing every ~4s (set AZURE_SPEECH_MODE=streaming to experiment)",
                 self.language
             ),
             is_final: false,
@@ -119,6 +133,13 @@ impl SpeechRecognizer for AzureRestRecognizer {
         }
 
         let chunk: Vec<i16> = buf.drain(..CHUNK_SAMPLES).collect();
+        if OVERLAP_SAMPLES > 0 {
+            let start = chunk.len().saturating_sub(OVERLAP_SAMPLES);
+            for &sample in chunk[start..].iter().rev() {
+                buf.push_front(sample);
+            }
+        }
+
         drop(buf);
 
         let this = self.clone_inner();
@@ -135,13 +156,7 @@ impl SpeechRecognizer for AzureRestRecognizer {
                     });
                 }
                 Ok(None) => {
-                    let _ = this.tx.send(SpeechEvent {
-                        text: format!(
-                            "(本段未识别到语音：播放内容需含对白，且 AZURE_SPEECH_LANGUAGE={} 与视频语言一致)",
-                            this.language
-                        ),
-                        is_final: false,
-                    });
+                    debug!("azure rest: no speech in chunk");
                 }
                 Err(e) => {
                     warn!(error = %e, "azure rest recognition failed");

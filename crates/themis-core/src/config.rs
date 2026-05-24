@@ -15,6 +15,13 @@ pub struct ThemisConfig {
     pub speech_language: String,
     pub sample_rate: u32,
     pub channels: u16,
+    /// Optional Windows playback endpoint (friendly name substring or device ID).
+    /// Default: Windows default **audio output** (render endpoint), not the microphone.
+    pub audio_output_device: Option<String>,
+    /// Max gain applied when loopback signal is quiet (default 16).
+    pub audio_gain_max: f32,
+    /// Windows capture strategy: `auto` | `process` | `endpoint`
+    pub audio_capture_mode: String,
 }
 
 impl Default for ThemisConfig {
@@ -28,9 +35,12 @@ impl Default for ThemisConfig {
             grpc_port: 50051,
             log_level: "info".into(),
             use_mock_speech: false,
-            speech_language: "zh-CN".into(),
+            speech_language: "en-US".into(),
             sample_rate: 16_000,
             channels: 1,
+            audio_output_device: None,
+            audio_gain_max: 16.0,
+            audio_capture_mode: "auto".into(),
         }
     }
 }
@@ -64,9 +74,19 @@ impl ThemisConfig {
             log_level: std::env::var("THEMIS_LOG_LEVEL").unwrap_or_else(|_| "info".into()),
             use_mock_speech: use_mock,
             speech_language: std::env::var("AZURE_SPEECH_LANGUAGE")
-                .unwrap_or_else(|_| "zh-CN".into()),
+                .unwrap_or_else(|_| "en-US".into()),
             sample_rate: 16_000,
             channels: 1,
+            audio_output_device: std::env::var("THEMIS_AUDIO_OUTPUT_DEVICE")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            audio_gain_max: std::env::var("THEMIS_AUDIO_GAIN_MAX")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(16.0),
+            audio_capture_mode: std::env::var("THEMIS_AUDIO_CAPTURE_MODE")
+                .unwrap_or_else(|_| "auto".into())
+                .to_lowercase(),
         }
     }
 
