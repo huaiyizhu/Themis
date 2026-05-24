@@ -1,48 +1,29 @@
-//! Rule-based extraction: acronyms, glossary hits, question detection.
+//! Rule-based extraction: glossary, English tech words, Chinese/English questions.
 
+use crate::glossary;
 use regex::Regex;
-use std::collections::HashMap;
 use std::sync::LazyLock;
 use themis_core::{AnalysisResult, QuestionInsight, TermInsight};
 
 static ACRONYM_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b[A-Z]{2,8}\b").expect("acronym regex"));
+static EN_WORD_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b[A-Za-z][A-Za-z0-9_-]{2,}\b").expect("en word"));
 static QUESTION_EN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[.!?]\s*([^.!?]*\?)").expect("question en"));
 static QUESTION_ZH_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[^。！？]*[？?]").expect("question zh"));
-
-static GLOSSARY: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
-    HashMap::from([
-        ("NBA", "National Basketball Association，美国职业篮球联赛"),
-        ("AI", "Artificial Intelligence，人工智能"),
-        ("ML", "Machine Learning，机器学习"),
-        ("LLM", "Large Language Model，大语言模型"),
-        ("RAG", "Retrieval-Augmented Generation，检索增强生成"),
-        ("GPU", "Graphics Processing Unit，图形处理器，常用于深度学习加速"),
-        ("CPU", "Central Processing Unit，中央处理器"),
-        ("API", "Application Programming Interface，应用程序接口"),
-        ("HTTP", "Hypertext Transfer Protocol，超文本传输协议"),
-        ("REST", "Representational State Transfer，一种 Web API 架构风格"),
-        ("SQL", "Structured Query Language，结构化查询语言"),
-        ("JSON", "JavaScript Object Notation，常用数据交换格式"),
-        ("OCR", "Optical Character Recognition，光学字符识别"),
-        ("STT", "Speech-to-Text，语音转文字"),
-        ("TTS", "Text-to-Speech，文字转语音"),
-        ("AWS", "Amazon Web Services，亚马逊云计算平台"),
-        ("Azure", "Microsoft Azure，微软云计算平台"),
-        ("GPT", "Generative Pre-trained Transformer，生成式预训练 Transformer 模型"),
-        ("UI", "User Interface，用户界面"),
-        ("UX", "User Experience，用户体验"),
-        ("IoT", "Internet of Things，物联网"),
-        ("VPN", "Virtual Private Network，虚拟专用网络"),
-        ("DNS", "Domain Name System，域名系统"),
-        ("CDN", "Content Delivery Network，内容分发网络"),
-        ("KPI", "Key Performance Indicator，关键绩效指标"),
-        ("ROI", "Return on Investment，投资回报率"),
-        ("CEO", "Chief Executive Officer，首席执行官"),
-        ("CTO", "Chief Technology Officer，首席技术官"),
-    ])
+/// 「embedding 是什么」「RAG是啥」— 口语常不带问号
+static ZH_X_IS_WHAT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)([A-Za-z][A-Za-z0-9_-]*|[\u4e00-\u9fff]{2,12})\s*(是什么|是啥|什么意思)")
+        .expect("zh x是什么")
+});
+static ZH_WHAT_IS_X_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(什么是|啥是|何谓)\s*([A-Za-z][A-Za-z0-9_-]*|[\u4e00-\u9fff]{2,12})")
+        .expect("zh 什么是x")
+});
+static EN_WHAT_IS_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)what\s+is\s+(?:an?\s+)?([A-Za-z][A-Za-z0-9_-]+)").expect("what is x")
 });
 
 pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
@@ -55,105 +36,163 @@ pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
 
     for cap in ACRONYM_RE.captures_iter(text) {
         if let Some(m) = cap.get(0) {
-            let term = m.as_str().to_string();
-            if term.len() < 2 {
-                continue;
-            }
-            if !result.keywords.iter().any(|k| k == &term) {
-                result.keywords.push(term.clone());
-            }
-            if let Some(exp) = GLOSSARY.get(term.as_str()) {
-                result.terms.push(TermInsight {
-                    term: term.clone(),
-                    explanation: (*exp).to_string(),
-                });
-            }
+            add_glossary_hit(&mut result, m.as_str());
         }
     }
 
-    // Chinese / mixed technical terms (simple token scan)
-    for (term, exp) in GLOSSARY.iter() {
-        if text.contains(term) && !result.terms.iter().any(|t| t.term == *term) {
-            if term.chars().any(|c| c.is_ascii_uppercase()) {
-                continue; // already handled by acronym pass
-            }
-            result.terms.push(TermInsight {
-                term: (*term).to_string(),
-                explanation: (*exp).to_string(),
-            });
+    for cap in EN_WORD_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            let word = m.as_str();
+            add_glossary_hit(&mut result, word);
+            push_keyword(&mut result, word);
         }
     }
-
-  // Longer English words that look like domain terms (TitleCase or technical)
-    let word_re = Regex::new(r"\b[A-Za-z]{4,}\b").unwrap();
-    for cap in word_re.captures_iter(text) {
-        if let Some(w) = cap.get(0) {
-            let word = w.as_str();
-            if word.chars().all(|c| c.is_ascii_uppercase()) {
-                continue;
-            }
-            if word.chars().next().is_some_and(|c| c.is_uppercase())
-                && !result.keywords.iter().any(|k| k.eq_ignore_ascii_case(word))
-            {
-                result.keywords.push(word.to_string());
-            }
-        }
-    }
-    result.keywords.truncate(8);
 
     for q in extract_questions(text) {
-        result.questions.push(QuestionInsight {
-            question: q.clone(),
-            answer: brief_question_hint(&q),
-        });
+        attach_question(&mut result, &q);
     }
 
+    result.keywords.truncate(10);
+    result.terms.truncate(8);
+    result.questions.truncate(4);
     result
+}
+
+fn add_glossary_hit(result: &mut AnalysisResult, raw: &str) {
+    let Some((display, explanation)) = glossary::lookup(raw) else {
+        return;
+    };
+    if !result
+        .terms
+        .iter()
+        .any(|t| t.term.eq_ignore_ascii_case(display))
+    {
+        result.terms.push(TermInsight {
+            term: display.to_string(),
+            explanation: explanation.to_string(),
+        });
+    }
+    push_keyword(result, display);
+}
+
+fn push_keyword(result: &mut AnalysisResult, word: &str) {
+    let w = word.trim();
+    if w.len() < 2 {
+        return;
+    }
+    if !result.keywords.iter().any(|k| k.eq_ignore_ascii_case(w)) {
+        result.keywords.push(w.to_string());
+    }
+}
+
+fn attach_question(result: &mut AnalysisResult, question: &str) {
+    let q = question.trim().to_string();
+    if q.len() < 4 {
+        return;
+    }
+    if result.questions.iter().any(|x| x.question == q) {
+        return;
+    }
+
+    let answer = answer_for_question(&q);
+    result.questions.push(QuestionInsight {
+        question: q.clone(),
+        answer,
+    });
+
+    // Pull subject term from 「X是什么」/ what is X
+    if let Some(subject) = subject_from_question(&q) {
+        add_glossary_hit(result, &subject);
+    }
+}
+
+fn subject_from_question(q: &str) -> Option<String> {
+    if let Some(cap) = ZH_X_IS_WHAT_RE.captures(q) {
+        return cap.get(1).map(|m| m.as_str().to_string());
+    }
+    if let Some(cap) = ZH_WHAT_IS_X_RE.captures(q) {
+        return cap.get(2).map(|m| m.as_str().to_string());
+    }
+    if let Some(cap) = EN_WHAT_IS_RE.captures(q) {
+        return cap.get(1).map(|m| m.as_str().to_string());
+    }
+    None
 }
 
 fn extract_questions(text: &str) -> Vec<String> {
     let mut out = Vec::new();
-    for cap in QUESTION_ZH_RE.find_iter(text) {
-        let q = cap.as_str().trim().to_string();
-        if q.len() >= 4 && !out.contains(&q) {
-            out.push(q);
+
+    for cap in ZH_X_IS_WHAT_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            push_unique(&mut out, m.as_str());
         }
+    }
+    for cap in ZH_WHAT_IS_X_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            push_unique(&mut out, m.as_str());
+        }
+    }
+    for cap in EN_WHAT_IS_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            push_unique(&mut out, m.as_str());
+        }
+    }
+    for cap in QUESTION_ZH_RE.find_iter(text) {
+        push_unique(&mut out, cap.as_str());
     }
     for cap in QUESTION_EN_RE.captures_iter(text) {
         if let Some(m) = cap.get(1) {
-            let q = m.as_str().trim().to_string();
-            if q.len() >= 6 && !out.contains(&q) {
-                out.push(q);
-            }
+            push_unique(&mut out, m.as_str());
         }
     }
-    if text.contains('?') || text.contains('？') {
-        let whole = text.trim().to_string();
-        if (whole.ends_with('?') || whole.ends_with('？'))
-            && whole.len() >= 6
-            && !out.contains(&whole)
-        {
-            out.push(whole);
-        }
+    let trimmed = text.trim();
+    if (trimmed.ends_with('?') || trimmed.ends_with('？')) && trimmed.len() >= 4 {
+        push_unique(&mut out, trimmed);
     }
-    out.truncate(3);
+    out.truncate(4);
     out
 }
 
-fn brief_question_hint(question: &str) -> String {
-    if question.contains("RAG") || question.to_lowercase().contains("rag") {
+fn push_unique(out: &mut Vec<String>, s: &str) {
+    let q = s.trim().to_string();
+    if q.len() >= 4 && !out.contains(&q) {
+        out.push(q);
+    }
+}
+
+fn answer_for_question(question: &str) -> String {
+    let q = question.to_lowercase();
+
+    if let Some((_, exp)) = glossary::lookup(question) {
+        return exp.to_string();
+    }
+    if let Some(subject) = subject_from_question(question) {
+        if let Some((_, exp)) = glossary::lookup(&subject) {
+            return exp.to_string();
+        }
+    }
+
+    if q.contains("rag") {
         return "RAG 通过检索外部知识再生成回答，常用于减少幻觉、接入私有文档。".into();
     }
-    if question.contains("什么") || question.contains("what") {
-        return "（初步）这是定义/概念类问题，可结合上下文中的术语进一步查证。".into();
+    if q.contains("embedding") {
+        return "Embedding 把文本映射为向量，用于语义相似度搜索、聚类，是 RAG 与推荐系统的常见基础。"
+            .into();
     }
-    if question.contains("为什么") || question.contains("why") {
-        return "（初步）这是因果/动机类问题，需结合前后文与领域背景分析。".into();
+    if question.contains("什么") || q.contains("what is") || q.contains("what's") {
+        return "这是概念/定义类问题。若已配置 FOUNDRY_*，LLM 会给出更完整的解释。".into();
     }
-    if question.contains("如何") || question.contains("怎么") || question.to_lowercase().contains("how") {
-        return "（初步）这是方法/步骤类问题，可拆解为流程或关键条件来回答。".into();
+    if question.contains("为什么") || q.contains("why") {
+        return "这是因果/动机类问题，需结合前后文与领域背景分析。".into();
     }
-    "（初步）已识别为问题句，启用 LLM 配置后可获得更完整回答。".into()
+    if question.contains("如何")
+        || question.contains("怎么")
+        || q.contains("how to")
+        || q.contains("how do")
+    {
+        return "这是方法/步骤类问题，可拆解为流程或关键条件来回答。".into();
+    }
+    "（初步）已识别为问题句；配置 Azure OpenAI（FOUNDRY_*）可获得更完整回答。".into()
 }
 
 #[cfg(test)]
@@ -165,5 +204,26 @@ mod tests {
         let r = analyze_heuristic("What is RAG in AI? NBA games tonight.");
         assert!(r.terms.iter().any(|t| t.term == "RAG"));
         assert!(r.terms.iter().any(|t| t.term == "NBA"));
+    }
+
+    #[test]
+    fn embedding_what_is_zh_without_question_mark() {
+        let r = analyze_heuristic("embedding 是什么");
+        assert!(
+            r.terms.iter().any(|t| t.term.eq_ignore_ascii_case("embedding")),
+            "terms: {:?}",
+            r.terms
+        );
+        assert!(
+            r.questions.iter().any(|q| q.question.contains("embedding")),
+            "questions: {:?}",
+            r.questions
+        );
+        assert!(
+            r.questions[0].answer.to_lowercase().contains("向量")
+                || r.questions[0].answer.to_lowercase().contains("embedding"),
+            "answer: {}",
+            r.questions[0].answer
+        );
     }
 }

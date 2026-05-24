@@ -9,22 +9,23 @@
 ## 工作原理
 
 ```
-┌─────────────────┐     WASAPI loopback      ┌──────────────────┐
-│ 系统正在播放的   │  (默认播放设备上的混音)   │  themis-service  │
-│ 应用音频输出     │ ───────────────────────► │  重采样 16 kHz   │
-└─────────────────┘                         │  Azure STT       │
-                                            └────────┬─────────┘
-                                                     │ gRPC
+┌─────────────────┐     WASAPI loopback      ┌──────────────────────────────┐
+│ 系统正在播放的   │  (进程/端点 loopback)     │  themis-service              │
+│ 应用音频输出     │ ───────────────────────► │  重采样 16 kHz → Azure STT   │
+└─────────────────┘                         │  → Insights 分析 (可选 LLM)  │
+                                            └────────┬─────────────────────┘
+                                                     │ gRPC (字幕 + insights_json)
                                             ┌────────▼─────────┐
                                             │  themis-tray     │
-                                            │  浮层 + 热键     │
+                                            │  字幕 + 侧栏洞察  │
                                             └──────────────────┘
 ```
 
 | 组件 | 作用 |
 |------|------|
-| `themis-service` | 后台：抓系统输出 → 识别 → gRPC 推送字幕 |
-| `themis-tray` | 托盘图标、浮层 UI、`Ctrl+Shift+T` / `Ctrl+Shift+D` 快捷键 |
+| `themis-service` | 后台：抓系统输出 → 听写 → **分析关键词/术语/问题** → gRPC 推送 |
+| `themis-analysis` | 启发式词表 + 可选 Azure OpenAI，生成结构化 Insights |
+| `themis-tray` | 托盘图标、浮层 UI（左侧字幕 + 右侧 Insights 侧栏） |
 | `themis-cli` | 安装服务、诊断、`status` / `doctor` |
 
 更细的架构见 [docs/architecture.md](docs/architecture.md)，平台差异见 [docs/platform-notes.md](docs/platform-notes.md)。
@@ -129,9 +130,7 @@ npm run tauri dev
 
 浮层**始终置顶**。风格预设：`dark-glass`、`light-glass`、`high-contrast-dark`、`high-contrast-light`、`outline`。**自适应**（`Ctrl+Shift+A`）会采样浮层下方的桌面亮度，自动在深浅面板间切换（Windows）。
 
-**Insights 侧栏**：每句最终转写后会提取**关键词**、**术语解释**（如 RAG、NBA）和**问题初步回答**；右侧显示。未配置 LLM 时使用内置启发式；配置 `FOUNDRY_*` 后使用 Azure OpenAI 增强。
-
-**诊断窗口**会显示当前浮层文字、最近短语的延迟分解（**Buffer** ≈ REST 分块累积时长、**Azure** = 网络 + 识别、**STT wall** = 多语言并行时的墙钟时间、**E2E est.** ≈ 从语音结束到文字就绪的估计、**UI** = 服务发出到浮层显示的间隔）。托盘菜单也可选 **Diagnostics**。
+**Insights 侧栏**（浮层右侧）：对**每一句最终听写结果**做关键词、术语解释与问题初答，详见下文 [Insights 洞察](#insights-洞察关键词--术语--问答)。**诊断窗口**（`Ctrl+Shift+D`）用于延迟分解，见 [延迟诊断](#延迟诊断)。
 
 开始采集后，字幕在浮层中**逐句累积**（最终结果追加，过程中显示灰色 partial）。
 
@@ -153,14 +152,140 @@ npm run tauri dev
 | `THEMIS_GRPC_PORT` | 否 | 默认 `50051` |
 | `THEMIS_LOG_LEVEL` | 否 | 默认 `info` |
 | `THEMIS_USE_MOCK_SPEECH` | 否 | `true` 强制 Mock，不连 Azure |
+| `THEMIS_ANALYSIS_ENABLED` | 否 | 默认 `true`；`false` 关闭 Insights 分析 |
+| `FOUNDRY_ENDPOINT` | 否 | Azure OpenAI 终结点（增强术语/问答，见 Insights 章节） |
+| `FOUNDRY_API_KEY` | 否 | Azure OpenAI API Key |
+| `FOUNDRY_DEPLOYMENT` | 否 | 部署名，默认 `gpt-4o-mini` |
 
-\* 缺 Key/Region 时自动 Mock。
+\* 缺 Key/Region 时自动 Mock。Insights **不依赖** Foundry：未配置时仍可用内置启发式与词表。
 
 修改 `.env` 后请执行：
 
 ```powershell
 .\scripts\themis.ps1 restart
 ```
+
+---
+
+## Insights 洞察（关键词 / 术语 / 问答）
+
+### 做什么、不做什么
+
+| 能力 | 说明 |
+|------|------|
+| ✅ | 从**听写文本**里抽关键词、技术术语、问句，并在浮层**右侧**给出简短解释或初答 |
+| ✅ | 内置词表覆盖常见缩写与 AI 词（RAG、embedding、GPU…），**无需大模型**即可用 |
+| ✅ | 可选接入 **Azure OpenAI**，对词表外内容、复杂问句做更强解释 |
+| ❌ | **不识别画面字幕**（不做 OCR）；视频里只显示文字、没有旁白时，Insights 不会出现该字幕 |
+
+### 端到端机理
+
+```
+Azure STT 输出 is_final 句子
+        │
+        ▼
+┌───────────────────┐     先推送 gRPC（仅 text，insights 为空）
+│ themis-service    │ ──► 浮层立刻显示该句字幕
+│ CaptureEngine     │
+└─────────┬─────────┘
+          │ 异步 analyze(text)
+          ▼
+┌───────────────────┐
+│ themis-analysis   │
+│ ① 启发式 (必跑)   │  词表 + 正则问句 + 英文词扫描
+│ ② LLM (可选)    │  若配置 FOUNDRY_*，合并 JSON 结果
+└─────────┬─────────┘
+          │ 再推送 gRPC（同一句 text + insights_json）
+          ▼
+     浮层右侧 Insights 更新；句末可带关键词小标签
+```
+
+相关代码：
+
+| 路径 | 职责 |
+|------|------|
+| [`crates/themis-service/src/engine.rs`](crates/themis-service/src/engine.rs) | 每句 `is_final` 先出字幕后调 `create_analyzer()` |
+| [`crates/themis-analysis/src/heuristic.rs`](crates/themis-analysis/src/heuristic.rs) | 规则引擎：问句、英文词、查词表 |
+| [`crates/themis-analysis/src/glossary.rs`](crates/themis-analysis/src/glossary.rs) | **内置术语表**（可编辑） |
+| [`crates/themis-analysis/src/llm.rs`](crates/themis-analysis/src/llm.rs) | Azure OpenAI Chat Completions（JSON 输出） |
+| [`crates/themis-ipc/proto/themis.proto`](crates/themis-ipc/proto/themis.proto) | 字段 `insights_json` |
+| [`apps/themis-tray/main.js`](apps/themis-tray/main.js) | 解析 JSON，渲染 Keywords / Terms / Questions |
+
+### 两层分析：启发式 vs 大模型
+
+| 层级 | 何时启用 | 成本 | 典型能力 |
+|------|----------|------|----------|
+| **启发式** | 默认始终开启（`THEMIS_ANALYSIS_ENABLED=true`） | 无 API 费用 | 词表术语、大写缩写、英文技术词作 Keywords；识别问句并给模板化初答 |
+| **Azure OpenAI** | `.env` 配置 `FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY` + `FOUNDRY_DEPLOYMENT` | 按 token 计费 | 词表外的术语、更长解释、开放域问题的 2–3 句初答 |
+
+合并策略：先跑启发式，再在 **12 秒超时**内等待 LLM；两者结果按「术语 / 关键词 / 问题」去重合并（见 [`factory.rs`](crates/themis-analysis/src/factory.rs)）。
+
+**未连大模型时侧栏为空？** 常见原因曾是：① 词表无该词；② 问句无 `?`/`？`（如「embedding 是什么」）。当前启发式已支持 **「X是什么 / 什么是X / what is X」** 无标点问句，并对 **小写英文技术词** 查表。
+
+### 内置术语表（如何扩展）
+
+文件：**[`crates/themis-analysis/src/glossary.rs`](crates/themis-analysis/src/glossary.rs)**
+
+```rust
+// 键：小写、不区分大小写匹配；值：(显示名, 解释)
+("embedding", ("embedding", "嵌入向量：把文本映射到高维向量…")),
+```
+
+修改后执行 `.\scripts\themis.ps1 restart`（需重新编译 `themis-service`）。
+
+### 启发式规则摘要
+
+1. **词表命中**：句中出现词表键（如 `embedding`、`RAG`）→ 写入 **Terms** + **Keywords**。  
+2. **大写缩写**：正则 `\b[A-Z]{2,8}\b`（NBA、API…）→ 查表。  
+3. **英文词**：`\b[A-Za-z][A-Za-z0-9_-]{2,}\b` → 查表并列入 Keywords。  
+4. **问句**（不要求句末问号）：  
+   - `embedding 是什么` / `啥是 RAG`  
+   - `什么是 embedding`  
+   - `what is RAG`  
+   - 以及带 `?` / `？` 的整句  
+5. **问题初答**：若问句主语在词表中，直接用词表解释；否则给简短模板句；配置 LLM 后可被更完整回答覆盖。
+
+### 浮层 UI
+
+| 区域 | 内容 |
+|------|------|
+| 左侧 | 听写正文；最终句可带灰色 **Keywords** 小标签 |
+| 右侧 **Insights** | **Keywords** 标签云、**Terms** 卡片（术语 + 解释）、**Questions** 卡片（问题 + 初答） |
+
+默认浮层宽度约 520px，便于并排阅读。
+
+### 配置示例（仅启发式）
+
+无需额外 Key，保持默认即可：
+
+```env
+THEMIS_ANALYSIS_ENABLED=true
+# 不填 FOUNDRY_* 亦可
+```
+
+### 配置示例（启发式 + Azure OpenAI）
+
+在 Azure 门户创建 **Azure OpenAI** 资源，部署聊天模型（如 `gpt-4o-mini`）：
+
+```env
+FOUNDRY_ENDPOINT=https://你的资源名.openai.azure.com
+FOUNDRY_API_KEY=你的_key
+FOUNDRY_DEPLOYMENT=gpt-4o-mini
+THEMIS_ANALYSIS_ENABLED=true
+```
+
+修改后：`.\scripts\themis.ps1 restart`。
+
+### 延迟诊断
+
+**诊断窗口**（`Ctrl+Shift+D` 或托盘 **Diagnostics**）与 Insights **无关**，专用于听写链路延迟：
+
+| 指标 | 含义 |
+|------|------|
+| **Buffer** | REST 模式下每块音频累积时长（默认约 **2s**） |
+| **Azure** | 单次 Azure STT HTTP 往返 |
+| **E2E est.** | 估计从「话说完」到「字幕就绪」≈ Buffer + Azure |
+| **UI** | 服务发出 → 浮层收到 |
 
 ---
 
@@ -250,6 +375,14 @@ capturing | capture=process sessions=2 peak=12000 frames=800 signal=strong
 4. 尝试 `AZURE_SPEECH_MODE=streaming`（默认）；若 WebSocket 失败可暂用 `rest`。
 5. 用 `.\scripts\themis.ps1 doctor` 检查 Azure 密钥与区域。
 
+### Insights 侧栏没有内容 / 只有字幕
+
+1. 确认听写的是**最终句**（灰色 partial 不会触发分析）。  
+2. 说的内容是否在**词表**里，或是否为可识别的**问句**（见 [Insights 洞察](#insights-洞察关键词--术语--问答)）。画面字幕不会自动进入 Insights。  
+3. 确认 `THEMIS_ANALYSIS_ENABLED` 未设为 `false`；改 `.env` 后 **`restart`**。  
+4. 需要更强解释时配置 `FOUNDRY_*`（Azure OpenAI），不是 Speech Key。  
+5. 若刚改过 `glossary.rs` / 分析逻辑，必须重新编译服务（`restart` 脚本会编译）。
+
 ### 想用 Mock 测 UI
 
 在 `.env` 设置 `THEMIS_USE_MOCK_SPEECH=true`，然后 `restart`。
@@ -304,6 +437,7 @@ themis-cli agent start
 crates/themis-core      # 配置、状态机、音频帧
 crates/themis-audio     # 系统音频输出采集（Windows WASAPI）
 crates/themis-azure     # Azure Speech（流式 / REST / Mock）
+crates/themis-analysis  # Insights：启发式词表 + 可选 Azure OpenAI
 crates/themis-ipc       # gRPC
 crates/themis-service   # 后台服务入口
 crates/themis-cli       # CLI / 服务安装

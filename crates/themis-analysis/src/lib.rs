@@ -1,4 +1,5 @@
 mod factory;
+mod glossary;
 mod heuristic;
 mod llm;
 
