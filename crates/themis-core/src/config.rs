@@ -22,6 +22,8 @@ pub struct ThemisConfig {
     pub audio_gain_max: f32,
     /// Windows capture strategy: `auto` | `process` | `endpoint`
     pub audio_capture_mode: String,
+    /// Enable transcript insight extraction (keywords, terms, Q&A).
+    pub analysis_enabled: bool,
 }
 
 impl Default for ThemisConfig {
@@ -41,6 +43,7 @@ impl Default for ThemisConfig {
             audio_output_device: None,
             audio_gain_max: 16.0,
             audio_capture_mode: "auto".into(),
+            analysis_enabled: true,
         }
     }
 }
@@ -87,6 +90,10 @@ impl ThemisConfig {
             audio_capture_mode: std::env::var("THEMIS_AUDIO_CAPTURE_MODE")
                 .unwrap_or_else(|_| "auto".into())
                 .to_lowercase(),
+            analysis_enabled: std::env::var("THEMIS_ANALYSIS_ENABLED")
+                .ok()
+                .map(|v| v != "0" && !v.eq_ignore_ascii_case("false"))
+                .unwrap_or(true),
         }
     }
 

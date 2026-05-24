@@ -15,9 +15,9 @@
       {
         "label": "overlay",
         "title": "Themis",
-        "width": 420,
+        "width": 520,
         "height": 320,
-        "minWidth": 320,
+        "minWidth": 400,
         "minHeight": 160,
         "maxHeight": 720,
         "alwaysOnTop": true,

@@ -4,6 +4,7 @@ members = [
     "crates/themis-core",
     "crates/themis-audio",
     "crates/themis-azure",
+    "crates/themis-analysis",
     "crates/themis-ipc",
     "crates/themis-service",
     "crates/themis-cli",
@@ -41,6 +42,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 themis-core = { path = "crates/themis-core" }
 themis-audio = { path = "crates/themis-audio" }
 themis-azure = { path = "crates/themis-azure" }
+themis-analysis = { path = "crates/themis-analysis" }
 themis-ipc = { path = "crates/themis-ipc" }
 
 [profile.release]

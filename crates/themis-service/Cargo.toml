@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 chrono.workspace = true
 themis-audio.workspace = true
 themis-azure.workspace = true
+themis-analysis.workspace = true
 themis-core.workspace = true
 themis-ipc.workspace = true
 tokio.workspace = true

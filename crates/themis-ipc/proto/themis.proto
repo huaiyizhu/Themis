@@ -50,6 +50,8 @@ message TranscriptMessage {
   string feedback = 3;
   int64 timestamp_unix_ms = 4;
   LatencyBreakdown latency = 5;
+  /// JSON: AnalysisResult (keywords, terms, questions)
+  string insights_json = 6;
 }
 
 message GetDiagnosticsRequest {}

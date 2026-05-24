@@ -184,9 +184,17 @@ impl ThemisService for ThemisGrpcServer {
             Ok(ev) => Some(Ok(TranscriptMessage {
                 text: ev.text,
                 is_final: ev.is_final,
-                feedback: ev.feedback.unwrap_or_default(),
+                feedback: ev
+                    .feedback
+                    .or_else(|| ev.insights.as_ref().map(|i| i.summary()))
+                    .unwrap_or_default(),
                 timestamp_unix_ms: ev.emitted_unix_ms,
                 latency: ev.latency.as_ref().map(breakdown_to_proto),
+                insights_json: ev
+                    .insights
+                    .as_ref()
+                    .map(|i| i.to_json())
+                    .unwrap_or_default(),
             })),
             Err(_) => None,
         });

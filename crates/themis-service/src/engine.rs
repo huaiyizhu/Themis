@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use themis_audio::{AudioSource, SystemAudioOptions};
+use themis_analysis::create_analyzer;
 use themis_azure::create_recognizer;
 use chrono::Utc;
 use themis_core::{
-    normalize_pcm16, AnalysisProvider, AudioFrame, CaptureDiagnostics, CaptureState,
-    LatencyDiagnostics, NoopAnalysis, StateMachine, ThemisConfig, TranscriptEvent,
+    normalize_pcm16, AudioFrame, CaptureDiagnostics, CaptureState, LatencyDiagnostics,
+    StateMachine, ThemisConfig, TranscriptEvent,
 };
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tracing::{error, info};
@@ -99,7 +100,7 @@ impl CaptureEngine {
 
         let state = Arc::clone(&self.state);
         let transcript_tx = self.transcript_tx.clone();
-        let analysis: Arc<dyn AnalysisProvider> = Arc::new(NoopAnalysis);
+        let analysis = create_analyzer(&self.config);
 
         let speech_handle = tokio::spawn(async move {
             let mut frame_rx = frame_rx;
@@ -130,11 +131,6 @@ impl CaptureEngine {
                 if ev.is_final {
                     state.record_transcript();
                 }
-                let feedback = if ev.is_final {
-                    analysis.analyze(&ev.text).await.ok().flatten()
-                } else {
-                    None
-                };
                 let latency = ev.latency.clone();
                 let emitted_unix_ms = Utc::now().timestamp_millis();
                 if ev.is_final {
@@ -142,13 +138,42 @@ impl CaptureEngine {
                         latency_diag.push(ev.text.clone(), true, breakdown.clone());
                     }
                 }
-                let _ = transcript_tx.send(TranscriptEvent {
-                    text: ev.text,
-                    is_final: ev.is_final,
-                    feedback,
-                    emitted_unix_ms,
-                    latency,
-                });
+
+                if ev.is_final {
+                    let text = ev.text.clone();
+                    let tx = transcript_tx.clone();
+                    let analysis = Arc::clone(&analysis);
+                    // Show transcript immediately; attach insights when ready.
+                    let _ = tx.send(TranscriptEvent {
+                        text: text.clone(),
+                        is_final: true,
+                        feedback: None,
+                        insights: None,
+                        emitted_unix_ms,
+                        latency: latency.clone(),
+                    });
+                    tokio::spawn(async move {
+                        let insights = analysis.analyze(&text).await.ok().flatten();
+                        let feedback = insights.as_ref().map(|i| i.summary());
+                        let _ = tx.send(TranscriptEvent {
+                            text,
+                            is_final: true,
+                            feedback,
+                            insights,
+                            emitted_unix_ms: Utc::now().timestamp_millis(),
+                            latency,
+                        });
+                    });
+                } else {
+                    let _ = transcript_tx.send(TranscriptEvent {
+                        text: ev.text,
+                        is_final: false,
+                        feedback: None,
+                        insights: None,
+                        emitted_unix_ms,
+                        latency,
+                    });
+                }
             }
         });
 

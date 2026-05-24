@@ -129,6 +129,8 @@ npm run tauri dev
 
 浮层**始终置顶**。风格预设：`dark-glass`、`light-glass`、`high-contrast-dark`、`high-contrast-light`、`outline`。**自适应**（`Ctrl+Shift+A`）会采样浮层下方的桌面亮度，自动在深浅面板间切换（Windows）。
 
+**Insights 侧栏**：每句最终转写后会提取**关键词**、**术语解释**（如 RAG、NBA）和**问题初步回答**；右侧显示。未配置 LLM 时使用内置启发式；配置 `FOUNDRY_*` 后使用 Azure OpenAI 增强。
+
 **诊断窗口**会显示当前浮层文字、最近短语的延迟分解（**Buffer** ≈ REST 分块累积时长、**Azure** = 网络 + 识别、**STT wall** = 多语言并行时的墙钟时间、**E2E est.** ≈ 从语音结束到文字就绪的估计、**UI** = 服务发出到浮层显示的间隔）。托盘菜单也可选 **Diagnostics**。
 
 开始采集后，字幕在浮层中**逐句累积**（最终结果追加，过程中显示灰色 partial）。

@@ -8,11 +8,19 @@ const themeBadgeEl = document.getElementById("theme-badge");
 const statusEl = document.getElementById("status");
 const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
-const feedbackEl = document.getElementById("feedback");
 const scrollLatestBtn = document.getElementById("scroll-latest");
+const insightsEmptyEl = document.getElementById("insights-empty");
+const insightsKeywordsSec = document.getElementById("insights-keywords");
+const insightsKeywordsList = document.getElementById("insights-keywords-list");
+const insightsTermsSec = document.getElementById("insights-terms");
+const insightsTermsList = document.getElementById("insights-terms-list");
+const insightsQuestionsSec = document.getElementById("insights-questions");
+const insightsQuestionsList = document.getElementById("insights-questions-list");
 
 /** @type {string[]} Final lines (one per Azure REST phrase). */
 let committedLines = [];
+/** @type {Map<string, object|null>} line text → latest insights */
+const lineInsights = new Map();
 /** Latest partial hypothesis while speaking. */
 let partialText = "";
 
@@ -79,10 +87,20 @@ function renderTranscript() {
   }
 
   for (const line of committedLines) {
-    const el = document.createElement("span");
-    el.className = "line-final";
-    el.textContent = line;
-    transcriptEl.appendChild(el);
+    const wrap = document.createElement("span");
+    wrap.className = "line-final line-with-tags";
+    const text = document.createElement("span");
+    text.textContent = line;
+    wrap.appendChild(text);
+    const ins = lineInsights.get(line);
+    if (ins?.keywords?.length) {
+      const kw = document.createElement("span");
+      kw.className = "line-kw";
+      kw.textContent = ins.keywords.slice(0, 4).join(" · ");
+      kw.title = "Keywords";
+      wrap.appendChild(kw);
+    }
+    transcriptEl.appendChild(wrap);
   }
 
   if (partialText) {
@@ -135,6 +153,54 @@ async function refreshStatus() {
   }
 }
 
+function renderInsights(insights) {
+  if (!insights || (!insights.keywords?.length && !insights.terms?.length && !insights.questions?.length)) {
+    return;
+  }
+  insightsEmptyEl.classList.add("hidden");
+
+  if (insights.keywords?.length) {
+    insightsKeywordsSec.classList.remove("hidden");
+    insightsKeywordsList.replaceChildren();
+    for (const kw of insights.keywords) {
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = kw;
+      insightsKeywordsList.appendChild(tag);
+    }
+  }
+
+  if (insights.terms?.length) {
+    insightsTermsSec.classList.remove("hidden");
+    insightsTermsList.replaceChildren();
+    for (const t of insights.terms) {
+      const card = document.createElement("div");
+      card.className = "insight-card";
+      card.innerHTML = `<div class="term">${escapeHtml(t.term)}</div><div>${escapeHtml(t.explanation)}</div>`;
+      insightsTermsList.appendChild(card);
+    }
+  }
+
+  if (insights.questions?.length) {
+    insightsQuestionsSec.classList.remove("hidden");
+    insightsQuestionsList.replaceChildren();
+    for (const q of insights.questions) {
+      const card = document.createElement("div");
+      card.className = "insight-card";
+      card.innerHTML = `<div class="q">${escapeHtml(q.question)}</div><div class="a">${escapeHtml(q.answer)}</div>`;
+      insightsQuestionsList.appendChild(card);
+    }
+  }
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function isSystemMessage(text) {
   return (
     /^Azure (REST|streaming|auto-language)/i.test(text) ||
@@ -145,7 +211,7 @@ function isSystemMessage(text) {
 }
 
 listen("transcript", (event) => {
-  const { text, is_final, feedback } = event.payload;
+  const { text, is_final, insights } = event.payload;
   if (!text || (text.startsWith("(") && text.includes("未识别"))) {
     return;
   }
@@ -153,21 +219,26 @@ listen("transcript", (event) => {
     return;
   }
 
+  const trimmed = text.trim();
+
   if (is_final) {
-    const trimmed = text.trim();
-    if (trimmed) {
+    if (insights) {
+      lineInsights.set(trimmed, insights);
+      renderInsights(insights);
+      if (committedLines.includes(trimmed)) {
+        renderTranscript();
+      }
+      return;
+    }
+    if (trimmed && !committedLines.includes(trimmed)) {
       committedLines.push(trimmed);
       partialText = "";
     }
   } else {
-    partialText = text.trim();
+    partialText = trimmed;
   }
 
   renderTranscript();
-
-  if (feedback) {
-    feedbackEl.textContent = feedback;
-  }
 });
 
 listen("capture-stopped", () => {
@@ -178,8 +249,16 @@ listen("capture-stopped", () => {
 listen("capture-started", () => {
   committedLines = [];
   partialText = "";
+  lineInsights.clear();
   followLatest = true;
   scrollLatestBtn.classList.add("hidden");
+  insightsEmptyEl.classList.remove("hidden");
+  insightsKeywordsSec.classList.add("hidden");
+  insightsTermsSec.classList.add("hidden");
+  insightsQuestionsSec.classList.add("hidden");
+  insightsKeywordsList.replaceChildren();
+  insightsTermsList.replaceChildren();
+  insightsQuestionsList.replaceChildren();
   setPlaceholder("Capture started — transcript builds below…");
 });
 

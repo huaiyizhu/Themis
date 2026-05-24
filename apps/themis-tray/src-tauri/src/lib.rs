@@ -27,13 +27,40 @@ struct StatusDto {
     audio_sessions: u32,
 }
 
+#[derive(Clone, Serialize, serde::Deserialize, Default)]
+struct InsightsDto {
+    keywords: Vec<String>,
+    terms: Vec<TermInsightDto>,
+    questions: Vec<QuestionInsightDto>,
+}
+
+#[derive(Clone, Serialize, serde::Deserialize)]
+struct TermInsightDto {
+    term: String,
+    explanation: String,
+}
+
+#[derive(Clone, Serialize, serde::Deserialize)]
+struct QuestionInsightDto {
+    question: String,
+    answer: String,
+}
+
 #[derive(Clone, Serialize)]
 struct TranscriptPayload {
     text: String,
     is_final: bool,
     feedback: Option<String>,
+    insights: Option<InsightsDto>,
     timestamp_unix_ms: i64,
     latency: Option<LatencyBreakdownDto>,
+}
+
+fn parse_insights_json(json: &str) -> Option<InsightsDto> {
+    if json.trim().is_empty() {
+        return None;
+    }
+    serde_json::from_str(json).ok()
 }
 
 #[derive(Clone, Serialize)]
@@ -327,6 +354,7 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
                                 language: b.language,
                             });
 
+                            let insights = parse_insights_json(&msg.insights_json);
                             let _ = app.emit(
                                 "transcript",
                                 TranscriptPayload {
@@ -337,6 +365,7 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
                                     } else {
                                         Some(msg.feedback)
                                     },
+                                    insights,
                                     timestamp_unix_ms: msg.timestamp_unix_ms,
                                     latency,
                                 },

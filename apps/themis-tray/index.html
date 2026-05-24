@@ -35,10 +35,29 @@
         </button>
       </header>
       <p id="status" class="status-line">Connecting…</p>
-      <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
-        <div id="transcript" class="transcript-body"></div>
+      <div class="content-split">
+        <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
+          <div id="transcript" class="transcript-body"></div>
+        </div>
+        <aside id="insights-panel" class="insights-panel" aria-label="Terms and answers">
+          <h2 class="insights-title">Insights</h2>
+          <p id="insights-empty" class="insights-empty">
+            Keywords, terms &amp; questions appear here after each phrase.
+          </p>
+          <section id="insights-keywords" class="insights-section hidden">
+            <h3>Keywords</h3>
+            <div id="insights-keywords-list" class="tag-list"></div>
+          </section>
+          <section id="insights-terms" class="insights-section hidden">
+            <h3>Terms</h3>
+            <div id="insights-terms-list" class="insight-cards"></div>
+          </section>
+          <section id="insights-questions" class="insights-section hidden">
+            <h3>Questions</h3>
+            <div id="insights-questions-list" class="insight-cards"></div>
+          </section>
+        </aside>
       </div>
-      <div id="feedback" class="feedback-line"></div>
     </div>
     <script type="module" src="/main.js"></script>
   </body>

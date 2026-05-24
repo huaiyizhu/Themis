@@ -7,7 +7,9 @@ mod latency;
 mod pipeline;
 mod state;
 
-pub use analysis::{AnalysisProvider, NoopAnalysis};
+pub use analysis::{
+    AnalysisProvider, AnalysisResult, NoopAnalysis, QuestionInsight, TermInsight,
+};
 pub use capture_diag::{CaptureDiagnostics, CaptureDiagnosticsSnapshot};
 pub use config::ThemisConfig;
 pub use frame::{AudioFrame, SampleFormat};
