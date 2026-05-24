@@ -6,7 +6,7 @@ use std::sync::{Mutex, RwLock};
 /// Per-phrase latency breakdown (REST mode: buffer ≈ chunk length).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LatencyBreakdown {
-    /// Audio accumulated before this STT request (~4s in REST mode).
+    /// Audio accumulated before this STT request (~2s in REST mode).
     pub buffer_ms: u32,
     /// Azure HTTP round-trip (network + recognition).
     pub azure_ms: u32,

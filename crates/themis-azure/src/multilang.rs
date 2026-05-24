@@ -1,5 +1,6 @@
 //! Azure REST with per-chunk language competition (e.g. en-US vs zh-CN).
 
+use crate::chunk::{self, CHUNK_SAMPLES, OVERLAP_SAMPLES};
 use crate::recognition::{self, ParsedRecognition};
 use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
@@ -9,9 +10,6 @@ use std::time::Instant;
 use themis_core::LatencyBreakdown;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, warn};
-
-const CHUNK_SAMPLES: usize = 16_000 * 4;
-const OVERLAP_SAMPLES: usize = 16_000;
 
 pub struct AzureMultiLangRestRecognizer {
     key: String,
@@ -42,7 +40,7 @@ impl AzureMultiLangRestRecognizer {
         pcm: Vec<i16>,
     ) -> anyhow::Result<Option<(ParsedRecognition, LatencyBreakdown)>> {
         let wall = Instant::now();
-        let buffer_ms = chunk_buffer_ms();
+        let buffer_ms = chunk::chunk_buffer_ms();
         let mut tasks = Vec::with_capacity(self.languages.len());
         for lang in &self.languages {
             let client = self.client.clone();
@@ -96,10 +94,6 @@ impl AzureMultiLangRestRecognizer {
     }
 }
 
-fn chunk_buffer_ms() -> u32 {
-    (CHUNK_SAMPLES as u32 * 1000) / 16_000
-}
-
 #[async_trait]
 impl SpeechRecognizer for AzureMultiLangRestRecognizer {
     async fn start(&mut self) -> anyhow::Result<()> {
@@ -107,7 +101,8 @@ impl SpeechRecognizer for AzureMultiLangRestRecognizer {
         let langs = self.languages.join(", ");
         let _ = self.tx.send(SpeechEvent {
             text: format!(
-                "Azure auto-language ({langs}) — picking best match every ~4s"
+                "Azure auto-language ({langs}) — picking best match every ~{}s",
+                chunk::CHUNK_SECS
             ),
             is_final: false,
             latency: None,

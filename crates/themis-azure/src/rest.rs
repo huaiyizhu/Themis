@@ -1,5 +1,6 @@
 //! Azure Speech recognition via REST with overlapping chunks.
 
+use crate::chunk::{self, CHUNK_SAMPLES, OVERLAP_SAMPLES};
 use crate::recognition;
 use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
@@ -8,9 +9,6 @@ use std::sync::Arc;
 use themis_core::LatencyBreakdown;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, warn};
-
-const CHUNK_SAMPLES: usize = 16_000 * 4;
-const OVERLAP_SAMPLES: usize = 16_000;
 
 pub struct AzureRestRecognizer {
     key: String,
@@ -44,7 +42,7 @@ impl AzureRestRecognizer {
         &self,
         pcm: Vec<i16>,
     ) -> anyhow::Result<Option<(recognition::ParsedRecognition, LatencyBreakdown)>> {
-        let buffer_ms = (CHUNK_SAMPLES as u32 * 1000) / 16_000;
+        let buffer_ms = chunk::chunk_buffer_ms();
         let (parsed, azure_ms) =
             recognition::recognize_pcm(&self.client, &self.key, &self.region, &self.language, &pcm)
                 .await?;
@@ -68,8 +66,9 @@ impl SpeechRecognizer for AzureRestRecognizer {
         *self.running.lock().await = true;
         let _ = self.tx.send(SpeechEvent {
             text: format!(
-                "Azure REST ({}) — transcribing every ~4s",
-                self.language
+                "Azure REST ({}) — transcribing every ~{}s",
+                self.language,
+                chunk::CHUNK_SECS
             ),
             is_final: false,
             latency: None,

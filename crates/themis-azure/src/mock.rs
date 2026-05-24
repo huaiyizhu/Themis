@@ -61,7 +61,7 @@ impl SpeechRecognizer for MockSpeechRecognizer {
 
         if n.is_multiple_of(30) {
             let mock_latency = LatencyBreakdown {
-                buffer_ms: 4000,
+                buffer_ms: 2000,
                 azure_ms: 120,
                 stt_wall_ms: 120,
                 estimated_e2e_ms: 4120,

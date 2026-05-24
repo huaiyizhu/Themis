@@ -137,7 +137,7 @@ npm run tauri dev
 | `AZURE_SPEECH_KEY` | 是* | Speech 资源密钥 |
 | `AZURE_SPEECH_REGION` | 是* | 区域，如 `eastus` |
 | `AZURE_SPEECH_LANGUAGE` | 建议 | **`auto`**（默认，中英自动）\| `en-US` \| `zh-CN` \| `en-US,zh-CN` |
-| `AZURE_SPEECH_MODE` | 否 | `streaming`（默认，整句流式）或 `rest`（6 秒分块，备用） |
+| `AZURE_SPEECH_MODE` | 否 | `streaming`（整句流式）或 `rest`（默认，**2 秒**分块） |
 | `THEMIS_AUDIO_CAPTURE_MODE` | 否 | **Windows**：`auto`（默认，优先进程 loopback）\| `process` \| `endpoint` |
 | `THEMIS_AUDIO_OUTPUT_DEVICE` | 否 | **仅 endpoint 模式**：播放设备友好名子串或 endpoint ID |
 | `THEMIS_AUDIO_GAIN_MAX` | 否 | 自动增益上限，默认 `16` |

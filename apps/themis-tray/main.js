@@ -103,7 +103,7 @@ async function refreshStatus() {
       if (s.message?.includes("no loopback signal")) {
         hint = s.message;
       } else if (s.message?.includes("signal=strong")) {
-        hint = "Capture OK. Transcript scrolls here (~4s per phrase)…";
+        hint = "Capture OK. Transcript scrolls here (~2s per phrase)…";
       } else if (s.message?.includes("signal=ok")) {
         hint = "Capture OK. Waiting for speech…";
       }
