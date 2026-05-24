@@ -5,6 +5,7 @@ use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use themis_core::LatencyBreakdown;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, warn};
 
@@ -36,15 +37,28 @@ impl AzureRestRecognizer {
     }
 
     pub async fn recognize_pcm(&self, pcm: Vec<i16>) -> anyhow::Result<Option<String>> {
-        Ok(
-            recognition::recognize_pcm(&self.client, &self.key, &self.region, &self.language, &pcm)
-                .await?
-                .map(|r| r.text),
-        )
+        Ok(self.recognize_chunk(pcm).await?.map(|(r, _)| r.text))
     }
 
-    async fn recognize_chunk(&self, pcm: Vec<i16>) -> anyhow::Result<Option<String>> {
-        Ok(self.recognize_pcm(pcm).await?)
+    async fn recognize_chunk(
+        &self,
+        pcm: Vec<i16>,
+    ) -> anyhow::Result<Option<(recognition::ParsedRecognition, LatencyBreakdown)>> {
+        let buffer_ms = (CHUNK_SAMPLES as u32 * 1000) / 16_000;
+        let (parsed, azure_ms) =
+            recognition::recognize_pcm(&self.client, &self.key, &self.region, &self.language, &pcm)
+                .await?;
+        let Some(parsed) = parsed else {
+            return Ok(None);
+        };
+        let breakdown = LatencyBreakdown {
+            buffer_ms,
+            azure_ms,
+            stt_wall_ms: azure_ms,
+            estimated_e2e_ms: buffer_ms.saturating_add(azure_ms),
+            language: self.language.clone(),
+        };
+        Ok(Some((parsed, breakdown)))
     }
 }
 
@@ -58,6 +72,7 @@ impl SpeechRecognizer for AzureRestRecognizer {
                 self.language
             ),
             is_final: false,
+            latency: None,
         });
         Ok(())
     }
@@ -91,14 +106,16 @@ impl SpeechRecognizer for AzureRestRecognizer {
         let this = self.clone_inner();
         tokio::spawn(async move {
             match this.recognize_chunk(chunk).await {
-                Ok(Some(text)) => {
+                Ok(Some((result, latency))) => {
                     let _ = this.tx.send(SpeechEvent {
-                        text: text.clone(),
+                        text: result.text.clone(),
                         is_final: false,
+                        latency: Some(latency.clone()),
                     });
                     let _ = this.tx.send(SpeechEvent {
-                        text,
+                        text: result.text,
                         is_final: true,
+                        latency: Some(latency),
                     });
                 }
                 Ok(None) => {
@@ -109,6 +126,7 @@ impl SpeechRecognizer for AzureRestRecognizer {
                     let _ = this.tx.send(SpeechEvent {
                         text: format!("Azure error: {e}"),
                         is_final: true,
+                        latency: None,
                     });
                 }
             }

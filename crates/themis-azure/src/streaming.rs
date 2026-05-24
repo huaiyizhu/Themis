@@ -96,6 +96,7 @@ impl AzureStreamingRecognizer {
                 let _ = tx.send(SpeechEvent {
                     text: phrase.to_string(),
                     is_final,
+                    latency: None,
                 });
             }
         }
@@ -137,6 +138,7 @@ impl SpeechRecognizer for AzureStreamingRecognizer {
         let _ = self.tx.send(SpeechEvent {
             text: format!("Azure streaming ({language}) connected…"),
             is_final: false,
+            latency: None,
         });
 
         tokio::spawn(async move {
@@ -149,6 +151,7 @@ impl SpeechRecognizer for AzureStreamingRecognizer {
                         "Streaming failed ({e}). Try AZURE_SPEECH_MODE=rest in .env and restart."
                     ),
                     is_final: true,
+                    latency: None,
                 });
             }
         });

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Themis Diagnostics</title>
+    <link rel="stylesheet" href="diagnose.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Themis diagnostics</h1>
+      <p class="hint">
+        <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> toggles this window. UI delay =
+        time from service emit → overlay receive.
+      </p>
+    </header>
+
+    <section class="panel">
+      <h2>Current overlay</h2>
+      <pre id="overlay-text" class="overlay-box">—</pre>
+      <p id="overlay-meta" class="meta"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Summary (final phrases)</h2>
+      <div id="summary" class="summary-grid">—</div>
+    </section>
+
+    <section class="panel">
+      <h2>Latency history</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Text</th>
+              <th>Buffer</th>
+              <th>Azure</th>
+              <th>STT wall</th>
+              <th>E2E est.</th>
+              <th>UI</th>
+              <th>Lang</th>
+            </tr>
+          </thead>
+          <tbody id="records"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <script type="module" src="diagnose.js"></script>
+  </body>
+</html>

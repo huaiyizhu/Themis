@@ -6,6 +6,7 @@ service ThemisService {
   rpc StartCapture(StartCaptureRequest) returns (StartCaptureResponse);
   rpc StopCapture(StopCaptureRequest) returns (StopCaptureResponse);
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc GetDiagnostics(GetDiagnosticsRequest) returns (GetDiagnosticsResponse);
   rpc SubscribeTranscripts(SubscribeTranscriptsRequest)
       returns (stream TranscriptMessage);
 }
@@ -48,4 +49,36 @@ message TranscriptMessage {
   bool is_final = 2;
   string feedback = 3;
   int64 timestamp_unix_ms = 4;
+  LatencyBreakdown latency = 5;
+}
+
+message GetDiagnosticsRequest {}
+
+message GetDiagnosticsResponse {
+  repeated LatencyRecord records = 1;
+  LatencySummary summary = 2;
+}
+
+message LatencyBreakdown {
+  uint32 buffer_ms = 1;
+  uint32 azure_ms = 2;
+  uint32 stt_wall_ms = 3;
+  uint32 estimated_e2e_ms = 4;
+  string language = 5;
+}
+
+message LatencyRecord {
+  uint64 id = 1;
+  string text = 2;
+  bool is_final = 3;
+  int64 emitted_unix_ms = 4;
+  LatencyBreakdown breakdown = 5;
+}
+
+message LatencySummary {
+  uint32 count = 1;
+  uint32 avg_azure_ms = 2;
+  uint32 avg_e2e_ms = 3;
+  uint32 max_e2e_ms = 4;
+  uint32 last_azure_ms = 5;
 }

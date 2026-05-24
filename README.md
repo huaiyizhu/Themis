@@ -24,7 +24,7 @@
 | 组件 | 作用 |
 |------|------|
 | `themis-service` | 后台：抓系统输出 → 识别 → gRPC 推送字幕 |
-| `themis-tray` | 托盘图标、浮层 UI、`Ctrl+Shift+T` / `Cmd+Shift+T` |
+| `themis-tray` | 托盘图标、浮层 UI、`Ctrl+Shift+T` / `Ctrl+Shift+D` 快捷键 |
 | `themis-cli` | 安装服务、诊断、`status` / `doctor` |
 
 更细的架构见 [docs/architecture.md](docs/architecture.md)，平台差异见 [docs/platform-notes.md](docs/platform-notes.md)。
@@ -118,8 +118,11 @@ npm run tauri dev
 | 操作 | Windows | macOS |
 |------|---------|-------|
 | 开始/停止采集 | `Ctrl+Shift+T` | `Cmd+Shift+T` |
+| 延迟诊断窗口 | `Ctrl+Shift+D` | `Cmd+Shift+D` |
 | 显示/隐藏浮层 | 左键托盘图标 | 同左 |
 | 退出 | 托盘菜单 Quit | 同左 |
+
+**诊断窗口**会显示当前浮层文字、最近短语的延迟分解（**Buffer** ≈ REST 分块累积时长、**Azure** = 网络 + 识别、**STT wall** = 多语言并行时的墙钟时间、**E2E est.** ≈ 从语音结束到文字就绪的估计、**UI** = 服务发出到浮层显示的间隔）。托盘菜单也可选 **Diagnostics**。
 
 开始采集后，字幕在浮层中**逐句累积**（最终结果追加，过程中显示灰色 partial）。
 

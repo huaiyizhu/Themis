@@ -1,6 +1,7 @@
 use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicU64, Ordering};
+use themis_core::LatencyBreakdown;
 use tokio::sync::broadcast;
 use tracing::debug;
 
@@ -28,6 +29,7 @@ impl SpeechRecognizer for MockSpeechRecognizer {
         let _ = self.tx.send(SpeechEvent {
             text: "Listening (mock)… generating sample transcripts from audio level".into(),
             is_final: false,
+            latency: None,
         });
         Ok(())
     }
@@ -54,12 +56,21 @@ impl SpeechRecognizer for MockSpeechRecognizer {
         let _ = self.tx.send(SpeechEvent {
             text: partial.clone(),
             is_final: false,
+            latency: None,
         });
 
         if n.is_multiple_of(30) {
+            let mock_latency = LatencyBreakdown {
+                buffer_ms: 4000,
+                azure_ms: 120,
+                stt_wall_ms: 120,
+                estimated_e2e_ms: 4120,
+                language: "mock".into(),
+            };
             let _ = self.tx.send(SpeechEvent {
                 text: format!("{partial} — mock transcript segment {}", n / 30),
                 is_final: true,
+                latency: Some(mock_latency),
             });
         }
 

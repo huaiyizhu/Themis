@@ -26,6 +26,21 @@
         "resizable": true,
         "skipTaskbar": true,
         "visible": true
+      },
+      {
+        "label": "diagnose",
+        "title": "Themis Diagnostics",
+        "url": "diagnose.html",
+        "width": 640,
+        "height": 520,
+        "minWidth": 480,
+        "minHeight": 360,
+        "alwaysOnTop": false,
+        "decorations": true,
+        "transparent": false,
+        "resizable": true,
+        "skipTaskbar": false,
+        "visible": false
       }
     ],
     "trayIcon": {

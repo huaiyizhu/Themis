@@ -1,11 +1,16 @@
 use crate::proto::{
-    themis_service_server::ThemisService, GetStatusRequest, GetStatusResponse, StartCaptureRequest,
-    StartCaptureResponse, StopCaptureRequest, StopCaptureResponse, SubscribeTranscriptsRequest,
-    TranscriptMessage,
+    themis_service_server::ThemisService, GetDiagnosticsRequest, GetDiagnosticsResponse,
+    GetStatusRequest, GetStatusResponse, LatencyBreakdown as ProtoLatencyBreakdown,
+    LatencyRecord as ProtoLatencyRecord, LatencySummary as ProtoLatencySummary,
+    StartCaptureRequest, StartCaptureResponse, StopCaptureRequest, StopCaptureResponse,
+    SubscribeTranscriptsRequest, TranscriptMessage,
 };
 use std::pin::Pin;
 use std::sync::Arc;
-use themis_core::{CaptureDiagnostics, CaptureState, StateMachine, TranscriptEvent};
+use themis_core::{
+    CaptureDiagnostics, CaptureState, LatencyBreakdown, LatencyDiagnostics, StateMachine,
+    TranscriptEvent,
+};
 use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tonic::{Request, Response, Status};
@@ -16,7 +21,18 @@ pub struct CaptureService {
     /// Subscribers attach here; engine publishes via the cloned sender.
     pub transcript_tx: broadcast::Sender<TranscriptEvent>,
     pub capture_diag: Arc<CaptureDiagnostics>,
+    pub latency_diag: Arc<LatencyDiagnostics>,
     pub engine: Arc<dyn CaptureEngineHandle + Send + Sync>,
+}
+
+fn breakdown_to_proto(b: &LatencyBreakdown) -> ProtoLatencyBreakdown {
+    ProtoLatencyBreakdown {
+        buffer_ms: b.buffer_ms,
+        azure_ms: b.azure_ms,
+        stt_wall_ms: b.stt_wall_ms,
+        estimated_e2e_ms: b.estimated_e2e_ms,
+        language: b.language.clone(),
+    }
 }
 
 #[async_trait::async_trait]
@@ -127,6 +143,35 @@ impl ThemisService for ThemisGrpcServer {
         }))
     }
 
+    async fn get_diagnostics(
+        &self,
+        _request: Request<GetDiagnosticsRequest>,
+    ) -> Result<Response<GetDiagnosticsResponse>, Status> {
+        let snap = self.service.latency_diag.snapshot();
+        let records = snap
+            .records
+            .into_iter()
+            .map(|r| ProtoLatencyRecord {
+                id: r.id,
+                text: r.text,
+                is_final: r.is_final,
+                emitted_unix_ms: r.emitted_unix_ms,
+                breakdown: Some(breakdown_to_proto(&r.breakdown)),
+            })
+            .collect();
+        let summary = snap.summary;
+        Ok(Response::new(GetDiagnosticsResponse {
+            records,
+            summary: Some(ProtoLatencySummary {
+                count: summary.count,
+                avg_azure_ms: summary.avg_azure_ms,
+                avg_e2e_ms: summary.avg_e2e_ms,
+                max_e2e_ms: summary.max_e2e_ms,
+                last_azure_ms: summary.last_azure_ms,
+            }),
+        }))
+    }
+
     type SubscribeTranscriptsStream =
         Pin<Box<dyn Stream<Item = Result<TranscriptMessage, Status>> + Send>>;
 
@@ -140,7 +185,8 @@ impl ThemisService for ThemisGrpcServer {
                 text: ev.text,
                 is_final: ev.is_final,
                 feedback: ev.feedback.unwrap_or_default(),
-                timestamp_unix_ms: chrono::Utc::now().timestamp_millis(),
+                timestamp_unix_ms: ev.emitted_unix_ms,
+                latency: ev.latency.as_ref().map(breakdown_to_proto),
             })),
             Err(_) => None,
         });

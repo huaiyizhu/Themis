@@ -1,9 +1,10 @@
 use std::sync::Arc;
 use themis_audio::{AudioSource, SystemAudioOptions};
 use themis_azure::create_recognizer;
+use chrono::Utc;
 use themis_core::{
     normalize_pcm16, AnalysisProvider, AudioFrame, CaptureDiagnostics, CaptureState,
-    NoopAnalysis, StateMachine, ThemisConfig, TranscriptEvent,
+    LatencyDiagnostics, NoopAnalysis, StateMachine, ThemisConfig, TranscriptEvent,
 };
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tracing::{error, info};
@@ -13,6 +14,7 @@ pub struct CaptureEngine {
     state: Arc<StateMachine>,
     transcript_tx: broadcast::Sender<TranscriptEvent>,
     capture_diag: Arc<CaptureDiagnostics>,
+    latency_diag: Arc<LatencyDiagnostics>,
     inner: Mutex<Option<RunningCapture>>,
 }
 
@@ -41,6 +43,7 @@ impl CaptureEngine {
         config: ThemisConfig,
         state: Arc<StateMachine>,
         capture_diag: Arc<CaptureDiagnostics>,
+        latency_diag: Arc<LatencyDiagnostics>,
     ) -> Self {
         let (transcript_tx, _) = broadcast::channel(256);
         Self {
@@ -48,8 +51,13 @@ impl CaptureEngine {
             state,
             transcript_tx,
             capture_diag,
+            latency_diag,
             inner: Mutex::new(None),
         }
+    }
+
+    pub fn latency_diagnostics(&self) -> Arc<LatencyDiagnostics> {
+        Arc::clone(&self.latency_diag)
     }
 
     pub fn transcript_sender(&self) -> broadcast::Sender<TranscriptEvent> {
@@ -116,18 +124,30 @@ impl CaptureEngine {
             let _ = speech.stop().await;
         });
 
+        let latency_diag = Arc::clone(&self.latency_diag);
         let event_handle = tokio::spawn(async move {
             while let Ok(ev) = speech_events.recv().await {
-                state.record_transcript();
+                if ev.is_final {
+                    state.record_transcript();
+                }
                 let feedback = if ev.is_final {
                     analysis.analyze(&ev.text).await.ok().flatten()
                 } else {
                     None
                 };
+                let latency = ev.latency.clone();
+                let emitted_unix_ms = Utc::now().timestamp_millis();
+                if ev.is_final {
+                    if let Some(ref breakdown) = latency {
+                        latency_diag.push(ev.text.clone(), true, breakdown.clone());
+                    }
+                }
                 let _ = transcript_tx.send(TranscriptEvent {
                     text: ev.text,
                     is_final: ev.is_final,
                     feedback,
+                    emitted_unix_ms,
+                    latency,
                 });
             }
         });

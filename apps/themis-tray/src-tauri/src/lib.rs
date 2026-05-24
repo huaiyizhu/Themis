@@ -8,7 +8,8 @@ use tauri::{
 use themis_core::ThemisConfig;
 use themis_ipc::client::connect;
 use themis_ipc::{
-    GetStatusRequest, StartCaptureRequest, StopCaptureRequest, SubscribeTranscriptsRequest,
+    GetDiagnosticsRequest, GetStatusRequest, StartCaptureRequest, StopCaptureRequest,
+    SubscribeTranscriptsRequest,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -28,6 +29,54 @@ struct TranscriptPayload {
     text: String,
     is_final: bool,
     feedback: Option<String>,
+    timestamp_unix_ms: i64,
+    latency: Option<LatencyBreakdownDto>,
+}
+
+#[derive(Clone, Serialize)]
+struct LatencyBreakdownDto {
+    buffer_ms: u32,
+    azure_ms: u32,
+    stt_wall_ms: u32,
+    estimated_e2e_ms: u32,
+    language: String,
+}
+
+#[derive(Clone, Serialize)]
+struct LatencyRecordDto {
+    id: u64,
+    text: String,
+    is_final: bool,
+    emitted_unix_ms: i64,
+    received_unix_ms: Option<i64>,
+    breakdown: Option<LatencyBreakdownDto>,
+}
+
+#[derive(Clone, Serialize)]
+struct LatencySummaryDto {
+    count: u32,
+    avg_azure_ms: u32,
+    avg_e2e_ms: u32,
+    max_e2e_ms: u32,
+    last_azure_ms: u32,
+}
+
+#[derive(Clone, Serialize)]
+struct DiagnosticsDto {
+    overlay_display: String,
+    partial: String,
+    committed_line_count: usize,
+    last_ui_latency_ms: Option<u32>,
+    service_online: bool,
+    summary: LatencySummaryDto,
+    records: Vec<LatencyRecordDto>,
+}
+
+#[derive(Default)]
+struct OverlayMirror {
+    committed: Vec<String>,
+    partial: String,
+    last_ui_latency_ms: Option<u32>,
 }
 
 #[derive(Clone)]
@@ -35,6 +84,7 @@ struct AppState {
     config: ThemisConfig,
     capturing: Arc<Mutex<bool>>,
     stream_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+    overlay: Arc<Mutex<OverlayMirror>>,
 }
 
 #[tauri::command]
@@ -58,6 +108,95 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
 }
 
 #[tauri::command]
+async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, String> {
+    let overlay = state.overlay.lock().await;
+    let overlay_display = if overlay.committed.is_empty() && overlay.partial.is_empty() {
+        String::new()
+    } else {
+        let mut lines = overlay.committed.clone();
+        if !overlay.partial.is_empty() {
+            lines.push(format!("{} …", overlay.partial));
+        }
+        lines.join("\n")
+    };
+    let partial = overlay.partial.clone();
+    let committed_line_count = overlay.committed.len();
+    let last_ui_latency_ms = overlay.last_ui_latency_ms;
+    drop(overlay);
+
+    let mut client = connect(state.config.grpc_port)
+        .await
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get_diagnostics(GetDiagnosticsRequest {})
+        .await
+        .map_err(|e| e.to_string())?
+        .into_inner();
+
+    let summary = resp.summary.unwrap_or(themis_ipc::LatencySummary {
+        count: 0,
+        avg_azure_ms: 0,
+        avg_e2e_ms: 0,
+        max_e2e_ms: 0,
+        last_azure_ms: 0,
+    });
+
+    let records = resp
+        .records
+        .into_iter()
+        .map(|r| {
+            let breakdown = r.breakdown.map(|b| LatencyBreakdownDto {
+                buffer_ms: b.buffer_ms,
+                azure_ms: b.azure_ms,
+                stt_wall_ms: b.stt_wall_ms,
+                estimated_e2e_ms: b.estimated_e2e_ms,
+                language: b.language,
+            });
+            LatencyRecordDto {
+                id: r.id,
+                text: r.text,
+                is_final: r.is_final,
+                emitted_unix_ms: r.emitted_unix_ms,
+                received_unix_ms: None,
+                breakdown,
+            }
+        })
+        .collect();
+
+    Ok(DiagnosticsDto {
+        overlay_display,
+        partial,
+        committed_line_count,
+        last_ui_latency_ms,
+        service_online: true,
+        summary: LatencySummaryDto {
+            count: summary.count,
+            avg_azure_ms: summary.avg_azure_ms,
+            avg_e2e_ms: summary.avg_e2e_ms,
+            max_e2e_ms: summary.max_e2e_ms,
+            last_azure_ms: summary.last_azure_ms,
+        },
+        records,
+    })
+}
+
+#[tauri::command]
+fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("diagnose")
+        .ok_or_else(|| "diagnose window not found".to_string())?;
+    let visible = w.is_visible().map_err(|e| e.to_string())?;
+    if visible {
+        w.hide().map_err(|e| e.to_string())?;
+        Ok(false)
+    } else {
+        w.show().map_err(|e| e.to_string())?;
+        w.set_focus().map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+}
+
+#[tauri::command]
 async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let capturing = *state.capturing.lock().await;
@@ -76,6 +215,10 @@ async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
         Ok(false)
     } else {
         *state.capturing.lock().await = true;
+        {
+            let mut o = state.overlay.lock().await;
+            *o = OverlayMirror::default();
+        }
         // Subscribe before StartCapture so we do not miss early transcript events.
         start_transcript_stream(app.clone(), state.inner().clone()).await;
         client
@@ -87,8 +230,32 @@ async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
     }
 }
 
+fn is_system_transcript(text: &str) -> bool {
+    text.starts_with("Azure ")
+        || text.contains("connected…")
+        || text.contains("transcribing every")
+        || text.contains("picking best match")
+}
+
+async fn update_overlay_mirror(state: &AppState, text: &str, is_final: bool) {
+    if is_system_transcript(text) {
+        return;
+    }
+    let mut o = state.overlay.lock().await;
+    if is_final {
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            o.committed.push(trimmed.to_string());
+            o.partial.clear();
+        }
+    } else {
+        o.partial = text.trim().to_string();
+    }
+}
+
 async fn start_transcript_stream(app: AppHandle, state: AppState) {
     let port = state.config.grpc_port;
+    let loop_state = state.clone();
     let handle = tokio::spawn(async move {
         loop {
             match connect(port).await {
@@ -100,6 +267,22 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
                     {
                         use tokio_stream::StreamExt;
                         while let Some(Ok(msg)) = stream.next().await {
+                            let received = chrono::Utc::now().timestamp_millis();
+                            let ui_ms = (received - msg.timestamp_unix_ms).max(0) as u32;
+                            if msg.is_final && ui_ms < 120_000 {
+                                loop_state.overlay.lock().await.last_ui_latency_ms = Some(ui_ms);
+                            }
+
+                            update_overlay_mirror(&loop_state, &msg.text, msg.is_final).await;
+
+                            let latency = msg.latency.map(|b| LatencyBreakdownDto {
+                                buffer_ms: b.buffer_ms,
+                                azure_ms: b.azure_ms,
+                                stt_wall_ms: b.stt_wall_ms,
+                                estimated_e2e_ms: b.estimated_e2e_ms,
+                                language: b.language,
+                            });
+
                             let _ = app.emit(
                                 "transcript",
                                 TranscriptPayload {
@@ -110,6 +293,8 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
                                     } else {
                                         Some(msg.feedback)
                                     },
+                                    timestamp_unix_ms: msg.timestamp_unix_ms,
+                                    latency,
                                 },
                             );
                         }
@@ -179,25 +364,42 @@ pub fn run() {
     let config = ThemisConfig::from_env();
     spawn_service_if_needed(&config);
 
-    let hotkey = if cfg!(target_os = "macos") {
+    let hotkey_toggle = if cfg!(target_os = "macos") {
         "Command+Shift+KeyT"
     } else {
         "Ctrl+Shift+KeyT"
     };
+    let hotkey_diagnose = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyD"
+    } else {
+        "Ctrl+Shift+KeyD"
+    };
+
+    let sc_toggle: tauri_plugin_global_shortcut::Shortcut = hotkey_toggle
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_toggle}: {e}"));
+    let sc_diagnose: tauri_plugin_global_shortcut::Shortcut = hotkey_diagnose
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_diagnose}: {e}"));
 
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts([hotkey])
-                .unwrap_or_else(|e| panic!("invalid hotkey {hotkey}: {e}"))
+                .with_shortcuts([hotkey_toggle, hotkey_diagnose])
+                .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
                 .with_handler({
-                    move |app, _shortcut, event| {
+                    move |app, shortcut, event| {
                         use tauri_plugin_global_shortcut::ShortcutState;
-                        if event.state == ShortcutState::Pressed {
+                        if event.state != ShortcutState::Pressed {
+                            return;
+                        }
+                        if shortcut == &sc_toggle {
                             let app = app.clone();
                             tauri::async_runtime::spawn(async move {
                                 let _ = toggle_capture(app).await;
                             });
+                        } else if shortcut == &sc_diagnose {
+                            let _ = toggle_diagnose_window(app.clone());
                         }
                     }
                 })
@@ -206,8 +408,15 @@ pub fn run() {
         .setup(move |app| {
             let show_i = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Toggle capture", true, None::<&str>)?;
+            let diag_i = MenuItem::with_id(
+                app,
+                "diagnose",
+                "Diagnostics (Ctrl+Shift+D)",
+                true,
+                None::<&str>,
+            )?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &diag_i, &quit_i])?;
 
             let icon = app
                 .default_window_icon()
@@ -229,6 +438,9 @@ pub fn run() {
                         tauri::async_runtime::spawn(async move {
                             let _ = toggle_capture(app).await;
                         });
+                    }
+                    "diagnose" => {
+                        let _ = toggle_diagnose_window(app.clone());
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -260,8 +472,14 @@ pub fn run() {
             config: config.clone(),
             capturing: Arc::new(Mutex::new(false)),
             stream_task: Arc::new(Mutex::new(None)),
+            overlay: Arc::new(Mutex::new(OverlayMirror::default())),
         })
-        .invoke_handler(tauri::generate_handler![get_status, toggle_capture])
+        .invoke_handler(tauri::generate_handler![
+            get_status,
+            toggle_capture,
+            get_diagnostics,
+            toggle_diagnose_window
+        ])
         .run(tauri::generate_context!())
         .expect("error running Themis tray");
 }

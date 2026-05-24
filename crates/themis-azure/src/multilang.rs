@@ -5,6 +5,8 @@ use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Instant;
+use themis_core::LatencyBreakdown;
 use tokio::sync::{broadcast, Mutex};
 use tracing::{debug, warn};
 
@@ -35,7 +37,12 @@ impl AzureMultiLangRestRecognizer {
         }
     }
 
-    async fn recognize_chunk(&self, pcm: Vec<i16>) -> anyhow::Result<Option<ParsedRecognition>> {
+    async fn recognize_chunk(
+        &self,
+        pcm: Vec<i16>,
+    ) -> anyhow::Result<Option<(ParsedRecognition, LatencyBreakdown)>> {
+        let wall = Instant::now();
+        let buffer_ms = chunk_buffer_ms();
         let mut tasks = Vec::with_capacity(self.languages.len());
         for lang in &self.languages {
             let client = self.client.clone();
@@ -48,22 +55,36 @@ impl AzureMultiLangRestRecognizer {
             }));
         }
 
-        let mut parsed = Vec::new();
+        let mut scored: Vec<(ParsedRecognition, u32)> = Vec::new();
         for t in tasks {
             match t.await {
-                Ok(Ok(opt)) => parsed.push(opt),
-                Ok(Err(e)) => {
-                    debug!(error = %e, "one language candidate failed");
-                    parsed.push(None);
+                Ok(Ok((opt, azure_ms))) => {
+                    if let Some(p) = opt {
+                        scored.push((p, azure_ms));
+                    }
                 }
-                Err(e) => {
-                    debug!(error = %e, "language task join failed");
-                    parsed.push(None);
-                }
+                Ok(Err(e)) => debug!(error = %e, "one language candidate failed"),
+                Err(e) => debug!(error = %e, "language task join failed"),
             }
         }
 
-        Ok(recognition::pick_best(parsed))
+        let Some((best, azure_ms)) = scored.into_iter().max_by(|a, b| {
+            a.0.confidence
+                .partial_cmp(&b.0.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }) else {
+            return Ok(None);
+        };
+
+        let stt_wall_ms = wall.elapsed().as_millis() as u32;
+        let breakdown = LatencyBreakdown {
+            buffer_ms,
+            azure_ms,
+            stt_wall_ms,
+            estimated_e2e_ms: buffer_ms.saturating_add(azure_ms),
+            language: best.language.clone(),
+        };
+        Ok(Some((best, breakdown)))
     }
 
     /// One-shot probe (CLI).
@@ -71,8 +92,12 @@ impl AzureMultiLangRestRecognizer {
         Ok(self
             .recognize_chunk(pcm)
             .await?
-            .map(|r| r.text))
+            .map(|(r, _)| r.text))
     }
+}
+
+fn chunk_buffer_ms() -> u32 {
+    (CHUNK_SAMPLES as u32 * 1000) / 16_000
 }
 
 #[async_trait]
@@ -85,6 +110,7 @@ impl SpeechRecognizer for AzureMultiLangRestRecognizer {
                 "Azure auto-language ({langs}) — picking best match every ~4s"
             ),
             is_final: false,
+            latency: None,
         });
         Ok(())
     }
@@ -118,14 +144,16 @@ impl SpeechRecognizer for AzureMultiLangRestRecognizer {
         let this = self.clone_inner();
         tokio::spawn(async move {
             match this.recognize_chunk(chunk).await {
-                Ok(Some(result)) => {
+                Ok(Some((result, latency))) => {
                     let _ = this.tx.send(SpeechEvent {
                         text: result.text.clone(),
                         is_final: false,
+                        latency: Some(latency.clone()),
                     });
                     let _ = this.tx.send(SpeechEvent {
                         text: result.text,
                         is_final: true,
+                        latency: Some(latency),
                     });
                 }
                 Ok(None) => {
@@ -136,6 +164,7 @@ impl SpeechRecognizer for AzureMultiLangRestRecognizer {
                     let _ = this.tx.send(SpeechEvent {
                         text: format!("Azure error: {e}"),
                         is_final: true,
+                        latency: None,
                     });
                 }
             }

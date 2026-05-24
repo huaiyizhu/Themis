@@ -61,7 +61,8 @@ pub async fn recognize_pcm(
     region: &str,
     language: &str,
     pcm: &[i16],
-) -> anyhow::Result<Option<ParsedRecognition>> {
+) -> anyhow::Result<(Option<ParsedRecognition>, u32)> {
+    let started = std::time::Instant::now();
     let url = format!(
         "https://{region}.stt.speech.microsoft.com/speech/recognition/dictation/cognitiveservices/v1?language={language}&format=detailed&punctuation=implicit"
     );
@@ -81,7 +82,8 @@ pub async fn recognize_pcm(
     }
 
     let json: serde_json::Value = resp.json().await?;
-    Ok(parse_detailed(&json, language))
+    let azure_ms = started.elapsed().as_millis() as u32;
+    Ok((parse_detailed(&json, language), azure_ms))
 }
 
 pub fn pick_best(results: Vec<Option<ParsedRecognition>>) -> Option<ParsedRecognition> {

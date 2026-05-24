@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { resolve } from "node:path";
 
 export default defineConfig({
   clearScreen: false,
@@ -8,5 +9,11 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, "index.html"),
+        diagnose: resolve(__dirname, "diagnose.html"),
+      },
+    },
   },
 });
