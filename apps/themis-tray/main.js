@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const overlayEl = document.getElementById("overlay");
+const dragHandle = document.getElementById("drag-handle");
 const themeBadgeEl = document.getElementById("theme-badge");
 const statusEl = document.getElementById("status");
 const scrollEl = document.getElementById("transcript-scroll");
@@ -18,6 +20,22 @@ let partialText = "";
 let followLatest = true;
 
 const SCROLL_BOTTOM_THRESHOLD = 48;
+
+/** Programmatic drag avoids Windows WM_NCHITTEST fighting resize after data-tauri-drag-region. */
+function setupWindowDrag() {
+  dragHandle.addEventListener("mousedown", async (e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest("button, a, input, select, textarea")) return;
+    e.preventDefault();
+    try {
+      await getCurrentWindow().startDragging();
+    } catch {
+      /* browser preview */
+    }
+  });
+}
+
+setupWindowDrag();
 
 function isNearBottom() {
   return (

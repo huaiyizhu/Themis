@@ -10,43 +10,66 @@ body {
   font-family: "Segoe UI", system-ui, sans-serif;
   height: 100%;
   overflow: hidden;
-  position: relative;
+  /* Leave a thin margin so native edge hit-test can coexist with custom chrome */
+  padding: 3px;
 }
 
-/* Invisible resize hit targets (edges + corners) */
-.resize-edge {
+#overlay {
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 12px 12px;
+  position: relative;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* Resize handles live inside the panel, below the drag header in z-order */
+.resize-layer {
+  inset: 0;
+  pointer-events: none;
   position: absolute;
-  z-index: 20;
+  z-index: 5;
+}
+
+.resize-edge {
+  pointer-events: auto;
+  position: absolute;
 }
 
 .resize-n {
   top: 0;
-  left: 10px;
-  right: 10px;
-  height: 6px;
+  left: 16px;
+  right: 16px;
+  height: 5px;
   cursor: ns-resize;
 }
 
 .resize-s {
   bottom: 0;
-  left: 10px;
-  right: 10px;
+  left: 16px;
+  right: 16px;
   height: 6px;
   cursor: ns-resize;
 }
 
+/* Side grips start below title bar so they never steal drag from the header */
 .resize-e {
-  top: 10px;
+  top: 40px;
   right: 0;
-  bottom: 10px;
+  bottom: 12px;
   width: 6px;
   cursor: ew-resize;
 }
 
 .resize-w {
-  top: 10px;
+  top: 40px;
   left: 0;
-  bottom: 10px;
+  bottom: 12px;
   width: 6px;
   cursor: ew-resize;
 }
@@ -54,48 +77,33 @@ body {
 .resize-ne {
   top: 0;
   right: 0;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   cursor: nesw-resize;
 }
 
 .resize-nw {
   top: 0;
   left: 0;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   cursor: nwse-resize;
 }
 
 .resize-se {
   right: 0;
   bottom: 0;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   cursor: nwse-resize;
 }
 
 .resize-sw {
   left: 0;
   bottom: 0;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   cursor: nesw-resize;
-}
-
-#overlay {
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  height: calc(100% - 4px);
-  margin: 2px;
-  max-height: calc(100vh - 4px);
-  min-height: 0;
-  padding: 10px 12px 12px;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
 }
 
 /* --- Theme presets --- */
@@ -166,11 +174,27 @@ body.adaptive-on .theme-badge::after {
   flex-shrink: 0;
   gap: 8px;
   justify-content: space-between;
+  position: relative;
   user-select: none;
+  z-index: 30;
+  -webkit-app-region: no-drag;
 }
 
 .overlay-header:active {
   cursor: grabbing;
+}
+
+.overlay-header .scroll-latest {
+  -webkit-app-region: no-drag;
+  cursor: pointer;
+}
+
+.transcript-scroll,
+.status-line,
+.feedback-line {
+  -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 10;
 }
 
 .header-left {
