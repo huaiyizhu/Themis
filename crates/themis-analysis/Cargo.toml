@@ -1,0 +1,15 @@
+[package]
+name = "themis-analysis"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+regex = "1"
+reqwest = { workspace = true, features = ["json"] }
+serde.workspace = true
+serde_json.workspace = true
+themis-core.workspace = true
+tokio.workspace = true
+tracing.workspace = true
