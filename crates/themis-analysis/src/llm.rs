@@ -43,13 +43,26 @@ impl LlmAnalyzer {
             self.endpoint, self.deployment
         );
 
-        let system = "You extract keywords, technical terms, and questions from live speech transcripts. \
-Respond ONLY with valid JSON matching this schema: \
+        let system = "You extract TECH-focused keywords, specialized terminology, and substantively \
+challenging questions from live speech transcripts. \
+Respond ONLY with valid JSON: \
 {\"keywords\":[\"...\"],\"terms\":[{\"term\":\"...\",\"explanation\":\"...\"}],\
 \"questions\":[{\"question\":\"...\",\"answer\":\"...\"}]}. \
-Rules: keywords max 8; terms max 6 with concise bilingual explanations when helpful; \
-questions max 3 with brief factual answers (2-3 sentences). \
-If nothing notable, return empty arrays.";
+\
+KEYWORDS (max 8): Prioritize AI/ML, software engineering, cloud/infra, data, security, and adjacent \
+technical domains. Include acronyms and product/framework names when domain-specific (RAG, LLM, CUDA, \
+Kubernetes). EXCLUDE generic daily words, sports/entertainment, people's names, places, and obvious \
+business buzzwords without technical meaning. \
+\
+TERMS (max 6): Only jargon that a general audience would NOT already understand well — e.g. RLHF, MoE, \
+KV cache, embedding space, retrieval reranking. Give concise explanations (bilingual zh/en when helpful). \
+EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
+\
+QUESTIONS (max 3): Only REAL technical or conceptual questions that need expertise — mechanisms, \
+tradeoffs, comparisons, failure modes, architecture, edge cases. Answers: 2-4 sentences, factual. \
+EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk, and trivial \
+one-liner definitions. \
+If nothing meets this bar, return empty arrays.";
 
         let body = ChatRequest {
             messages: vec![

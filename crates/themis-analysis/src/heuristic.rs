@@ -1,4 +1,4 @@
-//! Rule-based extraction: glossary, English tech words, Chinese/English questions.
+//! Rule-based extraction: glossary, tech-shaped English tokens, substantive questions.
 
 use crate::glossary;
 use regex::Regex;
@@ -26,6 +26,22 @@ static EN_WHAT_IS_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)what\s+is\s+(?:an?\s+)?([A-Za-z][A-Za-z0-9_-]+)").expect("what is x")
 });
 
+/// Common English words that should not become keywords on their own.
+static COMMON_WORDS: &[&str] = &[
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was", "one", "our",
+    "out", "day", "get", "has", "him", "his", "how", "its", "may", "new", "now", "old", "see", "two",
+    "way", "who", "did", "she", "use", "many", "some", "time", "very", "when", "come", "here", "just",
+    "like", "long", "make", "much", "over", "such", "take", "than", "them", "well", "were", "what",
+    "with", "your", "from", "have", "this", "that", "will", "they", "been", "each", "which", "their",
+    "said", "also", "into", "only", "other", "about", "after", "before", "being", "between", "both",
+    "could", "first", "more", "most", "should", "these", "those", "through", "under", "where", "while",
+    "would", "there", "then", "than", "because", "during", "without", "within", "against", "again",
+    "game", "games", "team", "teams", "tonight", "today", "tomorrow", "yesterday", "week", "month",
+    "year", "people", "person", "thing", "things", "good", "great", "best", "bad", "nice",
+    "really", "very", "think", "know", "want", "need", "look", "looking", "talk", "talking", "said",
+    "say", "says", "tell", "told", "going", "went", "come", "came", "right", "left", "back", "next",
+];
+
 pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
     let text = transcript.trim();
     if text.is_empty() {
@@ -44,18 +60,44 @@ pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
         if let Some(m) = cap.get(0) {
             let word = m.as_str();
             add_glossary_hit(&mut result, word);
-            push_keyword(&mut result, word);
+            if is_tech_shaped(word) && !is_common_word(word) {
+                push_keyword(&mut result, word);
+            }
         }
     }
 
     for q in extract_questions(text) {
-        attach_question(&mut result, &q);
+        if is_substantive_question(&q) {
+            attach_question(&mut result, &q);
+        }
     }
 
     result.keywords.truncate(10);
     result.terms.truncate(8);
     result.questions.truncate(4);
     result
+}
+
+fn is_common_word(word: &str) -> bool {
+    let lower = word.to_lowercase();
+    COMMON_WORDS.iter().any(|w| *w == lower.as_str())
+}
+
+/// English token looks like a technical identifier (not plain dictionary prose).
+fn is_tech_shaped(word: &str) -> bool {
+    if word.len() < 3 {
+        return false;
+    }
+    if word.contains('-') || word.contains('_') {
+        return true;
+    }
+    if word.chars().any(|c| c.is_ascii_digit()) {
+        return true;
+    }
+    let has_lower = word.chars().any(|c| c.is_ascii_lowercase());
+    let has_upper = word.chars().any(|c| c.is_ascii_uppercase());
+    // CamelCase / PascalCase, e.g. ChatGPT, PyTorch
+    has_lower && has_upper
 }
 
 fn add_glossary_hit(result: &mut AnalysisResult, raw: &str) {
@@ -117,6 +159,151 @@ fn subject_from_question(q: &str) -> Option<String> {
         return cap.get(1).map(|m| m.as_str().to_string());
     }
     None
+}
+
+fn contains_technical_signal(text: &str) -> bool {
+    if is_tech_shaped(text) {
+        return true;
+    }
+    for cap in EN_WORD_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            let w = m.as_str();
+            if glossary::lookup(w).is_some() {
+                return true;
+            }
+            if is_tech_shaped(w) && !is_common_word(w) {
+                return true;
+            }
+        }
+    }
+    for cap in ACRONYM_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            if glossary::lookup(m.as_str()).is_some() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn is_substantive_question(q: &str) -> bool {
+    let trimmed = q.trim();
+    let q_lower = q.to_lowercase();
+    let char_count = trimmed.chars().count();
+
+    if char_count < 6 {
+        return false;
+    }
+
+    const RHETORICAL: &[&str] = &[
+        "对吧",
+        "是不是",
+        "好吗",
+        "行吗",
+        "可以吗",
+        "有问题吗",
+        "你知道吗",
+        "你知道吧",
+        "明白吗",
+        "懂吗",
+        "听懂了吗",
+        "清楚了吗",
+        "明白了吗",
+        "是吗",
+        "真的吗",
+        "对不对",
+        "没问题吧",
+        "可以理解吗",
+        "听懂没有",
+        "isn't it",
+        "don't you",
+        "you know",
+        "does that make sense",
+        "can you hear",
+        "are you there",
+        "right?",
+        "correct?",
+        "ok?",
+        "okay?",
+    ];
+    if RHETORICAL.iter().any(|p| q_lower.contains(p)) {
+        return false;
+    }
+
+    let has_question_marker = trimmed.contains('?')
+        || trimmed.contains('？')
+        || q_lower.contains("what is")
+        || q_lower.contains("what's")
+        || q_lower.contains("how does")
+        || q_lower.contains("how do")
+        || q_lower.contains("how to")
+        || q_lower.contains("why ")
+        || trimmed.contains("为什么")
+        || trimmed.contains("如何")
+        || trimmed.contains("怎么")
+        || trimmed.contains("什么")
+        || trimmed.contains("为何")
+        || trimmed.contains("怎样");
+
+    if !has_question_marker {
+        return false;
+    }
+
+    // 「X是什么」/ what is X with a technical subject always counts
+    if let Some(subject) = subject_from_question(trimmed) {
+        if glossary::lookup(&subject).is_some() || is_tech_shaped(&subject) {
+            return true;
+        }
+    }
+
+    if contains_technical_signal(trimmed) {
+        return true;
+    }
+
+    // Deeper why/how questions without explicit glossary hits
+    let is_deep_why_how = trimmed.contains("为什么")
+        || trimmed.contains("为何")
+        || trimmed.contains("如何")
+        || trimmed.contains("怎么")
+        || trimmed.contains("怎样")
+        || q_lower.contains("why ")
+        || q_lower.contains("how does")
+        || q_lower.contains("how do");
+    if is_deep_why_how && char_count >= 12 {
+        return true;
+    }
+
+    // Comparison / tradeoff / mechanism phrasing
+    const DEEP_MARKERS: &[&str] = &[
+        "区别",
+        "差异",
+        "对比",
+        "比较",
+        "原理",
+        "机制",
+        "tradeoff",
+        "trade-off",
+        " versus ",
+        " vs ",
+        "相比",
+        "优缺点",
+        "局限",
+        "瓶颈",
+        "失败",
+        "幻觉",
+        "延迟",
+        "吞吐",
+        "成本",
+        "扩展",
+        "架构",
+        "实现",
+        "优化",
+    ];
+    if DEEP_MARKERS.iter().any(|m| q_lower.contains(m)) && char_count >= 10 {
+        return true;
+    }
+
+    false
 }
 
 fn extract_questions(text: &str) -> Vec<String> {
@@ -200,10 +387,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn finds_rag_and_nba() {
+    fn finds_rag_not_generic_words() {
         let r = analyze_heuristic("What is RAG in AI? NBA games tonight.");
         assert!(r.terms.iter().any(|t| t.term == "RAG"));
-        assert!(r.terms.iter().any(|t| t.term == "NBA"));
+        assert!(
+            !r.keywords.iter().any(|k| k.eq_ignore_ascii_case("games")),
+            "keywords: {:?}",
+            r.keywords
+        );
+        assert!(
+            !r.keywords.iter().any(|k| k.eq_ignore_ascii_case("nba")),
+            "keywords: {:?}",
+            r.keywords
+        );
     }
 
     #[test]
@@ -224,6 +420,26 @@ mod tests {
                 || r.questions[0].answer.to_lowercase().contains("embedding"),
             "answer: {}",
             r.questions[0].answer
+        );
+    }
+
+    #[test]
+    fn filters_rhetorical_questions() {
+        let r = analyze_heuristic("这个功能对吧？你明白了吗？");
+        assert!(
+            r.questions.is_empty(),
+            "expected no rhetorical questions, got {:?}",
+            r.questions
+        );
+    }
+
+    #[test]
+    fn keeps_deep_technical_question() {
+        let r = analyze_heuristic("为什么 RAG 比纯 LLM 更不容易产生幻觉？");
+        assert!(
+            !r.questions.is_empty(),
+            "expected substantive question, got {:?}",
+            r.questions
         );
     }
 }
