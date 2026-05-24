@@ -133,7 +133,7 @@ npm run tauri dev
 |------|------|------|
 | `AZURE_SPEECH_KEY` | 是* | Speech 资源密钥 |
 | `AZURE_SPEECH_REGION` | 是* | 区域，如 `eastus` |
-| `AZURE_SPEECH_LANGUAGE` | 建议 | 与音频语言一致：`en-US` 英文，`zh-CN` 中文。**不匹配时常见整句只出几个词** |
+| `AZURE_SPEECH_LANGUAGE` | 建议 | **`auto`**（默认，中英自动）\| `en-US` \| `zh-CN` \| `en-US,zh-CN` |
 | `AZURE_SPEECH_MODE` | 否 | `streaming`（默认，整句流式）或 `rest`（6 秒分块，备用） |
 | `THEMIS_AUDIO_CAPTURE_MODE` | 否 | **Windows**：`auto`（默认，优先进程 loopback）\| `process` \| `endpoint` |
 | `THEMIS_AUDIO_OUTPUT_DEVICE` | 否 | **仅 endpoint 模式**：播放设备友好名子串或 endpoint ID |
@@ -232,7 +232,7 @@ capturing | capture=process sessions=2 peak=12000 frames=800 signal=strong
 
 先确认采集：`.\scripts\themis.ps1 probe` 必须 `OK` 且 `peak > 200`。
 
-1. 检查 **`AZURE_SPEECH_LANGUAGE`** 是否与播放内容语言一致。
+1. 使用 **`AZURE_SPEECH_LANGUAGE=auto`**（默认）自动中英识别；或手动指定单一语言。
 2. 确认 `.env` 已保存并 **`.\scripts\themis.ps1 restart`**。
 3. 确认 `THEMIS_AUDIO_CAPTURE_MODE=auto`。
 4. 尝试 `AZURE_SPEECH_MODE=streaming`（默认）；若 WebSocket 失败可暂用 `rest`。

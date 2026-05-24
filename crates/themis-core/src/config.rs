@@ -11,7 +11,7 @@ pub struct ThemisConfig {
     pub grpc_port: u16,
     pub log_level: String,
     pub use_mock_speech: bool,
-    /// Azure Speech recognition language, e.g. `zh-CN`, `en-US`
+    /// Azure Speech: `auto` (en+zh), `en-US`, `zh-CN`, or comma-separated list
     pub speech_language: String,
     pub sample_rate: u32,
     pub channels: u16,
@@ -35,7 +35,7 @@ impl Default for ThemisConfig {
             grpc_port: 50051,
             log_level: "info".into(),
             use_mock_speech: false,
-            speech_language: "en-US".into(),
+            speech_language: "auto".into(),
             sample_rate: 16_000,
             channels: 1,
             audio_output_device: None,
@@ -74,7 +74,7 @@ impl ThemisConfig {
             log_level: std::env::var("THEMIS_LOG_LEVEL").unwrap_or_else(|_| "info".into()),
             use_mock_speech: use_mock,
             speech_language: std::env::var("AZURE_SPEECH_LANGUAGE")
-                .unwrap_or_else(|_| "en-US".into()),
+                .unwrap_or_else(|_| "auto".into()),
             sample_rate: 16_000,
             channels: 1,
             audio_output_device: std::env::var("THEMIS_AUDIO_OUTPUT_DEVICE")

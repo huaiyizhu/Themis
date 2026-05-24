@@ -117,9 +117,10 @@ async function refreshStatus() {
 
 function isSystemMessage(text) {
   return (
-    /^Azure (REST|streaming)/i.test(text) ||
+    /^Azure (REST|streaming|auto-language)/i.test(text) ||
     text.includes("connected…") ||
-    text.includes("transcribing every")
+    text.includes("transcribing every") ||
+    text.includes("picking best match")
   );
 }
 

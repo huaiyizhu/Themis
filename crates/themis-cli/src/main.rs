@@ -164,7 +164,6 @@ async fn cmd_stt_probe(config: &ThemisConfig, seconds: u64) -> anyhow::Result<()
     use std::time::{Duration, Instant};
     use themis_audio::{create_loopback, SystemAudioOptions};
     use themis_core::{normalize_pcm16, CaptureDiagnostics};
-    use themis_azure::AzureRestRecognizer;
     use tokio::sync::mpsc;
 
     let (key, region) = match (&config.azure_speech_key, &config.azure_speech_region) {
@@ -207,9 +206,23 @@ async fn cmd_stt_probe(config: &ThemisConfig, seconds: u64) -> anyhow::Result<()
         anyhow::bail!("capture too quiet — fix audio before testing STT");
     }
 
-    let recognizer = AzureRestRecognizer::new(key, region, config.speech_language.clone());
-    println!("calling Azure REST dictation...");
-    let text = recognizer.recognize_pcm(pcm).await?;
+    use themis_azure::{resolve_speech_languages, AzureMultiLangRestRecognizer, AzureRestRecognizer};
+    let langs = resolve_speech_languages(config);
+    println!("languages: {}", langs.join(", "));
+    println!("calling Azure dictation...");
+    let text = if langs.len() > 1 {
+        AzureMultiLangRestRecognizer::new(key, region, langs)
+            .recognize_pcm(pcm)
+            .await?
+    } else {
+        AzureRestRecognizer::new(
+            key,
+            region,
+            langs.into_iter().next().unwrap_or_else(|| "en-US".into()),
+        )
+        .recognize_pcm(pcm)
+        .await?
+    };
     match text {
         Some(t) => {
             println!("\nOK — Azure heard:\n  {t}");
