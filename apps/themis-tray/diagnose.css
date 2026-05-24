@@ -145,3 +145,144 @@ tr:last-child td {
   color: var(--muted);
   font-style: italic;
 }
+
+.pipeline-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pipe-step {
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-width: 140px;
+}
+
+.pipe-stt {
+  border-left: 3px solid #6eb5ff;
+}
+
+.pipe-heuristic {
+  border-left: 3px solid #7dcea0;
+}
+
+.pipe-llm {
+  border-left: 3px solid #f5b041;
+}
+
+.pipe-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pipe-desc {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.pipe-arrow {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.split-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .split-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.split-col {
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 8px;
+  min-height: 80px;
+}
+
+.split-col h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.col-heuristic h3 {
+  color: #7dcea0;
+}
+
+.col-llm h3 {
+  color: #f5b041;
+}
+
+.col-merged h3 {
+  color: var(--accent);
+}
+
+.latest-phrase {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.insight-block {
+  font-size: 11px;
+  line-height: 1.4;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ib-row {
+  margin-bottom: 6px;
+}
+
+.ib-label {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.tag {
+  display: inline-block;
+  background: rgba(120, 160, 255, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin: 1px 2px 1px 0;
+  font-size: 10px;
+}
+
+.ib-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 5px 6px;
+  margin-bottom: 5px;
+}
+
+.ib-term {
+  font-weight: 600;
+  color: #9bdcff;
+  margin-bottom: 2px;
+}
+
+.ib-q {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.ib-a {
+  opacity: 0.9;
+}
+
+td.compact {
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 120px;
+}

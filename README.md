@@ -130,7 +130,7 @@ npm run tauri dev
 
 浮层**始终置顶**。风格预设：`dark-glass`、`light-glass`、`high-contrast-dark`、`high-contrast-light`、`outline`。**自适应**（`Ctrl+Shift+A`）会采样浮层下方的桌面亮度，自动在深浅面板间切换（Windows）。
 
-**Insights 侧栏**（浮层右侧）：对**每一句最终听写结果**做关键词、术语解释与问题初答，详见下文 [Insights 洞察](#insights-洞察关键词--术语--问答)。**诊断窗口**（`Ctrl+Shift+D`）用于延迟分解，见 [延迟诊断](#延迟诊断)。
+**Insights 侧栏**（浮层右侧）：对**每一句最终听写结果**做关键词、术语解释与问题初答，详见下文 [Insights 洞察](#insights-洞察关键词--术语--问答)。**诊断窗口**（`Ctrl+Shift+D`）可查看 STT 延迟与启发式/LLM 分析拆分，见 [延迟诊断](#延迟诊断)。
 
 开始采集后，字幕在浮层中**逐句累积**（最终结果追加，过程中显示灰色 partial）。
 
@@ -146,6 +146,8 @@ npm run tauri dev
 | `AZURE_SPEECH_REGION` | 是* | 区域，如 `eastus` |
 | `AZURE_SPEECH_LANGUAGE` | 建议 | **`auto`**（默认，中英自动）\| `en-US` \| `zh-CN` \| `en-US,zh-CN` |
 | `AZURE_SPEECH_MODE` | 否 | `streaming`（整句流式）或 `rest`（默认，**2 秒**分块） |
+| `THEMIS_STT_FIXUP` | 否 | 默认 `true`：STT 后术语纠错（如 Reg→RAG） |
+| `AZURE_SPEECH_CORRECTIONS` | 否 | 额外纠错对，如 `Reg:RAG,某词:正确词` |
 | `THEMIS_AUDIO_CAPTURE_MODE` | 否 | **Windows**：`auto`（默认，优先进程 loopback）\| `process` \| `endpoint` |
 | `THEMIS_AUDIO_OUTPUT_DEVICE` | 否 | **仅 endpoint 模式**：播放设备友好名子串或 endpoint ID |
 | `THEMIS_AUDIO_GAIN_MAX` | 否 | 自动增益上限，默认 `16` |
@@ -278,7 +280,12 @@ THEMIS_ANALYSIS_ENABLED=true
 
 ### 延迟诊断
 
-**诊断窗口**（`Ctrl+Shift+D` 或托盘 **Diagnostics**）与 Insights **无关**，专用于听写链路延迟：
+**诊断窗口**（`Ctrl+Shift+D` 或托盘 **Diagnostics**）用于看清 **STT** 与 **分析** 各自在做什么：
+
+- **Pipeline**：音频 → Azure STT（字幕文本）→ 启发式（词表/正则，本地即时）→ 可选 LLM（`FOUNDRY_*`）→ 合并后写入浮层 Insights。
+- **STT 延迟表**：Buffer / Azure / E2E / UI（见下表）。
+- **Latest phrase — analysis split**：同一句的最终听写，分别展示启发式、LLM、合并三路的关键词 / 术语 / 问答。
+- **Analysis history**：每句的启发式与 LLM 产出摘要、`llm_status`（`ok` / `empty` / `disabled` / `error`）及耗时。
 
 | 指标 | 含义 |
 |------|------|
@@ -364,6 +371,47 @@ capturing | capture=process sessions=2 peak=12000 frames=800 signal=strong
 
 - 先运行 `.\scripts\themis.ps1 dev` 或 `restart`，或 `.\scripts\themis.ps1 status` 确认进程在跑。
 - 检查端口是否与 `.env` 中 `THEMIS_GRPC_PORT` 一致。
+
+### 听写把技术词听错（如 RAG → Reg）
+
+Azure 听中文视频里的英文缩写时，常把 **RAG** 听成 **Reg**（发音接近）。Themis 默认在 STT 结果上做一次**术语纠错**（[`transcript_fixup.rs`](crates/themis-azure/src/transcript_fixup.rs)）：
+
+| 机制 | 说明 |
+|------|------|
+| **内置替换** | `Reg` / `REG` → `RAG`（词边界）；句中出现 AI、知识、资料等上下文时，`Reg，` 也会纠正 |
+| **自定义** | `.env` 中 `AZURE_SPEECH_CORRECTIONS=误听:正确,Reg:RAG`（逗号分隔） |
+| **关闭** | `THEMIS_STT_FIXUP=false` |
+
+修改后 `.\scripts\themis.ps1 restart`。纠错后的文本会进入字幕与 Insights，词表里的 **RAG** 才能被正确解释。
+
+进一步从上游减少误听（可选，需 Azure 侧配置）：
+
+- 视频原声尽量清晰；`AZURE_SPEECH_LANGUAGE=auto` 或明确 `en-US,zh-CN`。
+- 专有名词很多时，可在 Azure 门户为该 Speech 资源配置 **Custom Speech / 短语列表**（当前 REST 分块接口未直接传 phrase list，故以本地纠错为主）。
+
+自定义纠错示例见 [.env.example](.env.example) 中 `AZURE_SPEECH_CORRECTIONS`（复制到 `.env` 后去掉注释）。
+
+### 换别的语音识别模型会更好吗？
+
+**有可能更好**，取决于场景：中文视频里夹英文术语、口音、背景 BGM 等。Themis **当前只接 Azure Speech**；换模型需要新做适配（接口在 `themis-azure`）。
+
+| 方案 | 适合场景 | 优点 | 缺点 / 备注 |
+|------|----------|------|-------------|
+| **Azure Speech（现状）** | 已用 Azure、要低延迟云端 | 与项目集成完整；`auto` 中英并行；可配 Custom Speech | 英文缩写偶发误听 → 用 `AZURE_SPEECH_CORRECTIONS` |
+| **Azure Custom Speech** | 固定领域词多（RAG、产品名） | 用你自己的音频+文本训练，专名词更稳 | 需标注数据与训练成本；集成比标准 STT 复杂 |
+| **Azure Speech `streaming`** | 要更快出字 | 边说边出 partial | 本项目里曾不稳定，默认 `rest` |
+| **OpenAI Whisper**（API 或本地） | 离线/成本敏感、多语言混合 | 术语与口音往往不错；本地无上传 | 非真正流式；延迟与算力需自管；需新写 `themis-whisper` |
+| **Deepgram** | 英文或实时流式 | 流式 API 成熟、延迟低 | 中文+英混需实测；付费 API |
+| **Google Cloud Speech-to-Text v2** | 已用 GCP | 短语/模型选择多 | 需新适配；国内访问视网络而定 |
+| **AssemblyAI** | 英文播客/会议 | 标点与说话人体验好 | 中文场景需自行验证 |
+
+**实用建议（不换代码的前提下）：**
+
+1. 继续 **Azure + `AZURE_SPEECH_LANGUAGE=auto`**，并打开 **`AZURE_SPEECH_CORRECTIONS`**（见 `.env.example`）。  
+2. 英文术语多的频道，可试 **`en-US,zh-CN`** 或暂时 **`en-US`** 对比效果。  
+3. 若 Reg→RAG 仍多，优先 **纠错表 + glossary**，比立刻换云厂商划算。
+
+**若你愿意换 Whisper / Deepgram 等**：可以说目标语言与延迟要求，可在 `themis-azure` 旁增加可选 backend（工作量中等，需改 `create_recognizer` 与配置项）。
 
 ### 能采集但几乎没有字幕 / 只有零星单词
 

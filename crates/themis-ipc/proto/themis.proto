@@ -59,6 +59,27 @@ message GetDiagnosticsRequest {}
 message GetDiagnosticsResponse {
   repeated LatencyRecord records = 1;
   LatencySummary summary = 2;
+  AnalysisDiagnosticsSummary analysis_summary = 3;
+  repeated AnalysisInsightRecord analysis_records = 4;
+}
+
+message AnalysisDiagnosticsSummary {
+  uint32 count = 1;
+  bool llm_configured = 2;
+  string last_llm_status = 3;
+}
+
+message AnalysisInsightRecord {
+  uint64 id = 1;
+  string text = 2;
+  int64 emitted_unix_ms = 3;
+  string heuristic_json = 4;
+  string llm_json = 5;
+  string merged_json = 6;
+  bool llm_configured = 7;
+  string llm_status = 8;
+  uint32 heuristic_ms = 9;
+  uint32 llm_ms = 10;
 }
 
 message LatencyBreakdown {

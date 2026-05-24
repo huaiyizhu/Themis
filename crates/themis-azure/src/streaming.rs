@@ -1,5 +1,6 @@
 //! Azure Speech continuous recognition over WebSocket (conversation API).
 
+use crate::transcript_fixup;
 use crate::{SpeechEvent, SpeechRecognizer};
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
@@ -88,13 +89,14 @@ impl AzureStreamingRecognizer {
                 .filter(|t| !t.is_empty());
 
             if let Some(phrase) = phrase {
+                let text = transcript_fixup::apply_contextual_fixup(phrase);
                 let is_final = json
                     .get("RecognitionStatus")
                     .and_then(|v| v.as_str())
                     .map(|s| s == "Success")
                     .unwrap_or_else(|| json.get("Text").is_none());
                 let _ = tx.send(SpeechEvent {
-                    text: phrase.to_string(),
+                    text,
                     is_final,
                     latency: None,
                 });

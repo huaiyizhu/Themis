@@ -4,8 +4,8 @@ use themis_analysis::create_analyzer;
 use themis_azure::create_recognizer;
 use chrono::Utc;
 use themis_core::{
-    normalize_pcm16, AudioFrame, CaptureDiagnostics, CaptureState, LatencyDiagnostics,
-    StateMachine, ThemisConfig, TranscriptEvent,
+    normalize_pcm16, AnalysisDiagnostics, AudioFrame, CaptureDiagnostics, CaptureState,
+    LatencyDiagnostics, StateMachine, ThemisConfig, TranscriptEvent,
 };
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tracing::{error, info};
@@ -16,6 +16,7 @@ pub struct CaptureEngine {
     transcript_tx: broadcast::Sender<TranscriptEvent>,
     capture_diag: Arc<CaptureDiagnostics>,
     latency_diag: Arc<LatencyDiagnostics>,
+    analysis_diag: Arc<AnalysisDiagnostics>,
     inner: Mutex<Option<RunningCapture>>,
 }
 
@@ -45,6 +46,7 @@ impl CaptureEngine {
         state: Arc<StateMachine>,
         capture_diag: Arc<CaptureDiagnostics>,
         latency_diag: Arc<LatencyDiagnostics>,
+        analysis_diag: Arc<AnalysisDiagnostics>,
     ) -> Self {
         let (transcript_tx, _) = broadcast::channel(256);
         Self {
@@ -53,6 +55,7 @@ impl CaptureEngine {
             transcript_tx,
             capture_diag,
             latency_diag,
+            analysis_diag,
             inner: Mutex::new(None),
         }
     }
@@ -76,6 +79,7 @@ impl CaptureEngine {
         }
 
         self.capture_diag.reset_session_peak();
+        self.analysis_diag.clear();
 
         let (frame_tx, frame_rx) = mpsc::channel::<AudioFrame>(256);
         let (stop_tx, stop_rx) = mpsc::channel::<()>(1);
@@ -126,6 +130,7 @@ impl CaptureEngine {
         });
 
         let latency_diag = Arc::clone(&self.latency_diag);
+        let analysis_diag = Arc::clone(&self.analysis_diag);
         let event_handle = tokio::spawn(async move {
             while let Ok(ev) = speech_events.recv().await {
                 if ev.is_final {
@@ -152,14 +157,19 @@ impl CaptureEngine {
                         emitted_unix_ms,
                         latency: latency.clone(),
                     });
+                    let analysis_diag = Arc::clone(&analysis_diag);
                     tokio::spawn(async move {
-                        let insights = analysis.analyze(&text).await.ok().flatten();
-                        let feedback = insights.as_ref().map(|i| i.summary());
+                        let detail = analysis.analyze(&text).await.ok().flatten();
+                        if let Some(ref d) = detail {
+                            analysis_diag.push(text.clone(), d);
+                        }
+                        let merged = detail.as_ref().map(|d| d.merged.clone());
+                        let feedback = merged.as_ref().map(|i| i.summary());
                         let _ = tx.send(TranscriptEvent {
                             text,
                             is_final: true,
                             feedback,
-                            insights,
+                            insights: merged,
                             emitted_unix_ms: Utc::now().timestamp_millis(),
                             latency,
                         });

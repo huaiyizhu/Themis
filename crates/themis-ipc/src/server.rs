@@ -8,8 +8,8 @@ use crate::proto::{
 use std::pin::Pin;
 use std::sync::Arc;
 use themis_core::{
-    CaptureDiagnostics, CaptureState, LatencyBreakdown, LatencyDiagnostics, StateMachine,
-    TranscriptEvent,
+    AnalysisDiagnostics, CaptureDiagnostics, CaptureState, LatencyBreakdown, LatencyDiagnostics,
+    StateMachine, TranscriptEvent,
 };
 use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
@@ -22,6 +22,7 @@ pub struct CaptureService {
     pub transcript_tx: broadcast::Sender<TranscriptEvent>,
     pub capture_diag: Arc<CaptureDiagnostics>,
     pub latency_diag: Arc<LatencyDiagnostics>,
+    pub analysis_diag: Arc<AnalysisDiagnostics>,
     pub engine: Arc<dyn CaptureEngineHandle + Send + Sync>,
 }
 
@@ -160,6 +161,30 @@ impl ThemisService for ThemisGrpcServer {
             })
             .collect();
         let summary = snap.summary;
+
+        let a_snap = self.service.analysis_diag.snapshot();
+        let analysis_records = a_snap
+            .records
+            .into_iter()
+            .map(|r| crate::proto::AnalysisInsightRecord {
+                id: r.id,
+                text: r.text,
+                emitted_unix_ms: r.emitted_unix_ms,
+                heuristic_json: r.heuristic.to_json(),
+                llm_json: r
+                    .llm
+                    .as_ref()
+                    .map(|l| l.to_json())
+                    .unwrap_or_default(),
+                merged_json: r.merged.to_json(),
+                llm_configured: r.llm_configured,
+                llm_status: r.llm_status,
+                heuristic_ms: r.heuristic_ms,
+                llm_ms: r.llm_ms.unwrap_or(0),
+            })
+            .collect();
+        let a_sum = a_snap.summary;
+
         Ok(Response::new(GetDiagnosticsResponse {
             records,
             summary: Some(ProtoLatencySummary {
@@ -169,6 +194,12 @@ impl ThemisService for ThemisGrpcServer {
                 max_e2e_ms: summary.max_e2e_ms,
                 last_azure_ms: summary.last_azure_ms,
             }),
+            analysis_summary: Some(crate::proto::AnalysisDiagnosticsSummary {
+                count: a_sum.count,
+                llm_configured: a_sum.llm_configured,
+                last_llm_status: a_sum.last_llm_status,
+            }),
+            analysis_records,
         }))
     }
 

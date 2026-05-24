@@ -76,16 +76,33 @@ impl AnalysisResult {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisMeta {
+    pub llm_configured: bool,
+    /// `disabled` | `skipped` | `ok` | `empty` | `timeout` | `error`
+    pub llm_status: String,
+    pub heuristic_ms: u32,
+    pub llm_ms: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalysisDetail {
+    pub merged: AnalysisResult,
+    pub heuristic: AnalysisResult,
+    pub llm: Option<AnalysisResult>,
+    pub meta: AnalysisMeta,
+}
+
 #[async_trait]
 pub trait AnalysisProvider: Send + Sync {
-    async fn analyze(&self, transcript: &str) -> anyhow::Result<Option<AnalysisResult>>;
+    async fn analyze(&self, transcript: &str) -> anyhow::Result<Option<AnalysisDetail>>;
 }
 
 pub struct NoopAnalysis;
 
 #[async_trait]
 impl AnalysisProvider for NoopAnalysis {
-    async fn analyze(&self, _transcript: &str) -> anyhow::Result<Option<AnalysisResult>> {
+    async fn analyze(&self, _transcript: &str) -> anyhow::Result<Option<AnalysisDetail>> {
         Ok(None)
     }
 }

@@ -5,6 +5,7 @@ mod recognition;
 mod recognizer;
 mod rest;
 mod streaming;
+mod transcript_fixup;
 
 pub use mock::MockSpeechRecognizer;
 pub use multilang::AzureMultiLangRestRecognizer;

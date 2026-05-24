@@ -2,7 +2,9 @@ mod engine;
 
 use engine::CaptureEngine;
 use std::sync::Arc;
-use themis_core::{CaptureDiagnostics, LatencyDiagnostics, StateMachine, ThemisConfig};
+use themis_core::{
+    AnalysisDiagnostics, CaptureDiagnostics, LatencyDiagnostics, StateMachine, ThemisConfig,
+};
 use themis_ipc::server::{CaptureEngineHandle, CaptureService, ThemisGrpcServer};
 use themis_ipc::ThemisServiceServer;
 use tonic::transport::Server;
@@ -38,11 +40,13 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(StateMachine::new());
     let capture_diag = Arc::new(CaptureDiagnostics::new());
     let latency_diag = Arc::new(LatencyDiagnostics::new(80));
+    let analysis_diag = Arc::new(AnalysisDiagnostics::new(80));
     let engine = Arc::new(CaptureEngine::new(
         config.clone(),
         Arc::clone(&state),
         Arc::clone(&capture_diag),
         Arc::clone(&latency_diag),
+        Arc::clone(&analysis_diag),
     ));
 
     let service = CaptureService {
@@ -50,6 +54,7 @@ async fn main() -> anyhow::Result<()> {
         transcript_tx: engine.transcript_sender(),
         capture_diag,
         latency_diag,
+        analysis_diag,
         engine: Arc::new(EngineHandle(Arc::clone(&engine))),
     };
 

@@ -10,29 +10,70 @@
     <header>
       <h1>Themis diagnostics</h1>
       <p class="hint">
-        <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> toggles this window. UI delay =
-        time from service emit → overlay receive.
+        <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> toggles this window. Compare
+        <strong>STT</strong> (Azure Speech) vs <strong>启发式</strong> (local rules) vs
+        <strong>LLM</strong> (Azure OpenAI, optional).
       </p>
     </header>
 
+    <section class="panel pipeline-panel">
+      <h2>Pipeline</h2>
+      <div class="pipeline-flow">
+        <div class="pipe-step pipe-stt">
+          <span class="pipe-title">1 · STT</span>
+          <span class="pipe-desc">Audio → Azure Speech → transcript text</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step pipe-heuristic">
+          <span class="pipe-title">2 · Heuristic</span>
+          <span class="pipe-desc">Glossary + regex (instant)</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step pipe-llm">
+          <span class="pipe-title">3 · LLM</span>
+          <span class="pipe-desc">FOUNDRY_* optional, merges into overlay</span>
+        </div>
+      </div>
+      <p id="analysis-meta" class="meta"></p>
+    </section>
+
     <section class="panel">
-      <h2>Current overlay</h2>
+      <h2>Current overlay (STT output)</h2>
       <pre id="overlay-text" class="overlay-box">—</pre>
       <p id="overlay-meta" class="meta"></p>
     </section>
 
     <section class="panel">
-      <h2>Summary (final phrases)</h2>
+      <h2>STT latency (final phrases)</h2>
       <div id="summary" class="summary-grid">—</div>
     </section>
 
     <section class="panel">
-      <h2>Latency history</h2>
+      <h2>Latest phrase — analysis split</h2>
+      <p id="latest-phrase" class="latest-phrase">—</p>
+      <div class="split-columns">
+        <div class="split-col col-heuristic">
+          <h3>Heuristic</h3>
+          <div id="latest-heuristic" class="insight-block">—</div>
+        </div>
+        <div class="split-col col-llm">
+          <h3>LLM</h3>
+          <div id="latest-llm" class="insight-block">—</div>
+        </div>
+        <div class="split-col col-merged">
+          <h3>Merged → overlay</h3>
+          <div id="latest-merged" class="insight-block">—</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>STT latency history</h2>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Text</th>
+              <th>Text (STT)</th>
               <th>Buffer</th>
               <th>Azure</th>
               <th>STT wall</th>
@@ -42,6 +83,26 @@
             </tr>
           </thead>
           <tbody id="records"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Analysis history (heuristic / LLM / merged)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Text</th>
+              <th>Heuristic</th>
+              <th>LLM</th>
+              <th>Merged</th>
+              <th>LLM status</th>
+              <th>H ms</th>
+              <th>LLM ms</th>
+            </tr>
+          </thead>
+          <tbody id="analysis-records"></tbody>
         </table>
       </div>
     </section>

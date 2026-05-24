@@ -1,5 +1,6 @@
 //! Shared Azure Speech REST dictation helpers.
 
+use crate::transcript_fixup;
 use tracing::debug;
 
 #[derive(Debug, Clone)]
@@ -48,11 +49,24 @@ pub fn parse_detailed(json: &serde_json::Value, language: &str) -> Option<Parsed
         .and_then(|v| v.as_f64())
         .unwrap_or(0.5) as f32;
 
+    let text = if fixup_enabled() {
+        transcript_fixup::apply_contextual_fixup(text)
+    } else {
+        text.to_string()
+    };
+
     Some(ParsedRecognition {
-        text: text.to_string(),
+        text,
         confidence,
         language: language.to_string(),
     })
+}
+
+fn fixup_enabled() -> bool {
+    std::env::var("THEMIS_STT_FIXUP")
+        .ok()
+        .map(|v| v != "0" && !v.eq_ignore_ascii_case("false"))
+        .unwrap_or(true)
 }
 
 pub async fn recognize_pcm(

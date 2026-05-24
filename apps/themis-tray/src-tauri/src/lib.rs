@@ -91,6 +91,27 @@ struct LatencySummaryDto {
     last_azure_ms: u32,
 }
 
+#[derive(Clone, Serialize, serde::Deserialize, Default)]
+struct AnalysisSummaryDto {
+    count: u32,
+    llm_configured: bool,
+    last_llm_status: String,
+}
+
+#[derive(Clone, Serialize, serde::Deserialize, Default)]
+struct AnalysisInsightRecordDto {
+    id: u64,
+    text: String,
+    emitted_unix_ms: i64,
+    heuristic: InsightsDto,
+    llm: Option<InsightsDto>,
+    merged: InsightsDto,
+    llm_configured: bool,
+    llm_status: String,
+    heuristic_ms: u32,
+    llm_ms: Option<u32>,
+}
+
 #[derive(Clone, Serialize)]
 struct DiagnosticsDto {
     overlay_display: String,
@@ -100,6 +121,8 @@ struct DiagnosticsDto {
     service_online: bool,
     summary: LatencySummaryDto,
     records: Vec<LatencyRecordDto>,
+    analysis_summary: AnalysisSummaryDto,
+    analysis_records: Vec<AnalysisInsightRecordDto>,
 }
 
 #[derive(Default)]
@@ -234,6 +257,33 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
         })
         .collect();
 
+    let a_sum = resp.analysis_summary.unwrap_or(themis_ipc::AnalysisDiagnosticsSummary {
+        count: 0,
+        llm_configured: false,
+        last_llm_status: String::new(),
+    });
+
+    let analysis_records = resp
+        .analysis_records
+        .into_iter()
+        .map(|r| AnalysisInsightRecordDto {
+            id: r.id,
+            text: r.text,
+            emitted_unix_ms: r.emitted_unix_ms,
+            heuristic: parse_insights_json(&r.heuristic_json).unwrap_or_default(),
+            llm: if r.llm_json.trim().is_empty() {
+                None
+            } else {
+                parse_insights_json(&r.llm_json)
+            },
+            merged: parse_insights_json(&r.merged_json).unwrap_or_default(),
+            llm_configured: r.llm_configured,
+            llm_status: r.llm_status,
+            heuristic_ms: r.heuristic_ms,
+            llm_ms: if r.llm_ms > 0 { Some(r.llm_ms) } else { None },
+        })
+        .collect();
+
     Ok(DiagnosticsDto {
         overlay_display,
         partial,
@@ -248,6 +298,12 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
             last_azure_ms: summary.last_azure_ms,
         },
         records,
+        analysis_summary: AnalysisSummaryDto {
+            count: a_sum.count,
+            llm_configured: a_sum.llm_configured,
+            last_llm_status: a_sum.last_llm_status,
+        },
+        analysis_records,
     })
 }
 
