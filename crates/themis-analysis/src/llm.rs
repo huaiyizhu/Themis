@@ -2,7 +2,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use themis_core::{AnalysisResult, QuestionInsight, TermInsight, ThemisConfig};
+use themis_core::{AnalysisResult, QuestionInsight, TermInsight, ThemisConfig, AnalysisContext};
 use tracing::{debug, warn};
 
 #[derive(Clone)]
@@ -32,7 +32,11 @@ impl LlmAnalyzer {
         })
     }
 
-    pub async fn analyze(&self, transcript: &str) -> anyhow::Result<Option<AnalysisResult>> {
+    pub async fn analyze(
+        &self,
+        transcript: &str,
+        ctx: &AnalysisContext,
+    ) -> anyhow::Result<Option<AnalysisResult>> {
         let text = transcript.trim();
         if text.len() < 6 {
             return Ok(None);
@@ -48,6 +52,10 @@ challenging questions from live speech transcripts. \
 Respond ONLY with valid JSON: \
 {\"keywords\":[\"...\"],\"terms\":[{\"term\":\"...\",\"explanation\":\"...\"}],\
 \"questions\":[{\"question\":\"...\",\"answer\":\"...\"}]}. \
+\
+CONTEXT: You receive session summary and/or recent prior lines to infer domain (e.g. AI/ML vs hardware). \
+Use that context to disambiguate acronyms — e.g. MCP in an AI/Agent/RAG discussion means Model Context Protocol, \
+not chip packaging. Answers must match the session domain. \
 \
 KEYWORDS (max 8): Prioritize AI/ML, software engineering, cloud/infra, data, security, and adjacent \
 technical domains. Include acronyms and product/framework names when domain-specific (RAG, LLM, CUDA, \
@@ -67,6 +75,8 @@ EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, sm
 one-liner definitions. \
 If nothing meets this bar, return empty arrays.";
 
+        let user_content = build_analysis_user_content(text, ctx);
+
         let body = ChatRequest {
             messages: vec![
                 ChatMessage {
@@ -75,7 +85,7 @@ If nothing meets this bar, return empty arrays.";
                 },
                 ChatMessage {
                     role: "user".into(),
-                    content: format!("Transcript:\n{text}"),
+                    content: user_content,
                 },
             ],
             temperature: 0.2,
@@ -136,6 +146,87 @@ If nothing meets this bar, return empty arrays.";
             Ok(Some(result))
         }
     }
+
+    pub async fn summarize_transcript(&self, full_text: &str) -> anyhow::Result<Option<String>> {
+        let text = full_text.trim();
+        if text.len() < 12 {
+            return Ok(None);
+        }
+
+        let url = format!(
+            "{}/openai/deployments/{}/chat/completions?api-version=2024-08-01-preview",
+            self.endpoint, self.deployment
+        );
+
+        let system = "你是实时听写助手，负责用简体中文总结目前已知的全部字幕内容。\
+输出 3-6 句概括性摘要，覆盖：主题、关键论点、技术要点、结论或待办（若有）。\
+要求：总结全文已知信息，不要引用或复述最新一两句话的原话，不要逐句罗列，不要反问，不要 Markdown 标题。\
+只输出总结正文，不要前缀。";
+
+        let body = SummarizeChatRequest {
+            messages: vec![
+                ChatMessage {
+                    role: "system".into(),
+                    content: system.into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: format!("Full transcript so far:\n{text}"),
+                },
+            ],
+            temperature: 0.25,
+            max_tokens: 420,
+        };
+
+        let resp = self
+            .client
+            .post(&url)
+            .header("api-key", &self.api_key)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let err = resp.text().await.unwrap_or_default();
+            warn!(%status, body = %err, "session summary llm failed");
+            return Ok(None);
+        }
+
+        let parsed: ChatResponse = resp.json().await?;
+        let content = parsed
+            .choices
+            .first()
+            .map(|c| c.message.content.trim().to_string())
+            .unwrap_or_default();
+        if content.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(content))
+        }
+    }
+}
+
+fn build_analysis_user_content(phrase: &str, ctx: &AnalysisContext) -> String {
+    let mut parts = Vec::new();
+    if let Some(summary) = ctx
+        .session_summary
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        parts.push(format!("Session summary so far:\n{summary}"));
+    }
+    if let Some(recent) = ctx
+        .recent_transcript
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+    {
+        parts.push(format!("Recent prior transcript:\n{recent}"));
+    }
+    parts.push(format!("Latest phrase (extract insights primarily from this):\n{phrase}"));
+    parts.join("\n\n")
 }
 
 #[derive(Serialize)]
@@ -144,6 +235,13 @@ struct ChatRequest {
     temperature: f32,
     max_tokens: u32,
     response_format: ResponseFormat,
+}
+
+#[derive(Serialize)]
+struct SummarizeChatRequest {
+    messages: Vec<ChatMessage>,
+    temperature: f32,
+    max_tokens: u32,
 }
 
 #[derive(Serialize)]

@@ -20,6 +20,8 @@ const questionsPanelEl = document.getElementById("questions-panel");
 const contentSplitEl = document.getElementById("content-split");
 const splitDividerEl = document.getElementById("split-divider");
 const insightsPanelEl = document.getElementById("insights-panel");
+const summaryEmptyEl = document.getElementById("summary-empty");
+const summaryTextEl = document.getElementById("summary-text");
 
 /** @type {string[]} Final lines (one per Azure REST phrase). */
 let committedLines = [];
@@ -31,8 +33,8 @@ let partialText = "";
 /** User scrolled up — pause auto-follow until they click Latest or scroll to bottom. */
 let followLatest = true;
 
-/** Minimum visible time for each term/question card (ms). */
-const INSIGHT_DWELL_MS = 10_000;
+/** Minimum visible time for each term/question card (ms); loaded from .env via tray. */
+let insightDwellMs = 20_000;
 
 let termSeq = 0;
 let questionSeq = 0;
@@ -128,6 +130,20 @@ function initSplitDivider() {
 }
 
 initSplitDivider();
+
+function renderSessionSummary(summary) {
+  const text = String(summary || "").trim();
+  if (!text) return;
+  summaryEmptyEl.classList.add("hidden");
+  summaryTextEl.classList.remove("hidden");
+  summaryTextEl.textContent = text;
+}
+
+function resetSessionSummary() {
+  summaryEmptyEl.classList.remove("hidden");
+  summaryTextEl.classList.add("hidden");
+  summaryTextEl.textContent = "";
+}
 
 function isNearBottom() {
   return (
@@ -255,7 +271,7 @@ function supersedeHeadEntry(entries, now) {
   const prev = entries[0];
   if (!prev) return;
   prev.pinned = false;
-  prev.expiresAt = now + INSIGHT_DWELL_MS;
+  prev.expiresAt = now + insightDwellMs;
 }
 
 function pruneEntryList(entries) {
@@ -263,7 +279,7 @@ function pruneEntryList(entries) {
   let changed = false;
   if (entries.length > 0) {
     const head = entries[0];
-    if (!head.pinned && now - head.addedAt >= INSIGHT_DWELL_MS) {
+    if (!head.pinned && now - head.addedAt >= insightDwellMs) {
       head.pinned = true;
       changed = true;
     }
@@ -302,7 +318,7 @@ function appendTermEntries(terms) {
       id: `${now}-t${termSeq}`,
       seq: termSeq,
       addedAt: now,
-      expiresAt: now + INSIGHT_DWELL_MS,
+      expiresAt: now + insightDwellMs,
       pinned: false,
       term: t.term,
       explanation: t.explanation,
@@ -327,7 +343,7 @@ function appendQuestionEntries(questions) {
       id: `${now}-q${questionSeq}`,
       seq: questionSeq,
       addedAt: now,
-      expiresAt: now + INSIGHT_DWELL_MS,
+      expiresAt: now + insightDwellMs,
       pinned: false,
       question: q.question,
       answer: q.answer,
@@ -435,7 +451,10 @@ function isSystemMessage(text) {
 }
 
 listen("transcript", (event) => {
-  const { text, is_final, insights } = event.payload;
+  const { text, is_final, insights, session_summary } = event.payload;
+  if (session_summary) {
+    renderSessionSummary(session_summary);
+  }
   if (!text || (text.startsWith("(") && text.includes("未识别"))) {
     return;
   }
@@ -477,6 +496,7 @@ listen("capture-started", () => {
   followLatest = true;
   scrollLatestBtn.classList.add("hidden");
   resetInsightDwellState();
+  resetSessionSummary();
   questionsEmptyEl.classList.remove("hidden");
   insightsEmptyEl.classList.remove("hidden");
   insightsKeywordsSec.classList.add("hidden");
@@ -495,12 +515,18 @@ function applyOverlayUi(payload) {
       ? Math.min(1, Math.max(0.35, payload.opacity))
       : 0.92;
   overlayEl.style.opacity = String(opacity);
+  const fontScale =
+    typeof payload.font_scale === "number"
+      ? Math.min(1.5, Math.max(0.75, payload.font_scale))
+      : 1;
+  overlayEl.style.setProperty("--font-scale", String(fontScale));
   document.body.classList.toggle("adaptive-on", Boolean(payload.adaptive));
   const short = theme.replace(/-glass$/, "").replace("high-contrast-", "hc-");
+  const scalePct = Math.round(fontScale * 100);
   themeBadgeEl.textContent = short;
   themeBadgeEl.title = payload.adaptive
-    ? `${theme} (auto contrast on)`
-    : `${theme} — Ctrl+Shift+S cycle`;
+    ? `${theme} (auto contrast) · text ${scalePct}% · Ctrl+Shift+S cycle style`
+    : `${theme} · text ${scalePct}% · Ctrl+Shift+−/+ size, Ctrl+Shift+0 reset`;
 }
 
 listen("overlay-ui", (event) => {
@@ -515,12 +541,25 @@ async function loadOverlayUi() {
       effective_theme: s.theme,
       adaptive: s.adaptive,
       opacity: s.opacity,
+      font_scale: s.font_scale,
     });
   } catch {
     /* not in tauri shell */
   }
 }
 
+async function loadInsightSettings() {
+  try {
+    const s = await invoke("get_insight_settings");
+    if (typeof s.insight_dwell_ms === "number" && s.insight_dwell_ms >= 5000) {
+      insightDwellMs = s.insight_dwell_ms;
+    }
+  } catch {
+    /* not in tauri shell */
+  }
+}
+
 loadOverlayUi();
+loadInsightSettings();
 refreshStatus();
 setInterval(refreshStatus, 5000);

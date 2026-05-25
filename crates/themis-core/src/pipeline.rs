@@ -11,4 +11,6 @@ pub struct TranscriptEvent {
     pub insights: Option<AnalysisResult>,
     pub emitted_unix_ms: i64,
     pub latency: Option<LatencyBreakdown>,
+    /// Rolling full-session summary in Chinese (updated as transcript grows).
+    pub session_summary: Option<String>,
 }

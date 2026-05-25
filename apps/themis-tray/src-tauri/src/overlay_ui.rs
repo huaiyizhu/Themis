@@ -16,12 +16,23 @@ const OPACITY_MIN: f64 = 0.35;
 const OPACITY_MAX: f64 = 1.0;
 pub const OPACITY_STEP: f64 = 0.05;
 
+const FONT_SCALE_MIN: f64 = 0.75;
+const FONT_SCALE_MAX: f64 = 1.5;
+pub const FONT_SCALE_STEP: f64 = 0.1;
+
+fn default_font_scale() -> f64 {
+    1.0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverlayUiSettings {
     pub opacity: f64,
     pub theme: String,
     /// Sample screen behind overlay and pick dark/light panel automatically.
     pub adaptive: bool,
+    /// Multiplier for overlay content text (1.0 = default).
+    #[serde(default = "default_font_scale")]
+    pub font_scale: f64,
 }
 
 impl Default for OverlayUiSettings {
@@ -30,6 +41,7 @@ impl Default for OverlayUiSettings {
             opacity: 0.92,
             theme: THEMES[0].to_string(),
             adaptive: false,
+            font_scale: 1.0,
         }
     }
 }
@@ -75,6 +87,7 @@ impl OverlayUiState {
     pub fn set(&self, settings: OverlayUiSettings) -> OverlayUiSettings {
         let mut s = self.settings.lock().unwrap();
         s.opacity = s.opacity.clamp(OPACITY_MIN, OPACITY_MAX);
+        s.font_scale = s.font_scale.clamp(FONT_SCALE_MIN, FONT_SCALE_MAX);
         if !THEMES.contains(&s.theme.as_str()) {
             s.theme = THEMES[0].to_string();
         }
@@ -88,6 +101,18 @@ impl OverlayUiState {
     pub fn adjust_opacity(&self, delta: f64) -> OverlayUiSettings {
         let mut s = self.get();
         s.opacity = (s.opacity + delta).clamp(OPACITY_MIN, OPACITY_MAX);
+        self.set(s)
+    }
+
+    pub fn adjust_font_scale(&self, delta: f64) -> OverlayUiSettings {
+        let mut s = self.get();
+        s.font_scale = (s.font_scale + delta).clamp(FONT_SCALE_MIN, FONT_SCALE_MAX);
+        self.set(s)
+    }
+
+    pub fn reset_font_scale(&self) -> OverlayUiSettings {
+        let mut s = self.get();
+        s.font_scale = 1.0;
         self.set(s)
     }
 
@@ -127,6 +152,7 @@ pub fn apply_overlay_ui(app: &AppHandle, settings: &OverlayUiSettings) -> Result
         theme: settings.theme.clone(),
         effective_theme,
         adaptive: settings.adaptive,
+        font_scale: settings.font_scale,
     };
     app.emit("overlay-ui", payload)
         .map_err(|e| e.to_string())?;
@@ -139,6 +165,7 @@ pub struct OverlayUiPayload {
     pub theme: String,
     pub effective_theme: String,
     pub adaptive: bool,
+    pub font_scale: f64,
 }
 
 pub fn adaptive_theme_for_window(window: &WebviewWindow) -> Option<String> {
@@ -224,6 +251,7 @@ pub fn spawn_adaptive_poll(app: AppHandle, ui: std::sync::Arc<OverlayUiState>) {
                             theme: settings.theme.clone(),
                             effective_theme: theme,
                             adaptive: true,
+                            font_scale: settings.font_scale,
                         };
                         let _ = app.emit("overlay-ui", payload);
                     }

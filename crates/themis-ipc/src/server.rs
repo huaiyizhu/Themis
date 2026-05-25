@@ -226,6 +226,7 @@ impl ThemisService for ThemisGrpcServer {
                     .as_ref()
                     .map(|i| i.to_json())
                     .unwrap_or_default(),
+                session_summary: ev.session_summary.unwrap_or_default(),
             })),
             Err(_) => None,
         });

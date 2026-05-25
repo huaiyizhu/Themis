@@ -1,13 +1,15 @@
 use std::sync::Arc;
+use std::time::Duration;
 use themis_audio::{AudioSource, SystemAudioOptions};
-use themis_analysis::create_analyzer;
+use themis_analysis::{create_analyzer, SessionSummarizer, ANALYSIS_CONTEXT_LINES};
 use themis_azure::create_recognizer;
 use chrono::Utc;
 use themis_core::{
-    normalize_pcm16, AnalysisDiagnostics, AudioFrame, CaptureDiagnostics, CaptureState,
-    LatencyDiagnostics, StateMachine, ThemisConfig, TranscriptEvent,
+    normalize_pcm16, AnalysisContext, AnalysisDiagnostics, AudioFrame, CaptureDiagnostics,
+    CaptureState, LatencyDiagnostics, StateMachine, ThemisConfig, TranscriptEvent,
 };
 use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::time::{interval, MissedTickBehavior};
 use tracing::{error, info};
 
 pub struct CaptureEngine {
@@ -29,14 +31,21 @@ struct RunningCapture {
 struct RunningTasks {
     speech: tokio::task::JoinHandle<()>,
     events: tokio::task::JoinHandle<()>,
+    summary: tokio::task::JoinHandle<()>,
 }
 
 impl RunningTasks {
     async fn join_all(self) {
-        let RunningTasks { speech, events } = self;
+        let RunningTasks {
+            speech,
+            events,
+            summary,
+        } = self;
         let _ = speech.await;
         events.abort();
+        summary.abort();
         let _ = events.await;
+        let _ = summary.await;
     }
 }
 
@@ -80,6 +89,10 @@ impl CaptureEngine {
 
         self.capture_diag.reset_session_peak();
         self.analysis_diag.clear();
+
+        let session_summary = Arc::new(SessionSummarizer::from_config(&self.config));
+        session_summary.reset();
+        let summary_interval_secs = self.config.session_summary_interval_secs;
 
         let (frame_tx, frame_rx) = mpsc::channel::<AudioFrame>(256);
         let (stop_tx, stop_rx) = mpsc::channel::<()>(1);
@@ -131,6 +144,7 @@ impl CaptureEngine {
 
         let latency_diag = Arc::clone(&self.latency_diag);
         let analysis_diag = Arc::clone(&self.analysis_diag);
+        let session_summary_events = Arc::clone(&session_summary);
         let event_handle = tokio::spawn(async move {
             while let Ok(ev) = speech_events.recv().await {
                 if ev.is_final {
@@ -148,18 +162,30 @@ impl CaptureEngine {
                     let text = ev.text.clone();
                     let tx = transcript_tx.clone();
                     let analysis = Arc::clone(&analysis);
-                    // Show transcript immediately; attach insights when ready.
+                    let session_summary = Arc::clone(&session_summary_events);
+                    session_summary.append_line(&text);
+                    // Show transcript immediately; insights attach later. Summary updates on its own interval.
                     let _ = tx.send(TranscriptEvent {
                         text: text.clone(),
                         is_final: true,
                         feedback: None,
                         insights: None,
+                        session_summary: session_summary.current_summary(),
                         emitted_unix_ms,
                         latency: latency.clone(),
                     });
                     let analysis_diag = Arc::clone(&analysis_diag);
                     tokio::spawn(async move {
-                        let detail = analysis.analyze(&text).await.ok().flatten();
+                        let prior = session_summary.prior_context(ANALYSIS_CONTEXT_LINES);
+                        let ctx = AnalysisContext {
+                            recent_transcript: if prior.is_empty() {
+                                None
+                            } else {
+                                Some(prior)
+                            },
+                            session_summary: session_summary.current_summary(),
+                        };
+                        let detail = analysis.analyze(&text, &ctx).await.ok().flatten();
                         if let Some(ref d) = detail {
                             analysis_diag.push(text.clone(), d);
                         }
@@ -170,6 +196,7 @@ impl CaptureEngine {
                             is_final: true,
                             feedback,
                             insights: merged,
+                            session_summary: None,
                             emitted_unix_ms: Utc::now().timestamp_millis(),
                             latency,
                         });
@@ -180,8 +207,31 @@ impl CaptureEngine {
                         is_final: false,
                         feedback: None,
                         insights: None,
+                        session_summary: None,
                         emitted_unix_ms,
                         latency,
+                    });
+                }
+            }
+        });
+
+        let session_summary_task = Arc::clone(&session_summary);
+        let tx_summary = self.transcript_tx.clone();
+        let summary_handle = tokio::spawn(async move {
+            let mut ticker = interval(Duration::from_secs(summary_interval_secs as u64));
+            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            ticker.tick().await;
+            loop {
+                ticker.tick().await;
+                if let Some(summary) = session_summary_task.refresh_if_due().await {
+                    let _ = tx_summary.send(TranscriptEvent {
+                        text: String::new(),
+                        is_final: false,
+                        feedback: None,
+                        insights: None,
+                        session_summary: Some(summary),
+                        emitted_unix_ms: Utc::now().timestamp_millis(),
+                        latency: None,
                     });
                 }
             }
@@ -193,6 +243,7 @@ impl CaptureEngine {
             _tasks: RunningTasks {
                 speech: speech_handle,
                 events: event_handle,
+                summary: summary_handle,
             },
         });
 

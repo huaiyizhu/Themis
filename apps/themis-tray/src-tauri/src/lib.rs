@@ -52,6 +52,7 @@ struct TranscriptPayload {
     is_final: bool,
     feedback: Option<String>,
     insights: Option<InsightsDto>,
+    session_summary: Option<String>,
     timestamp_unix_ms: i64,
     latency: Option<LatencyBreakdownDto>,
 }
@@ -132,6 +133,11 @@ struct OverlayMirror {
     last_ui_latency_ms: Option<u32>,
 }
 
+#[derive(Clone, Serialize)]
+struct InsightSettingsDto {
+    insight_dwell_ms: u32,
+}
+
 #[derive(Clone)]
 struct AppState {
     config: ThemisConfig,
@@ -179,6 +185,13 @@ fn toggle_overlay_adaptive(
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     app.exit(0);
+}
+
+#[tauri::command]
+fn get_insight_settings(state: State<'_, AppState>) -> InsightSettingsDto {
+    InsightSettingsDto {
+        insight_dwell_ms: state.config.insight_dwell_secs.saturating_mul(1000),
+    }
 }
 
 #[tauri::command]
@@ -411,6 +424,11 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
                             });
 
                             let insights = parse_insights_json(&msg.insights_json);
+                            let session_summary = if msg.session_summary.is_empty() {
+                                None
+                            } else {
+                                Some(msg.session_summary.clone())
+                            };
                             let _ = app.emit(
                                 "transcript",
                                 TranscriptPayload {
@@ -422,6 +440,7 @@ async fn start_transcript_stream(app: AppHandle, state: AppState) {
                                         Some(msg.feedback)
                                     },
                                     insights,
+                                    session_summary,
                                     timestamp_unix_ms: msg.timestamp_unix_ms,
                                     latency,
                                 },
@@ -528,6 +547,21 @@ pub fn run() {
     } else {
         "Ctrl+Shift+KeyA"
     };
+    let hotkey_font_down = if cfg!(target_os = "macos") {
+        "Command+Shift+Minus"
+    } else {
+        "Ctrl+Shift+Minus"
+    };
+    let hotkey_font_up = if cfg!(target_os = "macos") {
+        "Command+Shift+Equal"
+    } else {
+        "Ctrl+Shift+Equal"
+    };
+    let hotkey_font_reset = if cfg!(target_os = "macos") {
+        "Command+Shift+Digit0"
+    } else {
+        "Ctrl+Shift+Digit0"
+    };
 
     let sc_toggle: tauri_plugin_global_shortcut::Shortcut = hotkey_toggle
         .parse()
@@ -550,6 +584,15 @@ pub fn run() {
     let sc_adaptive: tauri_plugin_global_shortcut::Shortcut = hotkey_adaptive
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_adaptive}: {e}"));
+    let sc_font_down: tauri_plugin_global_shortcut::Shortcut = hotkey_font_down
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_font_down}: {e}"));
+    let sc_font_up: tauri_plugin_global_shortcut::Shortcut = hotkey_font_up
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_font_up}: {e}"));
+    let sc_font_reset: tauri_plugin_global_shortcut::Shortcut = hotkey_font_reset
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_font_reset}: {e}"));
 
     let ui_state = Arc::new(OverlayUiState::new());
 
@@ -564,6 +607,9 @@ pub fn run() {
                     hotkey_opacity_up,
                     hotkey_style,
                     hotkey_adaptive,
+                    hotkey_font_down,
+                    hotkey_font_up,
+                    hotkey_font_reset,
                 ])
                 .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
                 .with_handler({
@@ -593,6 +639,15 @@ pub fn run() {
                             let _ = apply_overlay_ui(app, &s);
                         } else if shortcut == &sc_adaptive {
                             let s = ui_state.toggle_adaptive();
+                            let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_font_down {
+                            let s = ui_state.adjust_font_scale(-overlay_ui::FONT_SCALE_STEP);
+                            let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_font_up {
+                            let s = ui_state.adjust_font_scale(overlay_ui::FONT_SCALE_STEP);
+                            let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_font_reset {
+                            let s = ui_state.reset_font_scale();
                             let _ = apply_overlay_ui(app, &s);
                         }
                     }
@@ -691,6 +746,7 @@ pub fn run() {
             get_diagnostics,
             toggle_diagnose_window,
             get_overlay_ui,
+            get_insight_settings,
             adjust_overlay_opacity,
             cycle_overlay_theme,
             toggle_overlay_adaptive,

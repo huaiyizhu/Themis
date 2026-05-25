@@ -52,6 +52,8 @@ message TranscriptMessage {
   LatencyBreakdown latency = 5;
   /// JSON: AnalysisResult (keywords, terms, questions)
   string insights_json = 6;
+  /// Rolling full-session summary (简体中文)
+  string session_summary = 7;
 }
 
 message GetDiagnosticsRequest {}

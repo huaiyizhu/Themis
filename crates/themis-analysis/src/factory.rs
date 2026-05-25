@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use themis_core::{
-    AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis, ThemisConfig,
+    AnalysisContext, AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis,
+    ThemisConfig,
 };
 use tokio::time::timeout;
 use tracing::debug;
@@ -18,7 +19,11 @@ struct CompositeAnalyzer {
 
 #[async_trait]
 impl AnalysisProvider for CompositeAnalyzer {
-    async fn analyze(&self, transcript: &str) -> anyhow::Result<Option<AnalysisDetail>> {
+    async fn analyze(
+        &self,
+        transcript: &str,
+        ctx: &AnalysisContext,
+    ) -> anyhow::Result<Option<AnalysisDetail>> {
         let h0 = Instant::now();
         let heuristic = analyze_heuristic(transcript);
         let heuristic_ms = h0.elapsed().as_millis() as u32;
@@ -34,7 +39,7 @@ impl AnalysisProvider for CompositeAnalyzer {
 
         if let Some(llm) = &self.llm {
             let l0 = Instant::now();
-            match timeout(self.llm_timeout, llm.analyze(transcript)).await {
+            match timeout(self.llm_timeout, llm.analyze(transcript, ctx)).await {
                 Ok(Ok(Some(llm_result))) => {
                     llm_ms = Some(l0.elapsed().as_millis() as u32);
                     llm_status = if llm_result.is_empty() {

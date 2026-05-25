@@ -24,6 +24,10 @@ pub struct ThemisConfig {
     pub audio_capture_mode: String,
     /// Enable transcript insight extraction (keywords, terms, Q&A).
     pub analysis_enabled: bool,
+    /// How long Questions/Terms cards stay visible before expiring (seconds).
+    pub insight_dwell_secs: u32,
+    /// Full-session summary refresh interval (seconds).
+    pub session_summary_interval_secs: u32,
 }
 
 impl Default for ThemisConfig {
@@ -44,7 +48,35 @@ impl Default for ThemisConfig {
             audio_gain_max: 16.0,
             audio_capture_mode: "auto".into(),
             analysis_enabled: true,
+            insight_dwell_secs: 20,
+            session_summary_interval_secs: 20,
         }
+    }
+}
+
+fn parse_session_summary_interval_secs(raw: Option<String>) -> u32 {
+    const DEFAULT: u32 = 20;
+    const MIN: u32 = 10;
+    const MAX: u32 = 120;
+    let Some(s) = raw.filter(|v| !v.is_empty()) else {
+        return DEFAULT;
+    };
+    match s.parse::<u32>() {
+        Ok(v) if v >= MIN => v.min(MAX),
+        _ => DEFAULT,
+    }
+}
+
+fn parse_insight_dwell_secs(raw: Option<String>) -> u32 {
+    const DEFAULT: u32 = 20;
+    const MIN: u32 = 5;
+    const MAX: u32 = 300;
+    let Some(s) = raw.filter(|v| !v.is_empty()) else {
+        return DEFAULT;
+    };
+    match s.parse::<u32>() {
+        Ok(v) if v >= MIN => v.min(MAX),
+        _ => DEFAULT,
     }
 }
 
@@ -94,6 +126,12 @@ impl ThemisConfig {
                 .ok()
                 .map(|v| v != "0" && !v.eq_ignore_ascii_case("false"))
                 .unwrap_or(true),
+            insight_dwell_secs: parse_insight_dwell_secs(
+                std::env::var("THEMIS_INSIGHT_DWELL_SECS").ok(),
+            ),
+            session_summary_interval_secs: parse_session_summary_interval_secs(
+                std::env::var("THEMIS_SESSION_SUMMARY_INTERVAL_SECS").ok(),
+            ),
         }
     }
 
@@ -138,5 +176,24 @@ mod tests {
         let cfg = ThemisConfig::default();
         assert_eq!(cfg.sample_rate, 16_000);
         assert_eq!(cfg.grpc_port, 50051);
+        assert_eq!(cfg.insight_dwell_secs, 20);
+        assert_eq!(cfg.session_summary_interval_secs, 20);
+    }
+
+    #[test]
+    fn parse_session_summary_interval_secs_clamps_and_defaults() {
+        assert_eq!(parse_session_summary_interval_secs(None), 20);
+        assert_eq!(parse_session_summary_interval_secs(Some("10".into())), 10);
+        assert_eq!(parse_session_summary_interval_secs(Some("5".into())), 20);
+        assert_eq!(parse_session_summary_interval_secs(Some("200".into())), 120);
+    }
+
+    #[test]
+    fn parse_insight_dwell_secs_clamps_and_defaults() {
+        assert_eq!(parse_insight_dwell_secs(None), 20);
+        assert_eq!(parse_insight_dwell_secs(Some("30".into())), 30);
+        assert_eq!(parse_insight_dwell_secs(Some("3".into())), 20);
+        assert_eq!(parse_insight_dwell_secs(Some("999".into())), 300);
+        assert_eq!(parse_insight_dwell_secs(Some("bad".into())), 20);
     }
 }

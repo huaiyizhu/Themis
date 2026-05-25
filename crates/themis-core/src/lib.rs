@@ -9,8 +9,8 @@ mod pipeline;
 mod state;
 
 pub use analysis::{
-    AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis, QuestionInsight,
-    TermInsight,
+    AnalysisContext, AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis,
+    QuestionInsight, TermInsight,
 };
 pub use analysis_diag::{
     AnalysisDiagnostics, AnalysisDiagnosticsSnapshot, AnalysisDiagnosticsSummary,

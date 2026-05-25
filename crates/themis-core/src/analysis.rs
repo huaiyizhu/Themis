@@ -2,6 +2,14 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AnalysisContext {
+    /// Recent finalized transcript lines before the current phrase.
+    pub recent_transcript: Option<String>,
+    /// Rolling full-session summary when available.
+    pub session_summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TermInsight {
     pub term: String,
     pub explanation: String,
@@ -95,14 +103,22 @@ pub struct AnalysisDetail {
 
 #[async_trait]
 pub trait AnalysisProvider: Send + Sync {
-    async fn analyze(&self, transcript: &str) -> anyhow::Result<Option<AnalysisDetail>>;
+    async fn analyze(
+        &self,
+        transcript: &str,
+        ctx: &AnalysisContext,
+    ) -> anyhow::Result<Option<AnalysisDetail>>;
 }
 
 pub struct NoopAnalysis;
 
 #[async_trait]
 impl AnalysisProvider for NoopAnalysis {
-    async fn analyze(&self, _transcript: &str) -> anyhow::Result<Option<AnalysisDetail>> {
+    async fn analyze(
+        &self,
+        _transcript: &str,
+        _ctx: &AnalysisContext,
+    ) -> anyhow::Result<Option<AnalysisDetail>> {
         Ok(None)
     }
 }

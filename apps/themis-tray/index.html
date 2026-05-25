@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -8,7 +8,6 @@
   </head>
   <body>
     <div id="overlay" class="theme-dark-glass">
-      <!-- Resize hit targets (inside panel; must not cover the drag title bar) -->
       <div class="resize-layer" aria-hidden="true">
         <div class="resize-edge resize-n" data-tauri-resize="north"></div>
         <div class="resize-edge resize-s" data-tauri-resize="south"></div>
@@ -25,40 +24,27 @@
           <span class="brand">Themis</span>
           <span id="theme-badge" class="theme-badge" title="Style preset">dark</span>
         </div>
-        <button
-          type="button"
-          id="scroll-latest"
-          class="scroll-latest hidden"
-          title="Jump to latest transcript"
-        >
-          ? Latest
-        </button>
+        <button type="button" id="scroll-latest" class="scroll-latest hidden" title="Jump to latest transcript">↓ Latest</button>
       </header>
-      <p id="status" class="status-line">Connecting?</p>
+      <p id="status" class="status-line">Connecting…</p>
+      <section id="summary-panel" class="summary-panel" aria-label="Full session summary">
+        <h2 class="summary-title">全文总结</h2>
+        <p id="summary-empty" class="summary-empty">采集中，摘要将约每 20 秒根据全文已知内容更新…</p>
+        <div id="summary-text" class="summary-text hidden"></div>
+      </section>
       <div class="content-split" id="content-split">
         <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
           <div id="transcript" class="transcript-body"></div>
         </div>
         <aside id="questions-panel" class="questions-panel" aria-label="Questions">
           <h2 class="questions-title">Questions</h2>
-          <p id="questions-empty" class="questions-empty">
-            ??????????????????????
-          </p>
+          <p id="questions-empty" class="questions-empty">核心问题会实时显示在此栏，无需滚动即可查看。</p>
           <div id="questions-list" class="question-cards"></div>
         </aside>
-        <div
-          id="split-divider"
-          class="split-divider"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize terms panel"
-          title="Drag to resize terms panel"
-        ></div>
+        <div id="split-divider" class="split-divider" role="separator" aria-orientation="vertical" aria-label="Resize terms panel" title="Drag to resize terms panel"></div>
         <aside id="insights-panel" class="insights-panel" aria-label="Keywords and terms">
           <h2 class="insights-title">Terms</h2>
-          <p id="insights-empty" class="insights-empty">
-            Keywords and terms appear here after each phrase.
-          </p>
+          <p id="insights-empty" class="insights-empty">Keywords and terms appear here after each phrase.</p>
           <section id="insights-keywords" class="insights-section hidden">
             <h3>Keywords</h3>
             <div id="insights-keywords-list" class="tag-list"></div>
