@@ -21,6 +21,9 @@ impl CaptureEngineHandle for EngineHandle {
     async fn stop(&self) -> anyhow::Result<()> {
         self.0.stop().await
     }
+    async fn reset_session(&self) -> anyhow::Result<()> {
+        self.0.reset_session().await
+    }
 }
 
 #[tokio::main]

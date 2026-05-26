@@ -9,6 +9,7 @@ const statusEl = document.getElementById("status");
 const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
 const scrollLatestBtn = document.getElementById("scroll-latest");
+const clearSessionBtn = document.getElementById("clear-session");
 const insightsEmptyEl = document.getElementById("insights-empty");
 const insightsKeywordsSec = document.getElementById("insights-keywords");
 const insightsKeywordsList = document.getElementById("insights-keywords-list");
@@ -38,9 +39,9 @@ let insightDwellMs = 20_000;
 
 let termSeq = 0;
 let questionSeq = 0;
-/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, term: string, explanation: string}>} */
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, term: string, explanation: string}>} */
 const termEntries = [];
-/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, question: string, answer: string}>} */
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, question: string, answer: string}>} */
 const questionEntries = [];
 /** @type {ReturnType<typeof setInterval> | null} */
 let insightPruneTimer = null;
@@ -132,8 +133,11 @@ function initSplitDivider() {
 initSplitDivider();
 
 function renderSessionSummary(summary) {
-  const text = String(summary || "").trim();
-  if (!text) return;
+  const text = String(summary ?? "").trim();
+  if (!text) {
+    resetSessionSummary();
+    return;
+  }
   summaryEmptyEl.classList.add("hidden");
   summaryTextEl.classList.remove("hidden");
   summaryTextEl.textContent = text;
@@ -269,10 +273,43 @@ function ensureInsightPruneTimer() {
 
 function supersedeHeadEntry(entries, now) {
   const prev = entries[0];
-  if (!prev) return;
+  if (!prev || prev.userPinned) return;
   prev.pinned = false;
   prev.expiresAt = now + insightDwellMs;
 }
+
+function toggleEntryPin(entries, id) {
+  const item = entries.find((e) => e.id === id);
+  if (!item) return false;
+  if (item.pinned) {
+    item.pinned = false;
+    item.userPinned = false;
+    item.expiresAt = Date.now() + insightDwellMs;
+  } else {
+    item.pinned = true;
+    item.userPinned = true;
+  }
+  return true;
+}
+
+function setupInsightCardPin() {
+  questionsListEl.addEventListener("click", (e) => {
+    const card = e.target.closest(".question-card");
+    if (!card?.dataset.id) return;
+    if (toggleEntryPin(questionEntries, card.dataset.id)) {
+      renderInsightPanels();
+    }
+  });
+  insightsTermsList.addEventListener("click", (e) => {
+    const card = e.target.closest(".insight-card");
+    if (!card?.dataset.id) return;
+    if (toggleEntryPin(termEntries, card.dataset.id)) {
+      renderInsightPanels();
+    }
+  });
+}
+
+setupInsightCardPin();
 
 function pruneEntryList(entries) {
   const now = Date.now();
@@ -320,6 +357,7 @@ function appendTermEntries(terms) {
       addedAt: now,
       expiresAt: now + insightDwellMs,
       pinned: false,
+      userPinned: false,
       term: t.term,
       explanation: t.explanation,
     });
@@ -345,12 +383,20 @@ function appendQuestionEntries(questions) {
       addedAt: now,
       expiresAt: now + insightDwellMs,
       pinned: false,
+      userPinned: false,
       question: q.question,
       answer: q.answer,
     });
     added = true;
   }
   return added;
+}
+
+function sortInsightEntries(entries) {
+  return [...entries].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.seq - a.seq;
+  });
 }
 
 function renderInsightPanels() {
@@ -360,13 +406,16 @@ function renderInsightPanels() {
 
   questionsEmptyEl.classList.toggle("hidden", hasQuestions);
   questionsListEl.replaceChildren();
-  for (const item of questionEntries) {
+  for (const item of sortInsightEntries(questionEntries)) {
     const card = document.createElement("div");
     card.className = "question-card";
+    if (item.pinned) card.classList.add("is-pinned");
     card.dataset.id = item.id;
+    card.title = item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）";
     const meta = document.createElement("div");
     meta.className = "insight-meta";
-    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}`;
+    const pinLabel = item.pinned ? " · 📌" : "";
+    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}${pinLabel}`;
     const q = document.createElement("div");
     q.className = "q";
     q.textContent = item.question;
@@ -385,13 +434,16 @@ function renderInsightPanels() {
 
   insightsTermsSec.classList.toggle("hidden", !hasTerms);
   insightsTermsList.replaceChildren();
-  for (const item of termEntries) {
+  for (const item of sortInsightEntries(termEntries)) {
     const card = document.createElement("div");
     card.className = "insight-card";
+    if (item.pinned) card.classList.add("is-pinned");
     card.dataset.id = item.id;
+    card.title = item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）";
     const meta = document.createElement("div");
     meta.className = "insight-meta";
-    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}`;
+    const pinLabel = item.pinned ? " · 📌" : "";
+    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}${pinLabel}`;
     const term = document.createElement("div");
     term.className = "term";
     term.textContent = item.term;
@@ -452,7 +504,7 @@ function isSystemMessage(text) {
 
 listen("transcript", (event) => {
   const { text, is_final, insights, session_summary } = event.payload;
-  if (session_summary) {
+  if (session_summary !== undefined && session_summary !== null) {
     renderSessionSummary(session_summary);
   }
   if (!text || (text.startsWith("(") && text.includes("未识别"))) {
@@ -489,7 +541,7 @@ listen("capture-stopped", () => {
   renderTranscript();
 });
 
-listen("capture-started", () => {
+function clearOverlaySession(placeholderText = "已清空，继续监听中…") {
   committedLines = [];
   partialText = "";
   lineInsights.clear();
@@ -504,8 +556,46 @@ listen("capture-started", () => {
   insightsKeywordsList.replaceChildren();
   insightsTermsList.replaceChildren();
   questionsListEl.replaceChildren();
-  setPlaceholder("Capture started — transcript builds below…");
+  setPlaceholder(placeholderText);
+}
+
+clearSessionBtn?.addEventListener("click", async () => {
+  try {
+    await invoke("clear_listening_session");
+  } catch (e) {
+    clearOverlaySession("已清空（本地）；服务未连接时仅清除界面");
+    statusEl.title = String(e);
+  }
 });
+
+listen("session-cleared", () => {
+  clearOverlaySession();
+});
+
+listen("capture-started", () => {
+  clearOverlaySession("Capture started — transcript builds below…");
+});
+
+const THEME_SHORT_LABELS = {
+  "dark-glass": "dark",
+  "light-glass": "light",
+  "solid-dark": "solid-d",
+  "solid-light": "solid-l",
+  "midnight": "night",
+  "slate": "slate",
+  "paper": "paper",
+  "cream": "cream",
+  "high-contrast-dark": "hc-dark",
+  "high-contrast-light": "hc-light",
+  outline: "outline",
+};
+
+function themeShortLabel(theme) {
+  return (
+    THEME_SHORT_LABELS[theme] ||
+    theme.replace(/-glass$/, "").replace("high-contrast-", "hc-").slice(0, 10)
+  );
+}
 
 function applyOverlayUi(payload) {
   const theme = payload.effective_theme || payload.theme || "dark-glass";
@@ -521,12 +611,12 @@ function applyOverlayUi(payload) {
       : 1;
   overlayEl.style.setProperty("--font-scale", String(fontScale));
   document.body.classList.toggle("adaptive-on", Boolean(payload.adaptive));
-  const short = theme.replace(/-glass$/, "").replace("high-contrast-", "hc-");
   const scalePct = Math.round(fontScale * 100);
-  themeBadgeEl.textContent = short;
+  const saved = payload.theme && payload.theme !== theme ? ` · saved ${payload.theme}` : "";
+  themeBadgeEl.textContent = themeShortLabel(theme);
   themeBadgeEl.title = payload.adaptive
-    ? `${theme} (auto contrast) · text ${scalePct}% · Ctrl+Shift+S cycle style`
-    : `${theme} · text ${scalePct}% · Ctrl+Shift+−/+ size, Ctrl+Shift+0 reset`;
+    ? `${theme}${saved} (auto contrast) · text ${scalePct}% · Ctrl+Shift+S cycle`
+    : `${theme} · text ${scalePct}% · Ctrl+Shift+S cycle · Ctrl+Shift+−/+ size`;
 }
 
 listen("overlay-ui", (event) => {

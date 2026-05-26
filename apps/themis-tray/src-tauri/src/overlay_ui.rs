@@ -5,12 +5,68 @@ use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use tracing::warn;
 
 pub const THEMES: &[&str] = &[
+    // Glass (translucent)
     "dark-glass",
     "light-glass",
+    // Solid opaque
+    "solid-dark",
+    "solid-light",
+    "midnight",
+    "slate",
+    "paper",
+    "cream",
+    // High contrast & minimal
     "high-contrast-dark",
     "high-contrast-light",
     "outline",
 ];
+
+const LIGHT_THEMES: &[&str] = &[
+    "light-glass",
+    "solid-light",
+    "paper",
+    "cream",
+    "high-contrast-light",
+];
+
+pub fn is_light_theme(theme: &str) -> bool {
+    LIGHT_THEMES.contains(&theme)
+}
+
+/// Pick a readable panel for the desktop luminance behind the overlay.
+pub fn adaptive_effective_theme(preferred: &str, background_lum: f32) -> String {
+    let want_dark_panel = background_lum >= 128.0;
+    let preferred_is_light = is_light_theme(preferred);
+
+    if want_dark_panel {
+        if preferred_is_light {
+            light_to_dark_counterpart(preferred)
+        } else {
+            preferred.to_string()
+        }
+    } else if !preferred_is_light {
+        dark_to_light_counterpart(preferred)
+    } else {
+        preferred.to_string()
+    }
+}
+
+fn light_to_dark_counterpart(theme: &str) -> String {
+    match theme {
+        "solid-light" | "paper" | "cream" => "solid-dark".into(),
+        "high-contrast-light" => "high-contrast-dark".into(),
+        _ => "dark-glass".into(),
+    }
+}
+
+fn dark_to_light_counterpart(theme: &str) -> String {
+    match theme {
+        "solid-dark" | "midnight" | "slate" => "solid-light".into(),
+        "high-contrast-dark" => "high-contrast-light".into(),
+        "outline" => "light-glass".into(),
+        _ => "light-glass".into(),
+    }
+}
 
 const OPACITY_MIN: f64 = 0.35;
 const OPACITY_MAX: f64 = 1.0;
@@ -142,7 +198,9 @@ pub fn apply_overlay_ui(app: &AppHandle, settings: &OverlayUiSettings) -> Result
     let _ = window.set_always_on_top(true);
 
     let effective_theme = if settings.adaptive {
-        adaptive_theme_for_window(&window).unwrap_or_else(|| settings.theme.clone())
+        adaptive_theme_for_window(&window)
+            .map(|lum| adaptive_effective_theme(&settings.theme, lum))
+            .unwrap_or_else(|| settings.theme.clone())
     } else {
         settings.theme.clone()
     };
@@ -168,17 +226,11 @@ pub struct OverlayUiPayload {
     pub font_scale: f64,
 }
 
-pub fn adaptive_theme_for_window(window: &WebviewWindow) -> Option<String> {
+pub fn adaptive_theme_for_window(window: &WebviewWindow) -> Option<f32> {
     #[cfg(windows)]
     {
         let hwnd = window.hwnd().ok()?;
-        let lum = sample_background_luminance(hwnd.0 as isize)?;
-        // Bright desktop → dark panel; dark desktop → light panel.
-        return Some(if lum >= 128.0 {
-            "dark-glass".into()
-        } else {
-            "light-glass".into()
-        });
+        return sample_background_luminance(hwnd.0 as isize);
     }
     #[cfg(not(windows))]
     {
@@ -228,6 +280,32 @@ fn sample_background_luminance(hwnd: isize) -> Option<f32> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adaptive_picks_dark_panel_on_bright_background() {
+        assert_eq!(
+            adaptive_effective_theme("solid-light", 200.0),
+            "solid-dark"
+        );
+        assert_eq!(adaptive_effective_theme("dark-glass", 200.0), "dark-glass");
+    }
+
+    #[test]
+    fn adaptive_picks_light_panel_on_dark_background() {
+        assert_eq!(
+            adaptive_effective_theme("solid-dark", 50.0),
+            "solid-light"
+        );
+        assert_eq!(
+            adaptive_effective_theme("midnight", 50.0),
+            "solid-light"
+        );
+    }
+}
+
 pub fn spawn_adaptive_poll(app: AppHandle, ui: std::sync::Arc<OverlayUiState>) {
     tauri::async_runtime::spawn(async move {
         let mut last_theme = String::new();
@@ -243,7 +321,8 @@ pub fn spawn_adaptive_poll(app: AppHandle, ui: std::sync::Arc<OverlayUiState>) {
                 continue;
             }
             if let Some(w) = overlay_window(&app) {
-                if let Some(theme) = adaptive_theme_for_window(&w) {
+                if let Some(lum) = adaptive_theme_for_window(&w) {
+                    let theme = adaptive_effective_theme(&settings.theme, lum);
                     if theme != last_theme {
                         last_theme = theme.clone();
                         let payload = OverlayUiPayload {

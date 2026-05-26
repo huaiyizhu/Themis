@@ -7,6 +7,7 @@ service ThemisService {
   rpc StopCapture(StopCaptureRequest) returns (StopCaptureResponse);
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
   rpc GetDiagnostics(GetDiagnosticsRequest) returns (GetDiagnosticsResponse);
+  rpc ResetSession(ResetSessionRequest) returns (ResetSessionResponse);
   rpc SubscribeTranscripts(SubscribeTranscriptsRequest)
       returns (stream TranscriptMessage);
 }
@@ -57,6 +58,13 @@ message TranscriptMessage {
 }
 
 message GetDiagnosticsRequest {}
+
+message ResetSessionRequest {}
+
+message ResetSessionResponse {
+  bool ok = 1;
+  string message = 2;
+}
 
 message GetDiagnosticsResponse {
   repeated LatencyRecord records = 1;

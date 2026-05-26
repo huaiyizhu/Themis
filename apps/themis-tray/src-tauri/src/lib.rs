@@ -11,8 +11,8 @@ use tauri::{
 use themis_core::ThemisConfig;
 use themis_ipc::client::connect;
 use themis_ipc::{
-    GetDiagnosticsRequest, GetStatusRequest, StartCaptureRequest, StopCaptureRequest,
-    SubscribeTranscriptsRequest,
+    GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest, StartCaptureRequest,
+    StopCaptureRequest, SubscribeTranscriptsRequest,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -334,6 +334,27 @@ fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
         w.set_focus().map_err(|e| e.to_string())?;
         Ok(true)
     }
+}
+
+#[tauri::command]
+async fn clear_listening_session(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let mut client = connect(state.config.grpc_port)
+        .await
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .reset_session(ResetSessionRequest {})
+        .await
+        .map_err(|e| e.to_string())?
+        .into_inner();
+    if !resp.ok {
+        return Err(resp.message);
+    }
+    {
+        let mut o = state.overlay.lock().await;
+        *o = OverlayMirror::default();
+    }
+    let _ = app.emit("session-cleared", ());
+    Ok(())
 }
 
 #[tauri::command]
@@ -750,6 +771,7 @@ pub fn run() {
             adjust_overlay_opacity,
             cycle_overlay_theme,
             toggle_overlay_adaptive,
+            clear_listening_session,
             quit_app
         ])
         .run(tauri::generate_context!())

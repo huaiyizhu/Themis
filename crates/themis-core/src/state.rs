@@ -63,6 +63,10 @@ impl StateMachine {
     pub fn record_transcript(&self) {
         self.transcript_count.fetch_add(1, Ordering::SeqCst);
     }
+
+    pub fn reset_transcript_count(&self) {
+        self.transcript_count.store(0, Ordering::SeqCst);
+    }
 }
 
 impl Default for StateMachine {

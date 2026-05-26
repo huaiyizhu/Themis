@@ -26,6 +26,7 @@ struct RunningCapture {
     stop_tx: mpsc::Sender<()>,
     _audio: Box<dyn AudioSource + Send>,
     _tasks: RunningTasks,
+    session_summary: Arc<SessionSummarizer>,
 }
 
 struct RunningTasks {
@@ -245,6 +246,7 @@ impl CaptureEngine {
                 events: event_handle,
                 summary: summary_handle,
             },
+            session_summary: Arc::clone(&session_summary),
         });
 
         self.state
@@ -262,6 +264,29 @@ impl CaptureEngine {
         }
         self.state.set_state(CaptureState::Idle, "capture stopped");
         info!("capture engine stopped");
+        Ok(())
+    }
+
+    /// Clear accumulated transcript, summary, and diagnostics; keep capture running.
+    pub async fn reset_session(&self) -> anyhow::Result<()> {
+        self.latency_diag.clear();
+        self.analysis_diag.clear();
+        self.state.reset_transcript_count();
+
+        let guard = self.inner.lock().await;
+        if let Some(running) = guard.as_ref() {
+            running.session_summary.reset();
+            let _ = self.transcript_tx.send(TranscriptEvent {
+                text: String::new(),
+                is_final: false,
+                feedback: None,
+                insights: None,
+                session_summary: Some(String::new()),
+                emitted_unix_ms: Utc::now().timestamp_millis(),
+                latency: None,
+            });
+        }
+        info!("session reset (listening continues)");
         Ok(())
     }
 }

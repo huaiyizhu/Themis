@@ -2,8 +2,8 @@ use crate::proto::{
     themis_service_server::ThemisService, GetDiagnosticsRequest, GetDiagnosticsResponse,
     GetStatusRequest, GetStatusResponse, LatencyBreakdown as ProtoLatencyBreakdown,
     LatencyRecord as ProtoLatencyRecord, LatencySummary as ProtoLatencySummary,
-    StartCaptureRequest, StartCaptureResponse, StopCaptureRequest, StopCaptureResponse,
-    SubscribeTranscriptsRequest, TranscriptMessage,
+    ResetSessionRequest, ResetSessionResponse, StartCaptureRequest, StartCaptureResponse,
+    StopCaptureRequest, StopCaptureResponse, SubscribeTranscriptsRequest, TranscriptMessage,
 };
 use std::pin::Pin;
 use std::sync::Arc;
@@ -40,6 +40,7 @@ fn breakdown_to_proto(b: &LatencyBreakdown) -> ProtoLatencyBreakdown {
 pub trait CaptureEngineHandle: Send + Sync {
     async fn start(&self) -> anyhow::Result<()>;
     async fn stop(&self) -> anyhow::Result<()>;
+    async fn reset_session(&self) -> anyhow::Result<()>;
 }
 
 pub struct ThemisGrpcServer {
@@ -201,6 +202,25 @@ impl ThemisService for ThemisGrpcServer {
             }),
             analysis_records,
         }))
+    }
+
+    async fn reset_session(
+        &self,
+        _request: Request<ResetSessionRequest>,
+    ) -> Result<Response<ResetSessionResponse>, Status> {
+        match self.service.engine.reset_session().await {
+            Ok(()) => {
+                info!("ResetSession RPC");
+                Ok(Response::new(ResetSessionResponse {
+                    ok: true,
+                    message: "session cleared".into(),
+                }))
+            }
+            Err(e) => Ok(Response::new(ResetSessionResponse {
+                ok: false,
+                message: e.to_string(),
+            })),
+        }
     }
 
     type SubscribeTranscriptsStream =
