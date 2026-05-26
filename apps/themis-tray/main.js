@@ -10,6 +10,16 @@ const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
 const scrollLatestBtn = document.getElementById("scroll-latest");
 const clearSessionBtn = document.getElementById("clear-session");
+const sizePresetsEl = document.getElementById("size-presets");
+const sizeToggleBtn = document.getElementById("size-toggle");
+const sizeMenuEl = document.getElementById("size-menu");
+const toggleTranscriptBtn = document.getElementById("toggle-transcript");
+
+const WINDOW_PRESET_STORAGE_KEY = "themis-window-preset";
+const TRANSCRIPT_VISIBLE_STORAGE_KEY = "themis-transcript-visible";
+
+/** Whether the live transcript column is shown. */
+let transcriptVisible = true;
 const insightsEmptyEl = document.getElementById("insights-empty");
 const insightsKeywordsSec = document.getElementById("insights-keywords");
 const insightsKeywordsList = document.getElementById("insights-keywords-list");
@@ -39,9 +49,9 @@ let insightDwellMs = 20_000;
 
 let termSeq = 0;
 let questionSeq = 0;
-/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, term: string, explanation: string}>} */
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, term: string, explanation: string, detailText?: string, detailExpanded?: boolean, detailLoading?: boolean, detailError?: string}>} */
 const termEntries = [];
-/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, question: string, answer: string}>} */
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, question: string, answer: string, detailText?: string, detailExpanded?: boolean, detailLoading?: boolean, detailError?: string}>} */
 const questionEntries = [];
 /** @type {ReturnType<typeof setInterval> | null} */
 let insightPruneTimer = null;
@@ -50,8 +60,10 @@ const SCROLL_BOTTOM_THRESHOLD = 48;
 
 const SPLIT_WIDTH_STORAGE_KEY = "themis-insights-panel-width";
 const INSIGHTS_PANEL_MIN = 120;
+const QUESTIONS_PANEL_MIN = 160;
 const TRANSCRIPT_PANEL_MIN = 100;
 const SPLIT_DIVIDER_WIDTH = 8;
+const TRANSCRIPT_TOGGLE_WIDTH = 24;
 
 /** Programmatic drag avoids Windows WM_NCHITTEST fighting resize after data-tauri-drag-region. */
 function setupWindowDrag() {
@@ -69,11 +81,29 @@ function setupWindowDrag() {
 
 setupWindowDrag();
 
+function reservedTranscriptWidth() {
+  if (!transcriptVisible) return 0;
+  const w = scrollEl?.offsetWidth ?? 0;
+  return w > 0 ? w : TRANSCRIPT_PANEL_MIN;
+}
+
+function gutterWidth() {
+  return toggleTranscriptBtn?.offsetWidth ?? TRANSCRIPT_TOGGLE_WIDTH;
+}
+
 function clampInsightsWidth(widthPx) {
   if (!contentSplitEl || !insightsPanelEl) return widthPx;
+  const total = contentSplitEl.clientWidth;
+  const gutter = gutterWidth();
+  const divider = SPLIT_DIVIDER_WIDTH;
+
+  if (!transcriptVisible) {
+    const max = total - QUESTIONS_PANEL_MIN - divider - gutter;
+    return Math.round(Math.max(INSIGHTS_PANEL_MIN, Math.min(widthPx, max)));
+  }
+
   const questionsW = questionsPanelEl?.offsetWidth ?? 0;
-  const max =
-    contentSplitEl.clientWidth - TRANSCRIPT_PANEL_MIN - questionsW - SPLIT_DIVIDER_WIDTH;
+  const max = total - reservedTranscriptWidth() - gutter - questionsW - divider;
   return Math.round(Math.max(INSIGHTS_PANEL_MIN, Math.min(widthPx, max)));
 }
 
@@ -131,6 +161,119 @@ function initSplitDivider() {
 }
 
 initSplitDivider();
+
+function closeSizeMenu() {
+  sizeMenuEl?.classList.add("hidden");
+  sizeToggleBtn?.setAttribute("aria-expanded", "false");
+}
+
+function markActiveSizePreset(presetId) {
+  if (!sizeMenuEl) return;
+  for (const btn of sizeMenuEl.querySelectorAll("[data-preset]")) {
+    btn.classList.toggle("is-active", btn.dataset.preset === presetId);
+  }
+}
+
+async function applyWindowPreset(presetId) {
+  try {
+    const applied = await invoke("apply_window_preset", { preset: presetId });
+    localStorage.setItem(WINDOW_PRESET_STORAGE_KEY, applied);
+    markActiveSizePreset(applied);
+    closeSizeMenu();
+  } catch (e) {
+    statusEl.title = String(e);
+  }
+}
+
+async function initSizePresets() {
+  if (!sizeMenuEl || !sizeToggleBtn) return;
+  let presets = [];
+  try {
+    presets = await invoke("list_window_presets");
+  } catch {
+    return;
+  }
+
+  sizeMenuEl.replaceChildren();
+  for (const p of presets) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "size-menu-item";
+    btn.dataset.preset = p.id;
+    btn.setAttribute("role", "menuitem");
+    btn.title = p.fullscreen
+      ? "全屏"
+      : `${p.width}×${p.height}`;
+    btn.textContent = p.fullscreen ? p.label : `${p.label} ${p.width}×${p.height}`;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      applyWindowPreset(p.id);
+    });
+    sizeMenuEl.appendChild(btn);
+  }
+
+  sizeToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const open = sizeMenuEl.classList.toggle("hidden");
+    sizeToggleBtn.setAttribute("aria-expanded", open ? "false" : "true");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!sizePresetsEl?.contains(e.target)) {
+      closeSizeMenu();
+    }
+  });
+
+  const saved = localStorage.getItem(WINDOW_PRESET_STORAGE_KEY) || "default";
+  markActiveSizePreset(saved);
+  try {
+    await invoke("apply_window_preset", { preset: saved });
+  } catch {
+    /* browser preview */
+  }
+}
+
+initSizePresets();
+
+function applyTranscriptVisible(visible) {
+  transcriptVisible = visible;
+  contentSplitEl?.classList.toggle("transcript-hidden", !visible);
+  if (toggleTranscriptBtn) {
+    toggleTranscriptBtn.textContent = visible ? "«" : "»";
+    toggleTranscriptBtn.title = visible
+      ? "隐藏实时字幕 (Ctrl+Shift+H)"
+      : "显示实时字幕 (Ctrl+Shift+H)";
+    toggleTranscriptBtn.setAttribute("aria-label", visible ? "隐藏实时字幕" : "显示实时字幕");
+    toggleTranscriptBtn.setAttribute("aria-pressed", visible ? "false" : "true");
+  }
+  if (!visible) {
+    scrollLatestBtn?.classList.add("hidden");
+  } else if (followLatest) {
+    scrollLatestBtn?.classList.add("hidden");
+  } else {
+    scrollLatestBtn?.classList.remove("hidden");
+  }
+  localStorage.setItem(TRANSCRIPT_VISIBLE_STORAGE_KEY, visible ? "1" : "0");
+  if (insightsPanelEl?.offsetWidth > 0) {
+    applyInsightsWidth(insightsPanelEl.offsetWidth);
+  }
+}
+
+function toggleTranscriptPanel() {
+  applyTranscriptVisible(!transcriptVisible);
+}
+
+applyTranscriptVisible(localStorage.getItem(TRANSCRIPT_VISIBLE_STORAGE_KEY) !== "0");
+
+toggleTranscriptBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  closeSizeMenu();
+  toggleTranscriptPanel();
+});
+
+listen("toggle-transcript-panel", () => {
+  toggleTranscriptPanel();
+});
 
 function renderSessionSummary(summary) {
   const text = String(summary ?? "").trim();
@@ -294,6 +437,12 @@ function toggleEntryPin(entries, id) {
 
 function setupInsightCardPin() {
   questionsListEl.addEventListener("click", (e) => {
+    const moreBtn = e.target.closest(".insight-more-btn");
+    if (moreBtn?.dataset.id) {
+      e.stopPropagation();
+      toggleInsightDetail("question", moreBtn.dataset.id);
+      return;
+    }
     const card = e.target.closest(".question-card");
     if (!card?.dataset.id) return;
     if (toggleEntryPin(questionEntries, card.dataset.id)) {
@@ -301,6 +450,12 @@ function setupInsightCardPin() {
     }
   });
   insightsTermsList.addEventListener("click", (e) => {
+    const moreBtn = e.target.closest(".insight-more-btn");
+    if (moreBtn?.dataset.id) {
+      e.stopPropagation();
+      toggleInsightDetail("term", moreBtn.dataset.id);
+      return;
+    }
     const card = e.target.closest(".insight-card");
     if (!card?.dataset.id) return;
     if (toggleEntryPin(termEntries, card.dataset.id)) {
@@ -399,6 +554,77 @@ function sortInsightEntries(entries) {
   });
 }
 
+function appendInsightMoreSection(card, item) {
+  const actions = document.createElement("div");
+  actions.className = "insight-actions";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "insight-more-btn";
+  btn.dataset.id = item.id;
+  if (item.detailLoading) {
+    btn.textContent = "加载中…";
+    btn.disabled = true;
+  } else if (item.detailExpanded) {
+    btn.textContent = "收起";
+  } else {
+    btn.textContent = "更详细";
+  }
+  actions.appendChild(btn);
+  card.appendChild(actions);
+
+  if (item.detailExpanded) {
+    const detail = document.createElement("div");
+    detail.className = "insight-detail";
+    if (item.detailLoading) {
+      detail.classList.add("loading");
+      detail.textContent = "正在生成详细说明…";
+    } else if (item.detailError) {
+      detail.classList.add("error");
+      detail.textContent = item.detailError;
+    } else if (item.detailText) {
+      detail.textContent = item.detailText;
+    }
+    card.appendChild(detail);
+  }
+}
+
+async function toggleInsightDetail(kind, id) {
+  const entries = kind === "term" ? termEntries : questionEntries;
+  const item = entries.find((e) => e.id === id);
+  if (!item) return;
+
+  if (item.detailExpanded) {
+    item.detailExpanded = false;
+    renderInsightPanels();
+    return;
+  }
+
+  if (item.detailText) {
+    item.detailExpanded = true;
+    renderInsightPanels();
+    return;
+  }
+
+  if (item.detailLoading) return;
+
+  item.detailLoading = true;
+  item.detailExpanded = true;
+  item.detailError = undefined;
+  renderInsightPanels();
+
+  const subject = kind === "term" ? item.term : item.question;
+  const brief = kind === "term" ? item.explanation : item.answer;
+
+  try {
+    item.detailText = await invoke("expand_insight", { kind, subject, brief });
+  } catch (err) {
+    item.detailError = String(err);
+  } finally {
+    item.detailLoading = false;
+    renderInsightPanels();
+  }
+}
+
 function renderInsightPanels() {
   const hasTerms = termEntries.length > 0;
   const hasQuestions = questionEntries.length > 0;
@@ -423,6 +649,7 @@ function renderInsightPanels() {
     a.className = "a";
     a.textContent = item.answer;
     card.append(meta, q, a);
+    appendInsightMoreSection(card, item);
     questionsListEl.appendChild(card);
   }
 
@@ -450,6 +677,7 @@ function renderInsightPanels() {
     const body = document.createElement("div");
     body.textContent = item.explanation;
     card.append(meta, term, body);
+    appendInsightMoreSection(card, item);
     insightsTermsList.appendChild(card);
   }
 

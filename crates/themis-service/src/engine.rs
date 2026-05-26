@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use themis_audio::{AudioSource, SystemAudioOptions};
-use themis_analysis::{create_analyzer, SessionSummarizer, ANALYSIS_CONTEXT_LINES};
+use themis_analysis::{create_analyzer, LlmAnalyzer, SessionSummarizer, ANALYSIS_CONTEXT_LINES};
 use themis_azure::create_recognizer;
 use chrono::Utc;
 use themis_core::{
@@ -288,5 +288,27 @@ impl CaptureEngine {
         }
         info!("session reset (listening continues)");
         Ok(())
+    }
+
+    pub async fn session_context(&self) -> String {
+        let guard = self.inner.lock().await;
+        guard
+            .as_ref()
+            .map(|r| r.session_summary.full_text())
+            .unwrap_or_default()
+    }
+
+    pub async fn expand_insight(
+        &self,
+        kind: &str,
+        subject: &str,
+        brief: &str,
+    ) -> anyhow::Result<String> {
+        let llm = LlmAnalyzer::from_config(&self.config)
+            .ok_or_else(|| anyhow::anyhow!("LLM not configured (set FOUNDRY_* in .env)"))?;
+        let context = self.session_context().await;
+        llm.expand_insight_detail(kind, subject, brief, &context)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("empty expand response"))
     }
 }

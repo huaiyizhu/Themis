@@ -1,6 +1,8 @@
 mod overlay_ui;
+mod window_presets;
 
 use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
+use window_presets::{apply_preset, list_presets, WindowPresetDto};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{
@@ -11,8 +13,8 @@ use tauri::{
 use themis_core::ThemisConfig;
 use themis_ipc::client::connect;
 use themis_ipc::{
-    GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest, StartCaptureRequest,
-    StopCaptureRequest, SubscribeTranscriptsRequest,
+    ExpandInsightRequest, GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest,
+    StartCaptureRequest, StopCaptureRequest, SubscribeTranscriptsRequest,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -320,6 +322,37 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
     })
 }
 
+fn set_overlay_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window missing".to_string())?;
+    if visible {
+        w.show().map_err(|e| e.to_string())?;
+        w.set_focus().map_err(|e| e.to_string())?;
+    } else {
+        w.hide().map_err(|e| e.to_string())?;
+    }
+    let _ = app.emit("overlay-visibility", visible);
+    Ok(visible)
+}
+
+#[tauri::command]
+fn toggle_overlay_visibility(app: AppHandle) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window missing".to_string())?;
+    let visible = w.is_visible().map_err(|e| e.to_string())?;
+    set_overlay_visible(&app, !visible)
+}
+
+#[tauri::command]
+fn is_overlay_visible(app: AppHandle) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window missing".to_string())?;
+    w.is_visible().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
     let w = app
@@ -333,6 +366,46 @@ fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
         w.show().map_err(|e| e.to_string())?;
         w.set_focus().map_err(|e| e.to_string())?;
         Ok(true)
+    }
+}
+
+#[tauri::command]
+fn list_window_presets() -> Vec<WindowPresetDto> {
+    list_presets()
+}
+
+#[tauri::command]
+fn apply_window_preset(app: AppHandle, preset: String) -> Result<String, String> {
+    apply_preset(&app, preset.trim())
+}
+
+#[tauri::command]
+async fn expand_insight(
+    state: State<'_, AppState>,
+    kind: String,
+    subject: String,
+    brief: String,
+) -> Result<String, String> {
+    let mut client = connect(state.config.grpc_port)
+        .await
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .expand_insight(ExpandInsightRequest {
+            kind,
+            subject,
+            brief,
+        })
+        .await
+        .map_err(|e| e.to_string())?
+        .into_inner();
+    if resp.ok {
+        Ok(resp.detail)
+    } else {
+        Err(if resp.message.is_empty() {
+            "expand insight failed".into()
+        } else {
+            resp.message
+        })
     }
 }
 
@@ -583,6 +656,11 @@ pub fn run() {
     } else {
         "Ctrl+Shift+Digit0"
     };
+    let hotkey_overlay_visibility = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyH"
+    } else {
+        "Ctrl+Shift+KeyH"
+    };
 
     let sc_toggle: tauri_plugin_global_shortcut::Shortcut = hotkey_toggle
         .parse()
@@ -614,6 +692,9 @@ pub fn run() {
     let sc_font_reset: tauri_plugin_global_shortcut::Shortcut = hotkey_font_reset
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_font_reset}: {e}"));
+    let sc_overlay_visibility: tauri_plugin_global_shortcut::Shortcut = hotkey_overlay_visibility
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_overlay_visibility}: {e}"));
 
     let ui_state = Arc::new(OverlayUiState::new());
 
@@ -631,6 +712,7 @@ pub fn run() {
                     hotkey_font_down,
                     hotkey_font_up,
                     hotkey_font_reset,
+                    hotkey_overlay_visibility,
                 ])
                 .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
                 .with_handler({
@@ -670,6 +752,8 @@ pub fn run() {
                         } else if shortcut == &sc_font_reset {
                             let s = ui_state.reset_font_scale();
                             let _ = apply_overlay_ui(app, &s);
+                        } else if shortcut == &sc_overlay_visibility {
+                            let _ = app.emit("toggle-transcript-panel", ());
                         }
                     }
                 })
@@ -686,6 +770,13 @@ pub fn run() {
             let _ = apply_overlay_ui(&app.handle(), &settings);
             spawn_adaptive_poll(app.handle().clone(), Arc::clone(&ui_state));
             let show_i = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
+            let hide_i = MenuItem::with_id(
+                app,
+                "hide_overlay",
+                "Hide overlay window",
+                true,
+                None::<&str>,
+            )?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Toggle capture", true, None::<&str>)?;
             let diag_i = MenuItem::with_id(
                 app,
@@ -695,7 +786,7 @@ pub fn run() {
                 None::<&str>,
             )?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit (Ctrl+Shift+Q)", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &diag_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_i, &hide_i, &toggle_i, &diag_i, &quit_i])?;
 
             if let Some(w) = app.get_webview_window("overlay") {
                 let _ = w.set_always_on_top(true);
@@ -713,10 +804,10 @@ pub fn run() {
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
-                        if let Some(w) = app.get_webview_window("overlay") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        let _ = set_overlay_visible(app, true);
+                    }
+                    "hide_overlay" => {
+                        let _ = set_overlay_visible(app, false);
                     }
                     "toggle" => {
                         let app = app.clone();
@@ -738,15 +829,7 @@ pub fn run() {
                     } = event
                     {
                         let app = tray.app_handle();
-                        if let Some(w) = app.get_webview_window("overlay") {
-                            let visible = w.is_visible().unwrap_or(false);
-                            if visible {
-                                let _ = w.hide();
-                            } else {
-                                let _ = w.show();
-                                let _ = w.set_focus();
-                            }
-                        }
+                        let _ = toggle_overlay_visibility(app.clone());
                     }
                 })
                 .build(app)?;
@@ -772,6 +855,11 @@ pub fn run() {
             cycle_overlay_theme,
             toggle_overlay_adaptive,
             clear_listening_session,
+            list_window_presets,
+            apply_window_preset,
+            expand_insight,
+            toggle_overlay_visibility,
+            is_overlay_visible,
             quit_app
         ])
         .run(tauri::generate_context!())

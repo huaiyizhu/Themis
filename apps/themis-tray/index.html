@@ -25,6 +25,10 @@
           <span id="theme-badge" class="theme-badge" title="Style preset">dark</span>
         </div>
         <div class="header-actions">
+          <div class="size-presets" id="size-presets">
+            <button type="button" id="size-toggle" class="header-btn size-toggle" title="窗口尺寸预设" aria-expanded="false" aria-haspopup="true">尺寸</button>
+            <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
+          </div>
           <button type="button" id="clear-session" class="header-btn clear-session" title="清空字幕、总结与洞察，从零继续监听">清空</button>
           <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden" title="Jump to latest transcript">↓ Latest</button>
         </div>
@@ -39,6 +43,16 @@
         <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
           <div id="transcript" class="transcript-body"></div>
         </div>
+        <button
+          type="button"
+          id="toggle-transcript"
+          class="transcript-toggle"
+          title="隐藏实时字幕 (Ctrl+Shift+H)"
+          aria-label="隐藏实时字幕"
+          aria-pressed="false"
+        >
+          «
+        </button>
         <aside id="questions-panel" class="questions-panel" aria-label="Questions">
           <h2 class="questions-title">Questions</h2>
           <p id="questions-empty" class="questions-empty">核心问题会实时显示在此栏，无需滚动即可查看。</p>

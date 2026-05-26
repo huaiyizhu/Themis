@@ -1,9 +1,10 @@
 use crate::proto::{
-    themis_service_server::ThemisService, GetDiagnosticsRequest, GetDiagnosticsResponse,
-    GetStatusRequest, GetStatusResponse, LatencyBreakdown as ProtoLatencyBreakdown,
-    LatencyRecord as ProtoLatencyRecord, LatencySummary as ProtoLatencySummary,
-    ResetSessionRequest, ResetSessionResponse, StartCaptureRequest, StartCaptureResponse,
-    StopCaptureRequest, StopCaptureResponse, SubscribeTranscriptsRequest, TranscriptMessage,
+    themis_service_server::ThemisService, ExpandInsightRequest, ExpandInsightResponse,
+    GetDiagnosticsRequest, GetDiagnosticsResponse, GetStatusRequest, GetStatusResponse,
+    LatencyBreakdown as ProtoLatencyBreakdown, LatencyRecord as ProtoLatencyRecord,
+    LatencySummary as ProtoLatencySummary, ResetSessionRequest, ResetSessionResponse,
+    StartCaptureRequest, StartCaptureResponse, StopCaptureRequest, StopCaptureResponse,
+    SubscribeTranscriptsRequest, TranscriptMessage,
 };
 use std::pin::Pin;
 use std::sync::Arc;
@@ -41,6 +42,7 @@ pub trait CaptureEngineHandle: Send + Sync {
     async fn start(&self) -> anyhow::Result<()>;
     async fn stop(&self) -> anyhow::Result<()>;
     async fn reset_session(&self) -> anyhow::Result<()>;
+    async fn expand_insight(&self, kind: &str, subject: &str, brief: &str) -> anyhow::Result<String>;
 }
 
 pub struct ThemisGrpcServer {
@@ -218,6 +220,30 @@ impl ThemisService for ThemisGrpcServer {
             }
             Err(e) => Ok(Response::new(ResetSessionResponse {
                 ok: false,
+                message: e.to_string(),
+            })),
+        }
+    }
+
+    async fn expand_insight(
+        &self,
+        request: Request<ExpandInsightRequest>,
+    ) -> Result<Response<ExpandInsightResponse>, Status> {
+        let req = request.into_inner();
+        match self
+            .service
+            .engine
+            .expand_insight(&req.kind, &req.subject, &req.brief)
+            .await
+        {
+            Ok(detail) => Ok(Response::new(ExpandInsightResponse {
+                ok: true,
+                detail,
+                message: String::new(),
+            })),
+            Err(e) => Ok(Response::new(ExpandInsightResponse {
+                ok: false,
+                detail: String::new(),
                 message: e.to_string(),
             })),
         }

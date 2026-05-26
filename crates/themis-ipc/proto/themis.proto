@@ -8,6 +8,7 @@ service ThemisService {
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
   rpc GetDiagnostics(GetDiagnosticsRequest) returns (GetDiagnosticsResponse);
   rpc ResetSession(ResetSessionRequest) returns (ResetSessionResponse);
+  rpc ExpandInsight(ExpandInsightRequest) returns (ExpandInsightResponse);
   rpc SubscribeTranscripts(SubscribeTranscriptsRequest)
       returns (stream TranscriptMessage);
 }
@@ -64,6 +65,19 @@ message ResetSessionRequest {}
 message ResetSessionResponse {
   bool ok = 1;
   string message = 2;
+}
+
+message ExpandInsightRequest {
+  /// "term" or "question"
+  string kind = 1;
+  string subject = 2;
+  string brief = 3;
+}
+
+message ExpandInsightResponse {
+  bool ok = 1;
+  string detail = 2;
+  string message = 3;
 }
 
 message GetDiagnosticsResponse {

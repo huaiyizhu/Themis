@@ -205,6 +205,97 @@ If nothing meets this bar, return empty arrays.";
             Ok(Some(content))
         }
     }
+
+    /// Longer Chinese explanation for a term or question (on demand).
+    pub async fn expand_insight_detail(
+        &self,
+        kind: &str,
+        subject: &str,
+        brief: &str,
+        session_context: &str,
+    ) -> anyhow::Result<Option<String>> {
+        let subject = subject.trim();
+        let brief = brief.trim();
+        if subject.is_empty() {
+            return Ok(None);
+        }
+
+        let (system, user) = match kind {
+            "term" => (
+                "你是技术听写助手，负责用简体中文给出术语的深入解释。\
+输出 4-8 句，覆盖：定义、原理或机制、典型用途、注意事项、1 个简短例子。\
+结合会话上下文判断领域（如 AI/软件）；缩写按当前语境解释（如 MCP = Model Context Protocol）。\
+不要 Markdown 标题，不要反问，只输出正文。",
+                format!(
+                    "Session context (if any):\n{}\n\nTerm: {subject}\nBrief explanation already shown:\n{brief}\n\nGive a fuller explanation:",
+                    session_context.trim()
+                ),
+            ),
+            "question" => (
+                "你是技术听写助手，负责用简体中文深入回答一个问题。\
+输出 4-8 句，覆盖：直接回答、关键原理、实践要点或对比、必要时举简短例子。\
+结合会话上下文；不要 Markdown 标题，不要反问，只输出正文。",
+                format!(
+                    "Session context (if any):\n{}\n\nQuestion: {subject}\nBrief answer already shown:\n{brief}\n\nGive a fuller answer:",
+                    session_context.trim()
+                ),
+            ),
+            _ => return Ok(None),
+        };
+
+        self.chat_plain(system, &user, 680, 0.25).await
+    }
+
+    async fn chat_plain(
+        &self,
+        system: &str,
+        user: &str,
+        max_tokens: u32,
+        temperature: f32,
+    ) -> anyhow::Result<Option<String>> {
+        let url = format!(
+            "{}/openai/deployments/{}/chat/completions?api-version=2024-08-01-preview",
+            self.endpoint, self.deployment
+        );
+        let body = SummarizeChatRequest {
+            messages: vec![
+                ChatMessage {
+                    role: "system".into(),
+                    content: system.into(),
+                },
+                ChatMessage {
+                    role: "user".into(),
+                    content: user.into(),
+                },
+            ],
+            temperature,
+            max_tokens,
+        };
+        let resp = self
+            .client
+            .post(&url)
+            .header("api-key", &self.api_key)
+            .json(&body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let err = resp.text().await.unwrap_or_default();
+            warn!(%status, body = %err, "llm expand failed");
+            return Ok(None);
+        }
+        let parsed: ChatResponse = resp.json().await?;
+        let content = parsed
+            .choices
+            .first()
+            .map(|c| c.message.content.trim().to_string())
+            .unwrap_or_default();
+        if content.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(content))
+        }
+    }
 }
 
 fn build_analysis_user_content(phrase: &str, ctx: &AnalysisContext) -> String {
