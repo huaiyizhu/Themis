@@ -27,6 +27,7 @@ struct StatusDto {
     audio_frames: u64,
     capture_mode: String,
     audio_sessions: u32,
+    capture_detail: String,
 }
 
 #[derive(Clone, Serialize, serde::Deserialize, Default)]
@@ -213,6 +214,7 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
         audio_frames: resp.audio_frames,
         capture_mode: resp.capture_mode,
         audio_sessions: resp.audio_sessions,
+        capture_detail: resp.capture_detail,
     })
 }
 

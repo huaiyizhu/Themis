@@ -378,19 +378,25 @@ async function refreshStatus() {
     const s = await invoke("get_status");
     const short =
       s.state === "capturing"
-        ? `● ${s.state} · ${s.capture_mode || "?"} · peak ${s.audio_peak ?? 0}`
+        ? `● ${s.state} · ${s.capture_mode || "?"} · peak ${s.audio_peak ?? 0} · frames ${s.audio_frames ?? 0}`
         : `● ${s.state}`;
     statusEl.textContent = short;
-    statusEl.title = s.message || "";
+    const detail = s.capture_detail ? `${s.capture_detail}\n` : "";
+    statusEl.title = `${detail}${s.message || ""}`.trim();
 
-    if (s.state === "capturing" && committedLines.length === 0 && !partialText) {
+    if (s.state === "idle") {
+      setPlaceholder(
+        "Service online — press Cmd+Shift+T (macOS) or Ctrl+Shift+T (Windows) to start capture.",
+      );
+    } else if (s.state === "capturing" && committedLines.length === 0 && !partialText) {
       let hint = "Listening… new lines appear below; view scrolls to latest.";
-      if (s.message?.includes("no loopback signal")) {
-        hint = s.message;
-      } else if (s.message?.includes("signal=strong")) {
-        hint = "Capture OK. Transcript scrolls here (~2s per phrase)…";
-      } else if (s.message?.includes("signal=ok")) {
-        hint = "Capture OK. Waiting for speech…";
+      if (s.message?.includes("no loopback signal") || s.message?.includes("signal=silent")) {
+        hint =
+          "No audio signal (peak low). macOS: route output to BlackHole and set Input=BlackHole; allow Microphone permission.";
+      } else if (s.message?.includes("signal=strong") || s.message?.includes("signal=ok")) {
+        hint = "Capture OK (see status peak/frames). Transcript appears here every ~2s when speech is detected…";
+      } else if ((s.audio_peak ?? 0) === 0 && (s.audio_frames ?? 0) === 0) {
+        hint = "Capturing but no frames yet — check input device in status tooltip.";
       }
       setPlaceholder(hint);
     }

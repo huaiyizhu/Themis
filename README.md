@@ -36,10 +36,18 @@
 
 | 项目 | 版本 |
 |------|------|
-| Windows | 10+（当前主要开发平台） |
-| macOS | 12+（托盘可用；系统音频需虚拟声卡，见平台说明） |
+| Windows | 10+ |
+| macOS | 12+（Monterey 及以上；系统音频需 BlackHole，见下文） |
 | Rust | stable（见 `rust-toolchain.toml`） |
 | Node.js | 20+（仅托盘 Tauri 前端） |
+
+**macOS 额外依赖**
+
+| 工具 | 用途 |
+|------|------|
+| [Xcode Command Line Tools](https://developer.apple.com/xcode/) | `xcode-select --install` — Tauri / 本地链接 |
+| [Homebrew](https://brew.sh/)（推荐） | 安装 Node 20、`rustup` 等 |
+| [BlackHole](https://existential.audio/blackhole/) | 将系统播放声路由为「输入」，供采集（见 [docs/platform-notes.md](docs/platform-notes.md)） |
 
 ---
 
@@ -52,15 +60,24 @@
 3. 复制环境变量模板并填写：
 
 ```powershell
+# Windows
 copy .env.example .env
-# 编辑 .env，填入 AZURE_SPEECH_KEY、AZURE_SPEECH_REGION
 ```
+
+```bash
+# macOS / Linux
+cp .env.example .env
+```
+
+编辑 `.env`，填入 `AZURE_SPEECH_KEY`、`AZURE_SPEECH_REGION`。
 
 未配置 Key 时会自动进入 **Mock 识别**（仅用于 UI 联调，无真实听写）。
 
 ### 2. 一键脚本（推荐）
 
-在项目根目录用 PowerShell，或双击根目录下的 **`dev.cmd` / `restart.cmd` / `tray.cmd`**（内部调用同一套脚本）：
+#### Windows
+
+在项目根目录用 PowerShell，或双击 **`dev.cmd` / `restart.cmd` / `tray.cmd`**：
 
 | 命令 | 作用 |
 |------|------|
@@ -74,40 +91,61 @@ copy .env.example .env
 | `.\scripts\themis.ps1 build` | 仅编译服务 |
 | `.\scripts\themis.ps1 build -Release` | Release 编译（加 `-Release` 适用于任意子命令） |
 
-macOS / Linux：
+```powershell
+# 典型流程
+.\scripts\themis.ps1 restart   # 改 .env / Rust 后
+.\scripts\themis.ps1 dev       # 只开后台服务
+.\scripts\themis.ps1 tray      # 服务 + 托盘（会自动编译并拉起服务）
+```
+
+日志：`%LOCALAPPDATA%\Themis\logs`
+
+#### macOS（MacBook）
+
+首次请安装 [BlackHole](https://existential.audio/blackhole/) 并按 [docs/platform-notes.md](docs/platform-notes.md) 配置「输出 → BlackHole、输入 → BlackHole」（或 Multi-Output 同时听耳机）。
 
 ```bash
-chmod +x scripts/themis.sh
-./scripts/themis.sh dev
-./scripts/themis.sh restart
-./scripts/themis.sh tray
+chmod +x scripts/themis.sh dev.sh restart.sh tray.sh
+./scripts/themis.sh dev      # 或 ./dev.sh
+./scripts/themis.sh restart  # 或 ./restart.sh
+./scripts/themis.sh tray     # 或 ./tray.sh — 首次会自动生成 Tauri 所需的 icon.icns
 ```
 
-**典型流程**
+| 命令 | 作用 |
+|------|------|
+| `./scripts/themis.sh dev` / `./dev.sh` | 编译 + 后台启动服务 |
+| `./scripts/themis.sh restart` / `./restart.sh` | 停止 → 编译 → 启动 |
+| `./scripts/themis.sh tray` / `./tray.sh` | 服务 + Tauri 托盘（前台） |
+| `./scripts/themis.sh stop` | 停止 `themis-service` |
+| `./scripts/themis.sh status` | 进程与 `.env` 状态 |
+| `./scripts/themis.sh doctor` | Azure / gRPC 自检 |
+| `./scripts/themis.sh probe` | 音频采集自检（8 秒） |
+| `./scripts/themis.sh icons` | 仅生成 `icon.icns`（`tray` 会自动调用） |
+| `./scripts/themis.sh build -r` | Release 编译（`-r` / `--release`） |
 
-```powershell
-# 1) 首次或改 .env / Rust 后
-.\scripts\themis.ps1 restart
+日志：`~/Library/Logs/Themis`  
+数据：`~/Library/Application Support/Themis`
 
-# 2) 只开后台服务
-.\scripts\themis.ps1 dev
-
-# 3) 再开托盘（也可只跑 tray，会自动尝试拉起已编译的服务）
-.\scripts\themis.ps1 tray
-```
-
-服务在**后台无窗口**运行；日志在 `%LOCALAPPDATA%\Themis\logs`（Windows），不在那个黑窗口里。
+macOS 上 `THEMIS_AUDIO_CAPTURE_MODE` / `THEMIS_AUDIO_OUTPUT_DEVICE` **无效**（仅 Windows WASAPI）；采集走**系统默认输入设备**。
 
 ### 3. 手动运行（两个终端）
 
-```powershell
-# 终端 1 — 后台服务（保持运行）
-cargo run -p themis-service
+**Windows**
 
-# 终端 2 — 托盘
+```powershell
+cargo run -p themis-service
 cd apps\themis-tray
 npm install
 npm run tauri dev
+```
+
+**macOS**
+
+```bash
+cargo run -p themis-service
+cd apps/themis-tray
+npm install
+npm run tauri dev   # 若缺 icon.icns：./scripts/themis.sh icons
 ```
 
 浮层应显示 `Status: idle — …`。若只有 **Service offline**，说明服务未启动或未监听 gRPC。
@@ -128,7 +166,7 @@ npm run tauri dev
 | 移动浮层 | 拖动标题栏 | 同左 |
 | 调整大小 | 拖动窗口边缘/角 | 同左 |
 
-浮层**始终置顶**。风格预设：`dark-glass`、`light-glass`、`high-contrast-dark`、`high-contrast-light`、`outline`。**自适应**（`Ctrl+Shift+A`）会采样浮层下方的桌面亮度，自动在深浅面板间切换（Windows）。
+浮层**始终置顶**。风格预设：`dark-glass`、`light-glass`、`high-contrast-dark`、`high-contrast-light`、`outline`。**自适应**（`Ctrl+Shift+A` / `Cmd+Shift+A`）会采样浮层下方的桌面亮度并自动切换深浅面板（**仅 Windows**；macOS 上快捷键存在但暂不采样桌面）。
 
 **Insights 侧栏**（浮层右侧）：对**每一句最终听写结果**做关键词、术语解释与问题初答，详见下文 [Insights 洞察](#insights-洞察关键词--术语--问答)。**诊断窗口**（`Ctrl+Shift+D`）可查看 STT 延迟与启发式/LLM 分析拆分，见 [延迟诊断](#延迟诊断)。
 
@@ -161,11 +199,7 @@ npm run tauri dev
 
 \* 缺 Key/Region 时自动 Mock。Insights **不依赖** Foundry：未配置时仍可用内置启发式与词表。
 
-修改 `.env` 后请执行：
-
-```powershell
-.\scripts\themis.ps1 restart
-```
+修改 `.env` 后请执行 `.\scripts\themis.ps1 restart`（Windows）或 `./scripts/themis.sh restart`（macOS）。
 
 ---
 
@@ -296,7 +330,28 @@ THEMIS_ANALYSIS_ENABLED=true
 
 ---
 
-## 音频采集（需求 1）— Windows
+## 音频采集
+
+### macOS（BlackHole）
+
+Apple 未提供「抓取所有 App 混音」的公开 API。Themis 通过 **默认输入设备**（cpal）采音。要转写 **系统正在播放的声音**（YouTube、会议等）：
+
+1. 安装 [BlackHole 2ch](https://existential.audio/blackhole/)
+2. **系统设置 → 声音 → 输出**：BlackHole（或 **MIDI 设置** 里建 Multi-Output Device：BlackHole + 内置扬声器，以便边听边录）
+3. **系统设置 → 声音 → 输入**：BlackHole
+4. 首次采集若弹出 **麦克风** 权限，请允许（输入设备采集需要）
+
+自检（播放 YouTube 等）：
+
+```bash
+./scripts/themis.sh probe
+# 或
+cargo run -p themis-cli -- audio-probe --seconds 8
+```
+
+`detail` 行会显示当前默认输入设备名。`peak > 200` 为正常。详见 [docs/platform-notes.md](docs/platform-notes.md)。
+
+### Windows（WASAPI loopback）
 
 目标：**只要系统里有应用在播放声音**（YouTube、会议、音乐等），Themis 就要能抓到**数字音频**，用于后续转写。与是否插耳机、物理扬声器无关；并尽量在**系统静音 / 音量很低**时仍能采到。
 
@@ -369,8 +424,22 @@ capturing | capture=process sessions=2 peak=12000 frames=800 signal=strong
 
 ### 浮层显示 Service offline
 
-- 先运行 `.\scripts\themis.ps1 dev` 或 `restart`，或 `.\scripts\themis.ps1 status` 确认进程在跑。
+- 先运行开发脚本启动服务：`.\scripts\themis.ps1 dev`（Windows）或 `./scripts/themis.sh dev`（macOS），或用 `restart` / `status` 确认进程在跑。
 - 检查端口是否与 `.env` 中 `THEMIS_GRPC_PORT` 一致。
+
+### macOS：Tauri 报错缺少 icon.icns
+
+```bash
+./scripts/themis.sh icons
+# 或
+./scripts/prepare-macos-icons.sh
+```
+
+### macOS：probe 失败 / peak 为 0
+
+- 确认正在播放声音，且 **输出** 已路由到 BlackHole。
+- **输入** 选 BlackHole；在 **隐私与安全性 → 麦克风** 中允许终端或 Themis。
+- 运行 `./scripts/themis.sh probe` 查看 `detail` 中的设备名。
 
 ### 听写把技术词听错（如 RAG → Reg）
 
@@ -415,7 +484,7 @@ Azure 听中文视频里的英文缩写时，常把 **RAG** 听成 **Reg**（发
 
 ### 能采集但几乎没有字幕 / 只有零星单词
 
-先确认采集：`.\scripts\themis.ps1 probe` 必须 `OK` 且 `peak > 200`。
+先确认采集：`probe` 必须 `OK` 且 `peak > 200`（Windows：`.\scripts\themis.ps1 probe`；macOS：`./scripts/themis.sh probe`）。
 
 1. 使用 **`AZURE_SPEECH_LANGUAGE=auto`**（默认）自动中英识别；或手动指定单一语言。
 2. 确认 `.env` 已保存并 **`.\scripts\themis.ps1 restart`**。
@@ -455,7 +524,10 @@ npm run tauri build    # 发布安装包
 npm run tauri dev      # 开发
 ```
 
-Release 二进制：`target/release/themis-service.exe`（Windows）。
+Release 二进制：
+
+- Windows：`target/release/themis-service.exe`
+- macOS / Linux：`target/release/themis-service`
 
 ---
 
@@ -490,8 +562,11 @@ crates/themis-ipc       # gRPC
 crates/themis-service   # 后台服务入口
 crates/themis-cli       # CLI / 服务安装
 apps/themis-tray        # Tauri 托盘 + 浮层
-scripts/themis.ps1      # Windows 一键脚本
-scripts/themis.sh       # macOS/Linux 一键脚本
+scripts/themis.ps1           # Windows 一键脚本
+scripts/themis.sh            # macOS/Linux 一键脚本
+scripts/prepare-macos-icons.sh
+dev.sh / restart.sh / tray.sh  # macOS 快捷入口（调用 themis.sh）
+dev.cmd / restart.cmd / tray.cmd  # Windows 快捷入口
 docs/                   # 架构与平台说明
 packaging/              # 服务安装模板
 ```
@@ -503,8 +578,10 @@ packaging/              # 服务安装模板
 ```bash
 cargo run -p themis-cli -- doctor
 cargo run -p themis-cli -- status
+cargo run -p themis-cli -- audio-probe --seconds 8   # Windows / macOS
 # 或
-.\scripts\themis.ps1 doctor
+./scripts/themis.sh doctor
+./scripts/themis.sh probe
 ```
 
 ---

@@ -15,7 +15,7 @@ enum Commands {
     /// Query service status via gRPC
     Status,
     /// Capture system audio for N seconds and print diagnostics (no Azure)
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     AudioProbe {
         /// Seconds to listen (default 5)
         #[arg(short, long, default_value = "5")]
@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Status => cmd_status(&config).await?,
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         Commands::AudioProbe { seconds } => cmd_audio_probe(seconds).await?,
         #[cfg(windows)]
         Commands::SttProbe { seconds } => cmd_stt_probe(&config, seconds).await?,
@@ -103,7 +103,7 @@ async fn cmd_status(config: &ThemisConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "macos"))]
 async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
@@ -112,17 +112,24 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
     use tokio::sync::mpsc;
 
     println!("Themis audio probe ({seconds}s)");
+    #[cfg(windows)]
     println!("Play sound on your PC (e.g. YouTube). Mute speakers to test process loopback.\n");
+    #[cfg(target_os = "macos")]
+    println!(
+        "Play sound (e.g. YouTube). For system output, route audio through BlackHole — see docs/platform-notes.md.\n"
+    );
 
+    let config = ThemisConfig::from_env();
     let diag = Arc::new(CaptureDiagnostics::new());
     let (tx, mut rx) = mpsc::channel(512);
     let mut source = create_loopback(
         16_000,
         1,
         SystemAudioOptions {
+            #[cfg(windows)]
             capture_mode: std::env::var("THEMIS_AUDIO_CAPTURE_MODE")
-                .unwrap_or_else(|_| "auto".into()),
-            gain_max: ThemisConfig::from_env().audio_gain_max,
+                .unwrap_or_else(|_| config.audio_capture_mode.clone()),
+            gain_max: config.audio_gain_max,
             diagnostics: Some(Arc::clone(&diag)),
             ..SystemAudioOptions::default()
         },
@@ -146,11 +153,20 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
     if snap.frames == 0 {
         println!("\nFAIL: no audio frames captured.");
         println!("  - Is any app playing sound?");
+        #[cfg(windows)]
         println!("  - Try THEMIS_AUDIO_CAPTURE_MODE=process or endpoint");
+        #[cfg(target_os = "macos")]
+        {
+            println!("  - System Settings → Sound → Input: select BlackHole (or your loopback device)");
+            println!("  - Grant microphone permission if macOS prompts (required for input capture)");
+        }
         std::process::exit(1);
     } else if snap.peak < 200 {
         println!("\nWARN: signal very weak. Speech recognition may fail.");
+        #[cfg(windows)]
         println!("  - Process loopback usually works when endpoint loopback is silent.");
+        #[cfg(target_os = "macos")]
+        println!("  - Confirm output is routed to BlackHole and input is set to the same device");
         std::process::exit(2);
     } else {
         println!("\nOK: capture pipeline is receiving audio.");

@@ -18,6 +18,8 @@ pub struct ThemisConfig {
     /// Optional Windows playback endpoint (friendly name substring or device ID).
     /// Default: Windows default **audio output** (render endpoint), not the microphone.
     pub audio_output_device: Option<String>,
+    /// macOS: optional input device name substring (e.g. `BlackHole`). Default: system default input.
+    pub audio_input_device: Option<String>,
     /// Max gain applied when loopback signal is quiet (default 16).
     pub audio_gain_max: f32,
     /// Windows capture strategy: `auto` | `process` | `endpoint`
@@ -45,6 +47,7 @@ impl Default for ThemisConfig {
             sample_rate: 16_000,
             channels: 1,
             audio_output_device: None,
+            audio_input_device: None,
             audio_gain_max: 16.0,
             audio_capture_mode: "auto".into(),
             analysis_enabled: true,
@@ -80,9 +83,28 @@ fn parse_insight_dwell_secs(raw: Option<String>) -> u32 {
     }
 }
 
+fn load_dotenv() {
+    if dotenvy::dotenv().is_ok() {
+        return;
+    }
+    let Ok(mut dir) = std::env::current_dir() else {
+        return;
+    };
+    for _ in 0..8 {
+        let candidate = dir.join(".env");
+        if candidate.is_file() {
+            let _ = dotenvy::from_path(candidate);
+            return;
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+}
+
 impl ThemisConfig {
     pub fn from_env() -> Self {
-        let _ = dotenvy::dotenv();
+        load_dotenv();
 
         let key = std::env::var("AZURE_SPEECH_KEY")
             .ok()
@@ -113,6 +135,9 @@ impl ThemisConfig {
             sample_rate: 16_000,
             channels: 1,
             audio_output_device: std::env::var("THEMIS_AUDIO_OUTPUT_DEVICE")
+                .ok()
+                .filter(|s| !s.is_empty()),
+            audio_input_device: std::env::var("THEMIS_AUDIO_INPUT_DEVICE")
                 .ok()
                 .filter(|s| !s.is_empty()),
             audio_gain_max: std::env::var("THEMIS_AUDIO_GAIN_MAX")

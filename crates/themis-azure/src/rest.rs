@@ -162,6 +162,8 @@ pub async fn check_connectivity(key: &str, region: &str) -> anyhow::Result<()> {
     let resp = client
         .post(&url)
         .header("Ocp-Apim-Subscription-Key", key)
+        .header("Content-Length", "0")
+        .body("")
         .send()
         .await?;
     if resp.status().is_success() {
