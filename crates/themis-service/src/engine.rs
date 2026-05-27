@@ -70,16 +70,8 @@ impl CaptureEngine {
         }
     }
 
-    pub fn latency_diagnostics(&self) -> Arc<LatencyDiagnostics> {
-        Arc::clone(&self.latency_diag)
-    }
-
     pub fn transcript_sender(&self) -> broadcast::Sender<TranscriptEvent> {
         self.transcript_tx.clone()
-    }
-
-    pub fn capture_diagnostics(&self) -> Arc<CaptureDiagnostics> {
-        Arc::clone(&self.capture_diag)
     }
 
     pub async fn start(&self) -> anyhow::Result<()> {

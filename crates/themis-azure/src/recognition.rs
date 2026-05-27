@@ -1,7 +1,6 @@
 //! Shared Azure Speech REST dictation helpers.
 
 use crate::transcript_fixup;
-use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct ParsedRecognition {
@@ -98,23 +97,4 @@ pub async fn recognize_pcm(
     let json: serde_json::Value = resp.json().await?;
     let azure_ms = started.elapsed().as_millis() as u32;
     Ok((parse_detailed(&json, language), azure_ms))
-}
-
-pub fn pick_best(results: Vec<Option<ParsedRecognition>>) -> Option<ParsedRecognition> {
-    let best = results
-        .into_iter()
-        .flatten()
-        .max_by(|a, b| {
-            a.confidence
-                .partial_cmp(&b.confidence)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-    if let Some(ref b) = best {
-        debug!(
-            language = %b.language,
-            confidence = b.confidence,
-            "auto language pick"
-        );
-    }
-    best
 }
