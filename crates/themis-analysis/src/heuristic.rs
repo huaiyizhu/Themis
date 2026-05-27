@@ -42,7 +42,7 @@ static COMMON_WORDS: &[&str] = &[
     "say", "says", "tell", "told", "going", "went", "come", "came", "right", "left", "back", "next",
 ];
 
-pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
+pub fn analyze_heuristic(transcript: &str, localize_zh: bool) -> AnalysisResult {
     let text = transcript.trim();
     if text.is_empty() {
         return AnalysisResult::default();
@@ -52,14 +52,14 @@ pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
 
     for cap in ACRONYM_RE.captures_iter(text) {
         if let Some(m) = cap.get(0) {
-            add_glossary_hit(&mut result, m.as_str());
+            add_glossary_hit(&mut result, m.as_str(), localize_zh);
         }
     }
 
     for cap in EN_WORD_RE.captures_iter(text) {
         if let Some(m) = cap.get(0) {
             let word = m.as_str();
-            add_glossary_hit(&mut result, word);
+            add_glossary_hit(&mut result, word, localize_zh);
             if is_tech_shaped(word) && !is_common_word(word) {
                 push_keyword(&mut result, word);
             }
@@ -68,7 +68,7 @@ pub fn analyze_heuristic(transcript: &str) -> AnalysisResult {
 
     for q in extract_questions(text) {
         if is_substantive_question(&q) {
-            attach_question(&mut result, &q);
+            attach_question(&mut result, &q, localize_zh);
         }
     }
 
@@ -100,9 +100,14 @@ fn is_tech_shaped(word: &str) -> bool {
     has_lower && has_upper
 }
 
-fn add_glossary_hit(result: &mut AnalysisResult, raw: &str) {
+fn add_glossary_hit(result: &mut AnalysisResult, raw: &str, localize_zh: bool) {
     let Some((display, explanation)) = glossary::lookup(raw) else {
         return;
+    };
+    let explanation = if localize_zh {
+        explanation.to_string()
+    } else {
+        format!("Technical term: {display}.")
     };
     if !result
         .terms
@@ -111,7 +116,7 @@ fn add_glossary_hit(result: &mut AnalysisResult, raw: &str) {
     {
         result.terms.push(TermInsight {
             term: display.to_string(),
-            explanation: explanation.to_string(),
+            explanation,
         });
     }
     push_keyword(result, display);
@@ -127,7 +132,7 @@ fn push_keyword(result: &mut AnalysisResult, word: &str) {
     }
 }
 
-fn attach_question(result: &mut AnalysisResult, question: &str) {
+fn attach_question(result: &mut AnalysisResult, question: &str, localize_zh: bool) {
     let q = question.trim().to_string();
     if q.len() < 4 {
         return;
@@ -136,7 +141,7 @@ fn attach_question(result: &mut AnalysisResult, question: &str) {
         return;
     }
 
-    let answer = answer_for_question(&q);
+    let answer = answer_for_question(&q, localize_zh);
     result.questions.push(QuestionInsight {
         question: q.clone(),
         answer,
@@ -144,7 +149,7 @@ fn attach_question(result: &mut AnalysisResult, question: &str) {
 
     // Pull subject term from 「X是什么」/ what is X
     if let Some(subject) = subject_from_question(&q) {
-        add_glossary_hit(result, &subject);
+        add_glossary_hit(result, &subject, localize_zh);
     }
 }
 
@@ -347,38 +352,70 @@ fn push_unique(out: &mut Vec<String>, s: &str) {
     }
 }
 
-fn answer_for_question(question: &str) -> String {
+fn answer_for_question(question: &str, localize_zh: bool) -> String {
     let q = question.to_lowercase();
 
-    if let Some((_, exp)) = glossary::lookup(question) {
-        return exp.to_string();
+    if let Some((display, exp)) = glossary::lookup(question) {
+        return if localize_zh {
+            exp.to_string()
+        } else {
+            format!("Technical term: {display}.")
+        };
     }
     if let Some(subject) = subject_from_question(question) {
-        if let Some((_, exp)) = glossary::lookup(&subject) {
-            return exp.to_string();
+        if let Some((display, exp)) = glossary::lookup(&subject) {
+            return if localize_zh {
+                exp.to_string()
+            } else {
+                format!("Technical term: {display}.")
+            };
         }
     }
 
     if q.contains("rag") {
-        return "检索增强生成：先查知识库再让模型回答。作用：减少幻觉、接入私有资料。例：企业 wiki 问答先搜文档再生成。".into();
+        return if localize_zh {
+            "检索增强生成：先查知识库再让模型回答。作用：减少幻觉、接入私有资料。例：企业 wiki 问答先搜文档再生成。".into()
+        } else {
+            "Retrieval-augmented generation: retrieve documents first, then generate an answer. Reduces hallucinations and grounds answers in private data.".into()
+        };
     }
     if q.contains("embedding") {
-        return "嵌入向量：把文本映射为数值向量。用途：语义搜索与 RAG 检索。例：「机器学习」与「ML」向量相近。".into();
+        return if localize_zh {
+            "嵌入向量：把文本映射为数值向量。用途：语义搜索与 RAG 检索。例：「机器学习」与「ML」向量相近。".into()
+        } else {
+            "Embeddings map text to dense vectors for semantic search and RAG retrieval.".into()
+        };
     }
     if question.contains("什么") || q.contains("what is") || q.contains("what's") {
-        return "这是概念/定义类问题。若已配置 FOUNDRY_*，LLM 会给出更完整的解释。".into();
+        return if localize_zh {
+            "这是概念/定义类问题，等待 LLM 补充更完整解释。".into()
+        } else {
+            "Definition-style question; waiting for LLM to expand.".into()
+        };
     }
     if question.contains("为什么") || q.contains("why") {
-        return "这是因果/动机类问题，需结合前后文与领域背景分析。".into();
+        return if localize_zh {
+            "这是因果/动机类问题，需结合前后文与领域背景分析。".into()
+        } else {
+            "Why/cause-style question; needs surrounding context to answer well.".into()
+        };
     }
     if question.contains("如何")
         || question.contains("怎么")
         || q.contains("how to")
         || q.contains("how do")
     {
-        return "这是方法/步骤类问题，可拆解为流程或关键条件来回答。".into();
+        return if localize_zh {
+            "这是方法/步骤类问题，可拆解为流程或关键条件来回答。".into()
+        } else {
+            "How-to/process question; break into steps or prerequisites.".into()
+        };
     }
-    "（初步）已识别为问题句；配置 Azure OpenAI（FOUNDRY_*）可获得更完整回答。".into()
+    if localize_zh {
+        "（初步）已识别为问题句，等待 LLM 补充答案。".into()
+    } else {
+        "Preliminary question detected; waiting for LLM answer.".into()
+    }
 }
 
 #[cfg(test)]
@@ -387,7 +424,7 @@ mod tests {
 
     #[test]
     fn finds_rag_not_generic_words() {
-        let r = analyze_heuristic("What is RAG in AI? NBA games tonight.");
+        let r = analyze_heuristic("What is RAG in AI? NBA games tonight.", true);
         assert!(r.terms.iter().any(|t| t.term == "RAG"));
         assert!(
             !r.keywords.iter().any(|k| k.eq_ignore_ascii_case("games")),
@@ -403,7 +440,7 @@ mod tests {
 
     #[test]
     fn embedding_what_is_zh_without_question_mark() {
-        let r = analyze_heuristic("embedding 是什么");
+        let r = analyze_heuristic("embedding 是什么", true);
         assert!(
             r.terms.iter().any(|t| t.term.eq_ignore_ascii_case("embedding")),
             "terms: {:?}",
@@ -424,7 +461,7 @@ mod tests {
 
     #[test]
     fn filters_rhetorical_questions() {
-        let r = analyze_heuristic("这个功能对吧？你明白了吗？");
+        let r = analyze_heuristic("这个功能对吧？你明白了吗？", true);
         assert!(
             r.questions.is_empty(),
             "expected no rhetorical questions, got {:?}",
@@ -434,7 +471,7 @@ mod tests {
 
     #[test]
     fn keeps_deep_technical_question() {
-        let r = analyze_heuristic("为什么 RAG 比纯 LLM 更不容易产生幻觉？");
+        let r = analyze_heuristic("为什么 RAG 比纯 LLM 更不容易产生幻觉？", true);
         assert!(
             !r.questions.is_empty(),
             "expected substantive question, got {:?}",

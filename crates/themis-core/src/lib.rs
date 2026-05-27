@@ -1,5 +1,6 @@
 mod analysis;
 mod analysis_diag;
+mod analysis_prefs;
 mod capture_diag;
 mod config;
 mod frame;
@@ -9,9 +10,11 @@ mod pipeline;
 mod state;
 
 pub use analysis::{
-    AnalysisContext, AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis,
-    QuestionInsight, TermInsight,
+    finalize_question_answers, is_placeholder_answer, questions_match, AnalysisContext,
+    AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis, QuestionInsight,
+    TermInsight,
 };
+pub use analysis_prefs::AnalysisPrefs;
 pub use analysis_diag::{
     AnalysisDiagnostics, AnalysisDiagnosticsSnapshot, AnalysisDiagnosticsSummary,
     AnalysisInsightRecord,

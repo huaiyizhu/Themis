@@ -10,7 +10,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, State,
 };
-use themis_core::ThemisConfig;
+use themis_core::{AnalysisPrefs, ThemisConfig};
 use themis_ipc::client::connect;
 use themis_ipc::{
     ExpandInsightRequest, GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest,
@@ -139,6 +139,7 @@ struct OverlayMirror {
 #[derive(Clone, Serialize)]
 struct InsightSettingsDto {
     insight_dwell_ms: u32,
+    localize_zh: bool,
 }
 
 #[derive(Clone)]
@@ -192,9 +193,22 @@ fn quit_app(app: AppHandle) {
 
 #[tauri::command]
 fn get_insight_settings(state: State<'_, AppState>) -> InsightSettingsDto {
+    let prefs = AnalysisPrefs::load();
     InsightSettingsDto {
         insight_dwell_ms: state.config.insight_dwell_secs.saturating_mul(1000),
+        localize_zh: prefs.localize_zh,
     }
+}
+
+#[tauri::command]
+fn set_insight_localize(localize_zh: bool) -> Result<InsightSettingsDto, String> {
+    let mut prefs = AnalysisPrefs::load();
+    prefs.localize_zh = localize_zh;
+    prefs.save().map_err(|e| e.to_string())?;
+    Ok(InsightSettingsDto {
+        insight_dwell_ms: 0,
+        localize_zh: prefs.localize_zh,
+    })
 }
 
 #[tauri::command]
@@ -356,6 +370,14 @@ fn is_overlay_visible(app: AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn is_diagnose_visible(app: AppHandle) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("diagnose")
+        .ok_or_else(|| "diagnose window not found".to_string())?;
+    w.is_visible().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
     let w = app
         .get_webview_window("diagnose")
@@ -363,10 +385,12 @@ fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
     let visible = w.is_visible().map_err(|e| e.to_string())?;
     if visible {
         w.hide().map_err(|e| e.to_string())?;
+        let _ = app.emit("diagnose-visibility", false);
         Ok(false)
     } else {
         w.show().map_err(|e| e.to_string())?;
         w.set_focus().map_err(|e| e.to_string())?;
+        let _ = app.emit("diagnose-visibility", true);
         Ok(true)
     }
 }
@@ -851,8 +875,10 @@ pub fn run() {
             toggle_capture,
             get_diagnostics,
             toggle_diagnose_window,
+            is_diagnose_visible,
             get_overlay_ui,
             get_insight_settings,
+            set_insight_localize,
             adjust_overlay_opacity,
             cycle_overlay_theme,
             toggle_overlay_adaptive,

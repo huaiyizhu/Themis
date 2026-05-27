@@ -47,33 +47,7 @@ impl LlmAnalyzer {
             self.endpoint, self.deployment
         );
 
-        let system = "You extract TECH-focused keywords, specialized terminology, and substantively \
-challenging questions from live speech transcripts. \
-Respond ONLY with valid JSON: \
-{\"keywords\":[\"...\"],\"terms\":[{\"term\":\"...\",\"explanation\":\"...\"}],\
-\"questions\":[{\"question\":\"...\",\"answer\":\"...\"}]}. \
-\
-CONTEXT: You receive session summary and/or recent prior lines to infer domain (e.g. AI/ML vs hardware). \
-Use that context to disambiguate acronyms — e.g. MCP in an AI/Agent/RAG discussion means Model Context Protocol, \
-not chip packaging. Answers must match the session domain. \
-\
-KEYWORDS (max 8): Prioritize AI/ML, software engineering, cloud/infra, data, security, and adjacent \
-technical domains. Include acronyms and product/framework names when domain-specific (RAG, LLM, CUDA, \
-Kubernetes). EXCLUDE generic daily words, sports/entertainment, people's names, places, and obvious \
-business buzzwords without technical meaning. \
-\
-TERMS (max 6): Only jargon that a general audience would NOT already understand well — e.g. RLHF, MoE, \
-KV cache, embedding space, retrieval reranking. \
-Each explanation MUST be in Chinese (简体中文), 1-3 short sentences, covering when possible: \
-主要用途、核心作用、常见用法/场景、一个简短例子. Be fast to read — no English-first phrasing, \
-no long definitions. English term name may appear in parentheses only if needed. \
-EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
-\
-QUESTIONS (max 3): Only REAL technical or conceptual questions that need expertise — mechanisms, \
-tradeoffs, comparisons, failure modes, architecture, edge cases. Answers: 2-4 sentences in Chinese, factual. \
-EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk, and trivial \
-one-liner definitions. \
-If nothing meets this bar, return empty arrays.";
+        let system = build_analysis_system_prompt(ctx.localize_zh);
 
         let user_content = build_analysis_user_content(text, ctx);
 
@@ -296,6 +270,46 @@ If nothing meets this bar, return empty arrays.";
             Ok(Some(content))
         }
     }
+}
+
+fn build_analysis_system_prompt(localize_zh: bool) -> String {
+    let lang = if localize_zh {
+        "Each explanation and answer MUST be in Chinese (简体中文), 1-3 short sentences, covering when possible: \
+主要用途、核心作用、常见用法/场景、一个简短例子. Keep the original term/question wording from the transcript when possible, \
+but explain in Chinese. \
+Answers: 2-4 sentences in Chinese, factual."
+    } else {
+        "Keep term names and question text in the SAME language as the transcript (do NOT translate English to Chinese). \
+Write explanations and answers in the same language as the source phrase (English in → English out). \
+2-4 concise sentences, factual."
+    };
+
+    format!(
+        "You extract TECH-focused keywords, specialized terminology, and substantively \
+challenging questions from live speech transcripts. \
+Respond ONLY with valid JSON: \
+{{\"keywords\":[\"...\"],\"terms\":[{{\"term\":\"...\",\"explanation\":\"...\"}}],\
+\"questions\":[{{\"question\":\"...\",\"answer\":\"...\"}}]}}. \
+\
+CONTEXT: You receive session summary and/or recent prior lines to infer domain (e.g. AI/ML vs hardware). \
+Use that context to disambiguate acronyms — e.g. MCP in an AI/Agent/RAG discussion means Model Context Protocol, \
+not chip packaging. Answers must match the session domain. \
+\
+KEYWORDS (max 8): Prioritize AI/ML, software engineering, cloud/infra, data, security, and adjacent \
+technical domains. Include acronyms and product/framework names when domain-specific (RAG, LLM, CUDA, \
+Kubernetes). EXCLUDE generic daily words, sports/entertainment, people's names, places, and obvious \
+business buzzwords without technical meaning. \
+\
+TERMS (max 6): Only jargon that a general audience would NOT already understand well — e.g. RLHF, MoE, \
+KV cache, embedding space, retrieval reranking. {lang} \
+EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
+\
+QUESTIONS (max 3): Only REAL technical or conceptual questions that need expertise — mechanisms, \
+tradeoffs, comparisons, failure modes, architecture, edge cases. \
+EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk, casual health/lifestyle questions, \
+and trivial one-liner definitions. \
+If nothing meets this bar, return empty arrays."
+    )
 }
 
 fn build_analysis_user_content(phrase: &str, ctx: &AnalysisContext) -> String {

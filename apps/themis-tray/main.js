@@ -10,6 +10,9 @@ const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
 const scrollLatestBtn = document.getElementById("scroll-latest");
 const clearSessionBtn = document.getElementById("clear-session");
+const toggleCaptureBtn = document.getElementById("toggle-capture");
+const toggleDiagnoseBtn = document.getElementById("toggle-diagnose");
+const toggleLocalizeBtn = document.getElementById("toggle-localize");
 const sizePresetsEl = document.getElementById("size-presets");
 const sizeToggleBtn = document.getElementById("size-toggle");
 const sizeMenuEl = document.getElementById("size-menu");
@@ -46,6 +49,8 @@ let followLatest = true;
 
 /** Minimum visible time for each term/question card (ms); loaded from .env via tray. */
 let insightDwellMs = 20_000;
+/** Whether term/Q&A explanations are localized to Chinese on the service side. */
+let insightLocalizeZh = true;
 
 let termSeq = 0;
 let questionSeq = 0;
@@ -383,6 +388,7 @@ async function refreshStatus() {
     statusEl.textContent = short;
     const detail = s.capture_detail ? `${s.capture_detail}\n` : "";
     statusEl.title = `${detail}${s.message || ""}`.trim();
+    updateCaptureButton(s.state === "capturing");
 
     if (s.state === "idle") {
       setPlaceholder(
@@ -403,6 +409,34 @@ async function refreshStatus() {
   } catch (e) {
     statusEl.textContent = `Service offline`;
     statusEl.title = String(e);
+  }
+}
+
+function updateCaptureButton(capturing) {
+  if (!toggleCaptureBtn) return;
+  toggleCaptureBtn.classList.toggle("is-capturing", capturing);
+  toggleCaptureBtn.textContent = capturing ? "停止" : "捕捉";
+  toggleCaptureBtn.title = capturing
+    ? "停止系统音频捕捉 (Ctrl+Shift+T)"
+    : "开始系统音频捕捉 (Ctrl+Shift+T)";
+  toggleCaptureBtn.setAttribute("aria-pressed", capturing ? "true" : "false");
+}
+
+function updateDiagnoseButton(open) {
+  if (!toggleDiagnoseBtn) return;
+  toggleDiagnoseBtn.classList.toggle("is-open", open);
+  toggleDiagnoseBtn.title = open
+    ? "关闭诊断窗口 (Ctrl+Shift+D)"
+    : "打开诊断窗口 (Ctrl+Shift+D)";
+  toggleDiagnoseBtn.setAttribute("aria-pressed", open ? "true" : "false");
+}
+
+async function syncDiagnoseButton() {
+  try {
+    const open = await invoke("is_diagnose_visible");
+    updateDiagnoseButton(Boolean(open));
+  } catch {
+    /* not in tauri shell */
   }
 }
 
@@ -771,6 +805,7 @@ listen("transcript", (event) => {
 });
 
 listen("capture-stopped", () => {
+  updateCaptureButton(false);
   partialText = "";
   renderTranscript();
 });
@@ -807,7 +842,30 @@ listen("session-cleared", () => {
 });
 
 listen("capture-started", () => {
+  updateCaptureButton(true);
   clearOverlaySession("Capture started — transcript builds below…");
+});
+
+toggleCaptureBtn?.addEventListener("click", async () => {
+  try {
+    const capturing = await invoke("toggle_capture");
+    updateCaptureButton(Boolean(capturing));
+  } catch (e) {
+    statusEl.title = String(e);
+  }
+});
+
+toggleDiagnoseBtn?.addEventListener("click", async () => {
+  try {
+    const open = await invoke("toggle_diagnose_window");
+    updateDiagnoseButton(Boolean(open));
+  } catch (e) {
+    statusEl.title = String(e);
+  }
+});
+
+listen("diagnose-visibility", (event) => {
+  updateDiagnoseButton(Boolean(event.payload));
 });
 
 const THEME_SHORT_LABELS = {
@@ -878,12 +936,36 @@ async function loadInsightSettings() {
     if (typeof s.insight_dwell_ms === "number" && s.insight_dwell_ms >= 5000) {
       insightDwellMs = s.insight_dwell_ms;
     }
+    if (typeof s.localize_zh === "boolean") {
+      updateLocalizeButton(s.localize_zh);
+    }
   } catch {
     /* not in tauri shell */
   }
 }
 
+function updateLocalizeButton(localizeZh) {
+  if (!toggleLocalizeBtn) return;
+  insightLocalizeZh = Boolean(localizeZh);
+  toggleLocalizeBtn.classList.toggle("is-localized", insightLocalizeZh);
+  toggleLocalizeBtn.textContent = insightLocalizeZh ? "中文" : "原文";
+  toggleLocalizeBtn.title = insightLocalizeZh
+    ? "术语/问答说明译为中文（点击切换为原文）"
+    : "保持术语/问答原文（点击切换为中文说明）";
+  toggleLocalizeBtn.setAttribute("aria-pressed", insightLocalizeZh ? "true" : "false");
+}
+
+toggleLocalizeBtn?.addEventListener("click", async () => {
+  try {
+    const s = await invoke("set_insight_localize", { localizeZh: !insightLocalizeZh });
+    updateLocalizeButton(s.localize_zh);
+  } catch (e) {
+    statusEl.title = String(e);
+  }
+});
+
 loadOverlayUi();
 loadInsightSettings();
+syncDiagnoseButton();
 refreshStatus();
 setInterval(refreshStatus, 5000);

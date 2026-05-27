@@ -302,6 +302,58 @@ body.adaptive-on .theme-badge::after {
   border-color: rgba(255, 120, 100, 0.45);
 }
 
+.header-btn.capture-btn.is-capturing {
+  background: rgba(100, 220, 140, 0.22);
+  border-color: rgba(100, 220, 140, 0.45);
+}
+
+.header-btn.capture-btn.is-capturing:hover {
+  background: rgba(255, 120, 100, 0.22);
+  border-color: rgba(255, 120, 100, 0.45);
+}
+
+.header-btn.diagnose-btn.is-open {
+  background: rgba(155, 180, 255, 0.22);
+  border-color: rgba(155, 180, 255, 0.45);
+}
+
+.theme-light-glass .header-btn.capture-btn.is-capturing,
+.theme-solid-light .header-btn.capture-btn.is-capturing,
+.theme-paper .header-btn.capture-btn.is-capturing,
+.theme-cream .header-btn.capture-btn.is-capturing,
+.theme-high-contrast-light .header-btn.capture-btn.is-capturing {
+  background: rgba(0, 140, 60, 0.14);
+  border-color: rgba(0, 140, 60, 0.35);
+}
+
+.theme-light-glass .header-btn.diagnose-btn.is-open,
+.theme-solid-light .header-btn.diagnose-btn.is-open,
+.theme-paper .header-btn.diagnose-btn.is-open,
+.theme-cream .header-btn.diagnose-btn.is-open,
+.theme-high-contrast-light .header-btn.diagnose-btn.is-open {
+  background: rgba(0, 70, 180, 0.12);
+  border-color: rgba(0, 70, 180, 0.3);
+}
+
+.header-btn.localize-btn.is-localized {
+  background: rgba(180, 140, 255, 0.18);
+  border-color: rgba(180, 140, 255, 0.35);
+}
+
+.header-btn.localize-btn:not(.is-localized) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.theme-light-glass .header-btn.localize-btn.is-localized,
+.theme-solid-light .header-btn.localize-btn.is-localized,
+.theme-paper .header-btn.localize-btn.is-localized,
+.theme-cream .header-btn.localize-btn.is-localized,
+.theme-high-contrast-light .header-btn.localize-btn.is-localized {
+  background: rgba(90, 40, 160, 0.12);
+  border-color: rgba(90, 40, 160, 0.28);
+}
+
 .transcript-toggle {
   align-items: center;
   align-self: stretch;

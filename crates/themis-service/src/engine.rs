@@ -170,6 +170,7 @@ impl CaptureEngine {
                     let analysis_diag = Arc::clone(&analysis_diag);
                     tokio::spawn(async move {
                         let prior = session_summary.prior_context(ANALYSIS_CONTEXT_LINES);
+                        let prefs = themis_core::AnalysisPrefs::load();
                         let ctx = AnalysisContext {
                             recent_transcript: if prior.is_empty() {
                                 None
@@ -177,6 +178,7 @@ impl CaptureEngine {
                                 Some(prior)
                             },
                             session_summary: session_summary.current_summary(),
+                            localize_zh: prefs.localize_zh,
                         };
                         let detail = analysis.analyze(&text, &ctx).await.ok().flatten();
                         if let Some(ref d) = detail {

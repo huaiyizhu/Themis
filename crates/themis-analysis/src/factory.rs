@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use themis_core::{
-    AnalysisContext, AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis,
-    ThemisConfig,
+    finalize_question_answers, AnalysisContext, AnalysisDetail, AnalysisMeta, AnalysisProvider,
+    AnalysisResult, NoopAnalysis, ThemisConfig,
 };
 use tokio::time::timeout;
 use tracing::debug;
@@ -25,7 +25,7 @@ impl AnalysisProvider for CompositeAnalyzer {
         ctx: &AnalysisContext,
     ) -> anyhow::Result<Option<AnalysisDetail>> {
         let h0 = Instant::now();
-        let heuristic = analyze_heuristic(transcript);
+        let heuristic = analyze_heuristic(transcript, ctx.localize_zh);
         let heuristic_ms = h0.elapsed().as_millis() as u32;
 
         let mut merged = heuristic.clone();
@@ -66,6 +66,14 @@ impl AnalysisProvider for CompositeAnalyzer {
                 }
             }
         }
+
+        finalize_question_answers(
+            &mut merged,
+            llm_out.as_ref(),
+            self.llm_configured,
+            &llm_status,
+            ctx.localize_zh,
+        );
 
         if merged.is_empty() {
             return Ok(None);
