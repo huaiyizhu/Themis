@@ -49,6 +49,9 @@ fn read_geometry(window: &WebviewWindow) -> Result<SavedGeometry, String> {
 
 fn enter_mini(window: &WebviewWindow) -> Result<(), String> {
     window.set_fullscreen(false).map_err(|e| e.to_string())?;
+    window
+        .set_background_color(Some(tauri::window::Color(0, 0, 0, 0)))
+        .map_err(|e| e.to_string())?;
     let mini = LogicalSize::new(MINI_LOGICAL, MINI_LOGICAL);
     window
         .set_min_size(Some(mini))

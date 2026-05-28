@@ -14,6 +14,7 @@ const toggleCaptureBtn = document.getElementById("toggle-capture");
 const toggleDiagnoseBtn = document.getElementById("toggle-diagnose");
 const toggleLocalizeBtn = document.getElementById("toggle-localize");
 const toggleMiniBtn = document.getElementById("toggle-mini");
+const hideOverlayBtn = document.getElementById("hide-overlay");
 const miniFloaterEl = document.getElementById("mini-floater");
 const sizePresetsEl = document.getElementById("size-presets");
 const sizeToggleBtn = document.getElementById("size-toggle");
@@ -91,12 +92,13 @@ function setupWindowDrag() {
 
 setupWindowDrag();
 
-/** @type {{ x: number, y: number, id: number } | null} */
-let miniPointer = null;
-
 function applyMiniMode(active) {
   document.body.classList.toggle("is-mini-mode", active);
+  document.documentElement.style.background = active ? "transparent" : "";
   miniFloaterEl?.classList.toggle("hidden", !active);
+  if (active) {
+    requestAnimationFrame(() => miniFloaterEl?.focus());
+  }
 }
 
 async function syncMiniMode() {
@@ -111,25 +113,44 @@ async function syncMiniMode() {
 function setupMiniFloater() {
   if (!miniFloaterEl) return;
 
-  miniFloaterEl.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
-    miniPointer = { x: e.screenX, y: e.screenY, id: e.pointerId };
-    miniFloaterEl.setPointerCapture(e.pointerId);
-    getCurrentWindow().startDragging().catch(() => {});
-  });
+  /** @type {{ dragging: boolean, x: number, y: number, id: number } | null} */
+  let press = null;
 
-  miniFloaterEl.addEventListener("pointerup", async (e) => {
-    if (!miniPointer || e.pointerId !== miniPointer.id) return;
-    const moved = Math.hypot(e.screenX - miniPointer.x, e.screenY - miniPointer.y) > 8;
-    miniPointer = null;
+  const clearPress = () => {
+    press = null;
+  };
+
+  const finishPress = async (e) => {
+    if (!press) return;
+    if (e.pointerId !== undefined && e.pointerId !== press.id) return;
+    const moved =
+      press.dragging || Math.hypot(e.screenX - press.x, e.screenY - press.y) > 6;
+    clearPress();
     if (!moved) {
       try {
         await invoke("toggle_overlay_mini_mode");
       } catch (err) {
-        statusEl.title = String(err);
+        if (statusEl) statusEl.title = String(err);
       }
     }
+  };
+
+  miniFloaterEl.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    press = { dragging: false, x: e.screenX, y: e.screenY, id: e.pointerId };
   });
+
+  miniFloaterEl.addEventListener("pointermove", (e) => {
+    if (!press || e.pointerId !== press.id || press.dragging) return;
+    if (Math.hypot(e.screenX - press.x, e.screenY - press.y) > 6) {
+      press.dragging = true;
+      getCurrentWindow().startDragging().catch(() => {});
+    }
+  });
+
+  window.addEventListener("pointerup", finishPress);
+  window.addEventListener("pointercancel", clearPress);
 
   miniFloaterEl.addEventListener("keydown", async (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
@@ -137,7 +158,7 @@ function setupMiniFloater() {
     try {
       await invoke("toggle_overlay_mini_mode");
     } catch (err) {
-      statusEl.title = String(err);
+      if (statusEl) statusEl.title = String(err);
     }
   });
 }
@@ -147,6 +168,14 @@ setupMiniFloater();
 toggleMiniBtn?.addEventListener("click", async () => {
   try {
     await invoke("toggle_overlay_mini_mode");
+  } catch (e) {
+    statusEl.title = String(e);
+  }
+});
+
+hideOverlayBtn?.addEventListener("click", async () => {
+  try {
+    await invoke("hide_overlay_window");
   } catch (e) {
     statusEl.title = String(e);
   }

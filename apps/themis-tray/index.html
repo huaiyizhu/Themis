@@ -12,7 +12,7 @@
       class="mini-floater hidden"
       role="button"
       tabindex="0"
-      title="拖动移动 · 点击恢复窗口"
+      title="拖动移动 · 点击恢复窗口 (Ctrl+Shift+M)"
       aria-label="Themis 桌面浮标，点击恢复窗口"
     >
       <span class="mini-floater-icon" aria-hidden="true">⚖</span>
@@ -38,12 +38,13 @@
           <button type="button" id="toggle-capture" class="header-btn capture-btn" title="开始系统音频捕捉 (Ctrl+Shift+T)">捕捉</button>
           <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" title="打开诊断窗口 (Ctrl+Shift+D)" aria-pressed="false">诊断</button>
           <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" title="术语/问答说明译为中文（点击切换为原文）" aria-pressed="true">中文</button>
-          <button type="button" id="toggle-mini" class="header-btn mini-toggle" title="最小化为桌面浮标">浮</button>
+          <button type="button" id="toggle-mini" class="header-btn mini-toggle" title="最小化为桌面浮标 (Ctrl+Shift+M)">浮</button>
           <div class="size-presets" id="size-presets">
             <button type="button" id="size-toggle" class="header-btn size-toggle" title="窗口尺寸预设" aria-expanded="false" aria-haspopup="true">尺寸</button>
             <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
           </div>
           <button type="button" id="clear-session" class="header-btn clear-session" title="清空字幕、总结与洞察，从零继续监听">清空</button>
+          <button type="button" id="hide-overlay" class="header-btn close-window" title="隐藏窗口（捕捉继续，托盘可再次打开）">×</button>
           <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden" title="Jump to latest transcript">↓ Latest</button>
         </div>
       </header>

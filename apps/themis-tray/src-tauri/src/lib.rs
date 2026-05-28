@@ -19,7 +19,8 @@ use themis_ipc::{
     StartCaptureRequest, StopCaptureRequest, SubscribeTranscriptsRequest,
 };
 use tokio::sync::Mutex;
-use tracing::info;
+use tokio::time::{sleep, Duration};
+use tracing::{info, warn};
 
 #[derive(Clone, Serialize)]
 struct StatusDto {
@@ -373,6 +374,12 @@ fn is_overlay_visible(app: AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn hide_overlay_window(app: AppHandle) -> Result<(), String> {
+    set_overlay_visible(&app, false)?;
+    Ok(())
+}
+
+#[tauri::command]
 fn is_diagnose_visible(app: AppHandle) -> Result<bool, String> {
     let w = app
         .get_webview_window("diagnose")
@@ -473,6 +480,41 @@ async fn clear_listening_session(app: AppHandle, state: State<'_, AppState>) -> 
     Ok(())
 }
 
+async fn start_capture_services(app: &AppHandle, state: &AppState) -> Result<(), String> {
+    *state.capturing.lock().await = true;
+    {
+        let mut o = state.overlay.lock().await;
+        *o = OverlayMirror::default();
+    }
+    start_transcript_stream(app.clone(), state.clone()).await;
+    let mut client = connect(state.config.grpc_port)
+        .await
+        .map_err(|e| e.to_string())?;
+    client
+        .start_capture(StartCaptureRequest {})
+        .await
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit("capture-started", ());
+    Ok(())
+}
+
+async fn auto_start_capture(app: AppHandle) {
+    for attempt in 0..6u32 {
+        sleep(Duration::from_millis(500 + u64::from(attempt) * 500)).await;
+        let state = app.state::<AppState>();
+        if *state.capturing.lock().await {
+            return;
+        }
+        match start_capture_services(&app, state.inner()).await {
+            Ok(()) => {
+                info!("capture auto-started");
+                return;
+            }
+            Err(e) => warn!(attempt, error = %e, "auto-start capture failed, retrying"),
+        }
+    }
+}
+
 #[tauri::command]
 async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
     let state = app.state::<AppState>();
@@ -487,22 +529,11 @@ async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
             .await
             .map_err(|e| e.to_string())?;
         *state.capturing.lock().await = false;
-        stop_transcript_stream(&state).await;
+        stop_transcript_stream(state.inner()).await;
         let _ = app.emit("capture-stopped", ());
         Ok(false)
     } else {
-        *state.capturing.lock().await = true;
-        {
-            let mut o = state.overlay.lock().await;
-            *o = OverlayMirror::default();
-        }
-        // Subscribe before StartCapture so we do not miss early transcript events.
-        start_transcript_stream(app.clone(), state.inner().clone()).await;
-        client
-            .start_capture(StartCaptureRequest {})
-            .await
-            .map_err(|e| e.to_string())?;
-        let _ = app.emit("capture-started", ());
+        start_capture_services(&app, state.inner()).await?;
         Ok(true)
     }
 }
@@ -704,6 +735,11 @@ pub fn run() {
     } else {
         "Ctrl+Shift+KeyH"
     };
+    let hotkey_mini = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyM"
+    } else {
+        "Ctrl+Shift+KeyM"
+    };
 
     let sc_toggle: tauri_plugin_global_shortcut::Shortcut = hotkey_toggle
         .parse()
@@ -738,6 +774,9 @@ pub fn run() {
     let sc_overlay_visibility: tauri_plugin_global_shortcut::Shortcut = hotkey_overlay_visibility
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_overlay_visibility}: {e}"));
+    let sc_mini: tauri_plugin_global_shortcut::Shortcut = hotkey_mini
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_mini}: {e}"));
 
     let ui_state = Arc::new(OverlayUiState::new());
 
@@ -756,6 +795,7 @@ pub fn run() {
                     hotkey_font_up,
                     hotkey_font_reset,
                     hotkey_overlay_visibility,
+                    hotkey_mini,
                 ])
                 .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
                 .with_handler({
@@ -797,6 +837,9 @@ pub fn run() {
                             let _ = apply_overlay_ui(app, &s);
                         } else if shortcut == &sc_overlay_visibility {
                             let _ = app.emit("toggle-transcript-panel", ());
+                        } else if shortcut == &sc_mini {
+                            let state = app.state::<AppState>();
+                            let _ = toggle_mini_mode(app, &state.mini_mode);
                         }
                     }
                 })
@@ -877,6 +920,11 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                auto_start_capture(app_handle).await;
+            });
+
             Ok(())
         }
         })
@@ -908,6 +956,7 @@ pub fn run() {
             expand_insight,
             toggle_overlay_visibility,
             is_overlay_visible,
+            hide_overlay_window,
             quit_app
         ])
         .run(tauri::generate_context!())

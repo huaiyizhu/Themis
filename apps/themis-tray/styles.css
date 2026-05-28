@@ -13,7 +13,11 @@ body {
 }
 
 body.is-mini-mode {
-  overflow: visible;
+  align-items: center;
+  background: rgba(0, 0, 0, 0) !important;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
 }
 
 body.is-mini-mode #overlay {
@@ -25,18 +29,20 @@ body.is-mini-mode #overlay {
   background: linear-gradient(145deg, rgba(42, 96, 150, 0.96), rgba(18, 44, 82, 0.98));
   border: 1.5px solid rgba(155, 220, 255, 0.55);
   border-radius: 50%;
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  box-shadow: none;
+  clip-path: circle(50% at 50% 50%);
   cursor: grab;
   display: flex;
-  height: 100%;
+  flex-shrink: 0;
+  height: 46px;
   justify-content: center;
   outline: none;
+  overflow: hidden;
   touch-action: none;
   user-select: none;
-  width: 100%;
+  width: 46px;
   -webkit-app-region: no-drag;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.38));
 }
 
 .mini-floater.hidden {
@@ -49,9 +55,8 @@ body:not(.is-mini-mode) .mini-floater {
 
 .mini-floater:hover {
   border-color: rgba(190, 235, 255, 0.85);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.42),
-    0 0 12px rgba(120, 190, 255, 0.25);
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.42))
+    drop-shadow(0 0 10px rgba(120, 190, 255, 0.28));
 }
 
 .mini-floater:active {
@@ -68,6 +73,19 @@ body:not(.is-mini-mode) .mini-floater {
 .header-btn.mini-toggle:hover {
   background: rgba(140, 190, 255, 0.22);
   border-color: rgba(140, 190, 255, 0.45);
+}
+
+.header-btn.close-window {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 24px;
+  padding: 2px 7px;
+}
+
+.header-btn.close-window:hover {
+  background: rgba(255, 120, 100, 0.22);
+  border-color: rgba(255, 120, 100, 0.45);
 }
 
 #overlay {
