@@ -56,7 +56,8 @@ const PRESETS: &[WindowPreset] = &[
     },
 ];
 
-const CENTER_QUARTER_ID: &str = "center-quarter";
+const CENTER_THIRD_ID: &str = "center-third";
+const CENTER_QUARTER_LEGACY_ID: &str = "center-quarter";
 
 pub fn list_presets() -> Vec<WindowPresetDto> {
     let mut out: Vec<WindowPresetDto> = PRESETS
@@ -70,8 +71,8 @@ pub fn list_presets() -> Vec<WindowPresetDto> {
         })
         .collect();
     out.push(WindowPresetDto {
-        id: CENTER_QUARTER_ID.into(),
-        label: "居中¼屏".into(),
+        id: CENTER_THIRD_ID.into(),
+        label: "居中⅓屏".into(),
         width: 0,
         height: 0,
         fullscreen: false,
@@ -104,7 +105,7 @@ fn monitor_for_window(window: &WebviewWindow) -> Result<tauri::Monitor, String> 
         .ok_or_else(|| "no monitor detected".to_string())
 }
 
-fn apply_center_quarter(window: &WebviewWindow) -> Result<(), String> {
+fn apply_center_third(window: &WebviewWindow) -> Result<(), String> {
     window.set_fullscreen(false).map_err(|e| e.to_string())?;
     window
         .set_max_size(None::<LogicalSize<f32>>)
@@ -119,7 +120,7 @@ fn apply_center_quarter(window: &WebviewWindow) -> Result<(), String> {
     let area_x = work.position.x as f64 / scale;
     let area_y = work.position.y as f64 / scale;
 
-    let width = (area_w / 4.0).max(280.0);
+    let width = (area_w / 3.0).max(280.0);
     let height = area_h;
     let x = area_x + (area_w - width) / 2.0;
     let y = area_y;
@@ -146,9 +147,9 @@ pub fn apply_preset(app: &AppHandle, preset_id: &str) -> Result<String, String> 
         return Ok("fullscreen".into());
     }
 
-    if preset_id == CENTER_QUARTER_ID {
-        apply_center_quarter(&window)?;
-        return Ok(CENTER_QUARTER_ID.into());
+    if preset_id == CENTER_THIRD_ID || preset_id == CENTER_QUARTER_LEGACY_ID {
+        apply_center_third(&window)?;
+        return Ok(CENTER_THIRD_ID.into());
     }
 
     let preset = PRESETS

@@ -363,11 +363,11 @@ async function initSizePresets() {
     btn.setAttribute("role", "menuitem");
     btn.title = p.fullscreen
       ? "全屏"
-      : p.id === "center-quarter"
-        ? "宽 1/4 屏 × 工作区全高，水平居中"
+      : p.id === "center-third"
+        ? "宽 1/3 屏 × 工作区全高，水平居中"
         : `${p.width}×${p.height}`;
     btn.textContent =
-      p.fullscreen || p.id === "center-quarter"
+      p.fullscreen || p.id === "center-third"
         ? p.label
         : `${p.label} ${p.width}×${p.height}`;
     btn.addEventListener("click", (e) => {
@@ -389,7 +389,11 @@ async function initSizePresets() {
     }
   });
 
-  const saved = localStorage.getItem(WINDOW_PRESET_STORAGE_KEY) || "center-quarter";
+  let saved = localStorage.getItem(WINDOW_PRESET_STORAGE_KEY) || "center-third";
+  if (saved === "center-quarter") {
+    saved = "center-third";
+    localStorage.setItem(WINDOW_PRESET_STORAGE_KEY, saved);
+  }
   markActiveSizePreset(saved);
   try {
     await invoke("apply_window_preset", { preset: saved });
