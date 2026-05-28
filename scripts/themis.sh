@@ -23,6 +23,20 @@ fi
 
 profile() { [[ "$RELEASE" -eq 1 ]] && echo release || echo debug; }
 service_bin() { echo "$ROOT/target/$(profile)/themis-service"; }
+cli_bin() { echo "$ROOT/target/$(profile)/themis-cli"; }
+
+# macOS 14.2+ process tap needs Info.plist (build.rs) + ad-hoc sign for TCC.
+sign_macos_bin() {
+  local bin="$1"
+  if [[ "$(uname -s)" != "Darwin" || ! -f "$bin" ]]; then
+    return 0
+  fi
+  if codesign --force --sign - "$bin" 2>/dev/null; then
+    echo "codesign: $bin"
+  else
+    echo "warn: codesign failed for $bin (process tap may get OSStatus 'nope')" >&2
+  fi
+}
 
 # rustup installs to ~/.cargo/bin; new shells need `source ~/.cargo/env`
 ensure_cargo() {
@@ -70,6 +84,7 @@ build_service() {
   else
     cargo build -p themis-service
   fi
+  sign_macos_bin "$(service_bin)"
   echo "Built: $(service_bin)"
 }
 
@@ -129,9 +144,17 @@ run_probe() {
   ensure_env
   echo "Audio probe (8s) — play sound now."
   if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "Tip: route system audio via BlackHole (docs/platform-notes.md)."
+    echo "Tip: allow System Audio Recording when macOS prompts."
+    if [[ "$RELEASE" -eq 1 ]]; then
+      cargo build -p themis-cli --release
+    else
+      cargo build -p themis-cli
+    fi
+    sign_macos_bin "$(cli_bin)"
+    "$(cli_bin)" audio-probe --seconds 8
+  else
+    cargo run -p themis-cli -- audio-probe --seconds 8
   fi
-  cargo run -p themis-cli -- audio-probe --seconds 8
 }
 
 status_cmd() {

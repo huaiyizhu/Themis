@@ -51,14 +51,15 @@ pub fn create_loopback(
     }
     #[cfg(target_os = "macos")]
     {
-        Ok(Box::new(macos::CoreAudioLoopback::new(
+        macos::create_macos_source(
             sample_rate,
             channels,
             options.diagnostics,
             std::env::var("THEMIS_AUDIO_INPUT_DEVICE")
                 .ok()
                 .filter(|s| !s.is_empty()),
-        )?))
+            &options.capture_mode,
+        )
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {

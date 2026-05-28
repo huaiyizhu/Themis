@@ -9,9 +9,19 @@
 
 ## macOS
 
-- **System audio**: Apple does not expose a public loopback API for all apps. This build captures the **default input device** via Core Audio / cpal. For true system-playback capture, route output through a virtual device and select it as input.
+- **System audio (recommended, macOS 14.2+)**: **Core Audio Process Tap** — captures all apps’ playback without BlackHole. Enabled when `THEMIS_AUDIO_CAPTURE_MODE` is `auto` (default) or `process_tap` / `tap` / `process`. Requires **System Audio Recording** permission (prompt on first capture).
+- **Fallback — input device**: `THEMIS_AUDIO_CAPTURE_MODE=input` uses the default **microphone / input** via cpal (same as older builds). Optional `THEMIS_AUDIO_INPUT_DEVICE=BlackHole` if you use a virtual device.
 
-### BlackHole setup (recommended)
+### Process tap (no BlackHole)
+
+1. Use macOS **14.2+** (you are on 26.x — supported).
+2. Keep `THEMIS_AUDIO_CAPTURE_MODE=auto` in `.env` (or set `process_tap`).
+3. `./scripts/themis.sh restart` then `tray` → **Cmd+Shift+T**.
+4. On first capture, allow **System Audio Recording** when macOS prompts (also check **System Settings → Privacy & Security** if `probe` shows no signal).
+5. If probe fails with `themis_tap_start failed ('nope')`: rebuild and let the script sign the binary (`./scripts/themis.sh probe` runs `codesign` on macOS), or manually: `codesign --force --sign - target/debug/themis-cli target/debug/themis-service`
+6. Status should show `capture=process_tap` and rising `peak` / `frames` while audio is playing.
+
+### BlackHole setup (optional legacy)
 
 1. Install [BlackHole 2ch](https://existential.audio/blackhole/) (free; reboot if the installer asks).
 2. **System Settings → Sound → Output**: choose **BlackHole 2ch** while capturing (apps will play into BlackHole).

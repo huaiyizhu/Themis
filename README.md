@@ -37,7 +37,7 @@
 | 项目 | 版本 |
 |------|------|
 | Windows | 10+ |
-| macOS | 12+（Monterey 及以上；系统音频需 BlackHole，见下文） |
+| macOS | 14.2+（推荐 Process Tap 抓系统播放声；见下文） |
 | Rust | stable（见 `rust-toolchain.toml`） |
 | Node.js | 20+（仅托盘 Tauri 前端） |
 
@@ -47,7 +47,7 @@
 |------|------|
 | [Xcode Command Line Tools](https://developer.apple.com/xcode/) | `xcode-select --install` — Tauri / 本地链接 |
 | [Homebrew](https://brew.sh/)（推荐） | 安装 Node 20、`rustup` 等 |
-| [BlackHole](https://existential.audio/blackhole/) | 将系统播放声路由为「输入」，供采集（见 [docs/platform-notes.md](docs/platform-notes.md)） |
+| [BlackHole](https://existential.audio/blackhole/)（可选） | 仅在使用 `THEMIS_AUDIO_CAPTURE_MODE=input` 且需虚拟环回时 |
 
 ---
 
@@ -102,7 +102,7 @@ cp .env.example .env
 
 #### macOS（MacBook）
 
-首次请安装 [BlackHole](https://existential.audio/blackhole/) 并按 [docs/platform-notes.md](docs/platform-notes.md) 配置「输出 → BlackHole、输入 → BlackHole」（或 Multi-Output 同时听耳机）。
+默认使用 **Process Tap**（无需 BlackHole）。详见 [docs/platform-notes.md](docs/platform-notes.md)。
 
 ```bash
 chmod +x scripts/themis.sh dev.sh restart.sh tray.sh
@@ -332,24 +332,25 @@ THEMIS_ANALYSIS_ENABLED=true
 
 ## 音频采集
 
-### macOS（BlackHole）
+### macOS（Process Tap，推荐，无需 BlackHole）
 
-Apple 未提供「抓取所有 App 混音」的公开 API。Themis 通过 **默认输入设备**（cpal）采音。要转写 **系统正在播放的声音**（YouTube、会议等）：
+**macOS 14.2+**（含你当前的 26.x）可用 Apple **Core Audio Process Tap** 直接抓系统播放声。`.env` 保持默认即可：
 
-1. 安装 [BlackHole 2ch](https://existential.audio/blackhole/)
-2. **系统设置 → 声音 → 输出**：BlackHole（或 **MIDI 设置** 里建 Multi-Output Device：BlackHole + 内置扬声器，以便边听边录）
-3. **系统设置 → 声音 → 输入**：BlackHole
-4. 首次采集若弹出 **麦克风** 权限，请允许（输入设备采集需要）
+```env
+THEMIS_AUDIO_CAPTURE_MODE=auto
+```
 
-自检（播放 YouTube 等）：
+1. `./scripts/themis.sh restart` → `./scripts/themis.sh tray` → **Cmd+Shift+T** 开始采集  
+2. 首次会提示 **系统音频录制** 权限，请允许  
+3. 状态行应显示 `process_tap`，播放 YouTube 时 `peak` / `frames` 上升  
+
+自检：
 
 ```bash
 ./scripts/themis.sh probe
-# 或
-cargo run -p themis-cli -- audio-probe --seconds 8
 ```
 
-`detail` 行会显示当前默认输入设备名。`peak > 200` 为正常。详见 [docs/platform-notes.md](docs/platform-notes.md)。
+若 tap 不可用，会自动回退到**默认输入设备**（麦克风）；此时可设 `THEMIS_AUDIO_CAPTURE_MODE=input`，或可选安装 [BlackHole](https://existential.audio/blackhole/)（见 [docs/platform-notes.md](docs/platform-notes.md)）。
 
 ### Windows（WASAPI loopback）
 

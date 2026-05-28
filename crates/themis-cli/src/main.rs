@@ -116,7 +116,8 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
     println!("Play sound on your PC (e.g. YouTube). Mute speakers to test process loopback.\n");
     #[cfg(target_os = "macos")]
     println!(
-        "Play sound (e.g. YouTube). For system output, route audio through BlackHole — see docs/platform-notes.md.\n"
+        "Play sound (e.g. YouTube). Using Core Audio process tap (no BlackHole). \
+         Allow System Audio Recording if macOS prompts.\n"
     );
 
     let config = ThemisConfig::from_env();
@@ -126,9 +127,7 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
         16_000,
         1,
         SystemAudioOptions {
-            #[cfg(windows)]
-            capture_mode: std::env::var("THEMIS_AUDIO_CAPTURE_MODE")
-                .unwrap_or_else(|_| config.audio_capture_mode.clone()),
+            capture_mode: config.audio_capture_mode.clone(),
             gain_max: config.audio_gain_max,
             diagnostics: Some(Arc::clone(&diag)),
             ..SystemAudioOptions::default()
@@ -157,8 +156,13 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
         println!("  - Try THEMIS_AUDIO_CAPTURE_MODE=process or endpoint");
         #[cfg(target_os = "macos")]
         {
-            println!("  - System Settings → Sound → Input: select BlackHole (or your loopback device)");
-            println!("  - Grant microphone permission if macOS prompts (required for input capture)");
+            if snap.mode == "process_tap" {
+                println!("  - Allow System Audio Recording (see error above if probe failed at start)");
+                println!("  - Rebuild: cargo build -p themis-cli && ./scripts/themis.sh probe");
+            } else {
+                println!("  - System Settings → Sound → Input: pick the correct device");
+                println!("  - Or use THEMIS_AUDIO_CAPTURE_MODE=auto for process tap");
+            }
         }
         std::process::exit(1);
     } else if snap.peak < 200 {
@@ -166,7 +170,7 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
         #[cfg(windows)]
         println!("  - Process loopback usually works when endpoint loopback is silent.");
         #[cfg(target_os = "macos")]
-        println!("  - Confirm output is routed to BlackHole and input is set to the same device");
+        println!("  - Play louder audio; confirm System Audio Recording is allowed for themis-cli");
         std::process::exit(2);
     } else {
         println!("\nOK: capture pipeline is receiving audio.");
