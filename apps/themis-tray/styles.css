@@ -928,6 +928,90 @@ body.split-dragging {
   margin-bottom: 10px;
 }
 
+.insights-section.collapsible .section-toggle {
+  align-items: center;
+  background: rgba(120, 160, 255, 0.08);
+  border: 1px solid rgba(120, 160, 255, 0.2);
+  border-radius: 5px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: calc(10px * var(--font-scale));
+  font-weight: 600;
+  gap: 6px;
+  margin: 0 0 6px;
+  opacity: 1;
+  padding: 4px 6px 4px 8px;
+  width: 100%;
+}
+
+.insights-section.collapsible .section-toggle:hover {
+  background: rgba(120, 160, 255, 0.16);
+  border-color: rgba(120, 160, 255, 0.38);
+}
+
+.insights-section.collapsible .section-toggle-label {
+  flex: 1;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.insights-section.collapsible .section-toggle-count {
+  background: rgba(120, 160, 255, 0.28);
+  border-radius: 8px;
+  font-size: calc(9px * var(--font-scale));
+  font-weight: 700;
+  line-height: 1.2;
+  min-width: 1.2em;
+  padding: 1px 6px;
+  text-align: center;
+}
+
+.insights-section.collapsible .section-toggle-count.hidden {
+  display: none;
+}
+
+.insights-section.collapsible .section-toggle-chevron {
+  align-items: center;
+  background: rgba(120, 160, 255, 0.24);
+  border: 1px solid rgba(155, 200, 255, 0.45);
+  border-radius: 4px;
+  box-sizing: border-box;
+  display: flex;
+  flex-shrink: 0;
+  height: 18px;
+  justify-content: center;
+  width: 18px;
+}
+
+.insights-section.collapsible .section-toggle-chevron::before {
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  content: "";
+  display: block;
+  margin-top: 2px;
+  opacity: 0.95;
+  transition: transform 0.15s ease;
+}
+
+.insights-section.collapsible .section-toggle:hover .section-toggle-chevron {
+  background: rgba(155, 200, 255, 0.32);
+  border-color: rgba(155, 220, 255, 0.65);
+}
+
+.insights-section.collapsible.is-collapsed .section-toggle-chevron::before {
+  margin-left: 2px;
+  margin-top: 0;
+  transform: rotate(-90deg);
+}
+
+.insights-section.collapsible.is-collapsed .section-body {
+  display: none;
+}
+
 .insights-section h3 {
   font-size: 10px;
   font-weight: 600;
@@ -959,6 +1043,50 @@ body.split-dragging {
 .theme-cream .tag,
 .theme-high-contrast-light .tag {
   background: rgba(0, 80, 160, 0.12);
+}
+
+.theme-light-glass .insights-section.collapsible .section-toggle,
+.theme-solid-light .insights-section.collapsible .section-toggle,
+.theme-paper .insights-section.collapsible .section-toggle,
+.theme-cream .insights-section.collapsible .section-toggle,
+.theme-high-contrast-light .insights-section.collapsible .section-toggle {
+  background: rgba(0, 80, 160, 0.07);
+  border-color: rgba(0, 80, 160, 0.2);
+}
+
+.theme-light-glass .insights-section.collapsible .section-toggle:hover,
+.theme-solid-light .insights-section.collapsible .section-toggle:hover,
+.theme-paper .insights-section.collapsible .section-toggle:hover,
+.theme-cream .insights-section.collapsible .section-toggle:hover,
+.theme-high-contrast-light .insights-section.collapsible .section-toggle:hover {
+  background: rgba(0, 80, 160, 0.12);
+  border-color: rgba(0, 80, 160, 0.32);
+}
+
+.theme-light-glass .insights-section.collapsible .section-toggle-count,
+.theme-solid-light .insights-section.collapsible .section-toggle-count,
+.theme-paper .insights-section.collapsible .section-toggle-count,
+.theme-cream .insights-section.collapsible .section-toggle-count,
+.theme-high-contrast-light .insights-section.collapsible .section-toggle-count {
+  background: rgba(0, 80, 160, 0.14);
+}
+
+.theme-light-glass .insights-section.collapsible .section-toggle-chevron,
+.theme-solid-light .insights-section.collapsible .section-toggle-chevron,
+.theme-paper .insights-section.collapsible .section-toggle-chevron,
+.theme-cream .insights-section.collapsible .section-toggle-chevron,
+.theme-high-contrast-light .insights-section.collapsible .section-toggle-chevron {
+  background: rgba(0, 90, 160, 0.14);
+  border-color: rgba(0, 90, 160, 0.35);
+}
+
+.theme-light-glass .insights-section.collapsible .section-toggle:hover .section-toggle-chevron,
+.theme-solid-light .insights-section.collapsible .section-toggle:hover .section-toggle-chevron,
+.theme-paper .insights-section.collapsible .section-toggle:hover .section-toggle-chevron,
+.theme-cream .insights-section.collapsible .section-toggle:hover .section-toggle-chevron,
+.theme-high-contrast-light .insights-section.collapsible .section-toggle:hover .section-toggle-chevron {
+  background: rgba(0, 90, 160, 0.22);
+  border-color: rgba(0, 90, 160, 0.5);
 }
 
 .insight-card {

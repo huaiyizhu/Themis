@@ -65,9 +65,21 @@
         <aside id="insights-panel" class="insights-panel" aria-label="Keywords and terms">
           <h2 class="insights-title">Terms</h2>
           <p id="insights-empty" class="insights-empty">Keywords and terms appear here after each phrase.</p>
-          <section id="insights-keywords" class="insights-section hidden">
-            <h3>Keywords</h3>
-            <div id="insights-keywords-list" class="tag-list"></div>
+          <section id="insights-keywords" class="insights-section collapsible hidden">
+            <button
+              type="button"
+              id="keywords-toggle"
+              class="section-toggle"
+              aria-expanded="true"
+              aria-controls="insights-keywords-body"
+            >
+              <span class="section-toggle-label">Keywords</span>
+              <span id="keywords-count" class="section-toggle-count"></span>
+              <span class="section-toggle-chevron" aria-hidden="true"></span>
+            </button>
+            <div id="insights-keywords-body" class="section-body">
+              <div id="insights-keywords-list" class="tag-list"></div>
+            </div>
           </section>
           <section id="insights-terms" class="insights-section hidden">
             <h3>Terms</h3>
