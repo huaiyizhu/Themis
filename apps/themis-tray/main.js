@@ -37,8 +37,12 @@ const insightsTermsList = document.getElementById("insights-terms-list");
 const questionsEmptyEl = document.getElementById("questions-empty");
 const questionsListEl = document.getElementById("questions-list");
 const questionsPanelEl = document.getElementById("questions-panel");
-const contentSplitEl = document.getElementById("content-split");
-const splitDividerEl = document.getElementById("split-divider");
+const layoutBodyEl = document.getElementById("layout-body");
+const middleRowEl = document.getElementById("middle-row");
+const middleDividerEl = document.getElementById("middle-divider");
+const stackDividerEl = document.getElementById("stack-divider");
+const transcriptBlockEl = document.getElementById("transcript-block");
+const transcriptSectionEl = document.getElementById("transcript-section");
 const insightsPanelEl = document.getElementById("insights-panel");
 const summaryEmptyEl = document.getElementById("summary-empty");
 const summaryTextEl = document.getElementById("summary-text");
@@ -69,12 +73,14 @@ let insightPruneTimer = null;
 
 const SCROLL_BOTTOM_THRESHOLD = 48;
 
-const SPLIT_WIDTH_STORAGE_KEY = "themis-insights-panel-width";
-const INSIGHTS_PANEL_MIN = 120;
+const TRANSCRIPT_HEIGHT_STORAGE_KEY = "themis-transcript-panel-height";
+const MIDDLE_WIDTH_STORAGE_KEY = "themis-questions-panel-width";
+const TRANSCRIPT_PANEL_MIN = 80;
+const MIDDLE_ROW_MIN = 120;
 const QUESTIONS_PANEL_MIN = 160;
-const TRANSCRIPT_PANEL_MIN = 100;
-const SPLIT_DIVIDER_WIDTH = 8;
-const TRANSCRIPT_TOGGLE_WIDTH = 24;
+const INSIGHTS_PANEL_MIN = 120;
+const STACK_DIVIDER_HEIGHT = 8;
+const MIDDLE_DIVIDER_WIDTH = 8;
 
 /** Programmatic drag avoids Windows WM_NCHITTEST fighting resize after data-tauri-drag-region. */
 function setupWindowDrag() {
@@ -185,86 +191,136 @@ listen("mini-mode-changed", (event) => {
   applyMiniMode(Boolean(event.payload));
 });
 
-function reservedTranscriptWidth() {
-  if (!transcriptVisible) return 0;
-  const w = scrollEl?.offsetWidth ?? 0;
-  return w > 0 ? w : TRANSCRIPT_PANEL_MIN;
+function clampTranscriptHeight(heightPx) {
+  if (!layoutBodyEl || !transcriptBlockEl) return heightPx;
+  const total = layoutBodyEl.clientHeight;
+  const max = total - MIDDLE_ROW_MIN;
+  return Math.round(Math.max(TRANSCRIPT_PANEL_MIN, Math.min(heightPx, max)));
 }
 
-function gutterWidth() {
-  return toggleTranscriptBtn?.offsetWidth ?? TRANSCRIPT_TOGGLE_WIDTH;
+function applyTranscriptHeight(heightPx) {
+  if (!transcriptBlockEl) return;
+  const clamped = clampTranscriptHeight(heightPx);
+  transcriptBlockEl.style.flex = `0 0 ${clamped}px`;
+  transcriptBlockEl.style.height = `${clamped}px`;
+  transcriptBlockEl.style.maxHeight = "none";
 }
 
-function clampInsightsWidth(widthPx) {
-  if (!contentSplitEl || !insightsPanelEl) return widthPx;
-  const total = contentSplitEl.clientWidth;
-  const gutter = gutterWidth();
-  const divider = SPLIT_DIVIDER_WIDTH;
-
-  if (!transcriptVisible) {
-    const max = total - QUESTIONS_PANEL_MIN - divider - gutter;
-    return Math.round(Math.max(INSIGHTS_PANEL_MIN, Math.min(widthPx, max)));
-  }
-
-  const questionsW = questionsPanelEl?.offsetWidth ?? 0;
-  const max = total - reservedTranscriptWidth() - gutter - questionsW - divider;
-  return Math.round(Math.max(INSIGHTS_PANEL_MIN, Math.min(widthPx, max)));
+function clampQuestionsWidth(widthPx) {
+  if (!middleRowEl || !questionsPanelEl) return widthPx;
+  const total = middleRowEl.clientWidth;
+  const max = total - INSIGHTS_PANEL_MIN - MIDDLE_DIVIDER_WIDTH;
+  return Math.round(Math.max(QUESTIONS_PANEL_MIN, Math.min(widthPx, max)));
 }
 
-function applyInsightsWidth(widthPx) {
-  if (!insightsPanelEl) return;
-  const clamped = clampInsightsWidth(widthPx);
-  insightsPanelEl.style.flex = `0 0 ${clamped}px`;
-  insightsPanelEl.style.width = `${clamped}px`;
-  insightsPanelEl.style.maxWidth = "none";
+function applyQuestionsWidth(widthPx) {
+  if (!questionsPanelEl) return;
+  const clamped = clampQuestionsWidth(widthPx);
+  questionsPanelEl.style.flex = `0 0 ${clamped}px`;
+  questionsPanelEl.style.width = `${clamped}px`;
+  questionsPanelEl.style.maxWidth = "none";
 }
 
-function initSplitDivider() {
-  if (!contentSplitEl || !splitDividerEl || !insightsPanelEl) return;
+function initStackDivider() {
+  if (!layoutBodyEl || !stackDividerEl || !transcriptBlockEl) return;
 
-  const saved = localStorage.getItem(SPLIT_WIDTH_STORAGE_KEY);
+  const saved = localStorage.getItem(TRANSCRIPT_HEIGHT_STORAGE_KEY);
   if (saved) {
     const parsed = Number(saved);
     if (Number.isFinite(parsed) && parsed > 0) {
-      applyInsightsWidth(parsed);
+      applyTranscriptHeight(parsed);
     }
+  } else if (layoutBodyEl.clientHeight > 0) {
+    applyTranscriptHeight(Math.round(layoutBodyEl.clientHeight * 0.35));
   }
 
   let dragging = false;
 
-  splitDividerEl.addEventListener("mousedown", (e) => {
+  stackDividerEl.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
     dragging = true;
-    splitDividerEl.classList.add("is-dragging");
-    document.body.classList.add("split-dragging");
+    stackDividerEl.classList.add("is-dragging");
+    document.body.classList.add("stack-dragging");
   });
 
   window.addEventListener("mousemove", (e) => {
     if (!dragging) return;
-    const rect = contentSplitEl.getBoundingClientRect();
-    applyInsightsWidth(rect.right - e.clientX);
+    const rect = layoutBodyEl.getBoundingClientRect();
+    applyTranscriptHeight(rect.bottom - e.clientY);
   });
 
   const stopDrag = () => {
     if (!dragging) return;
     dragging = false;
-    splitDividerEl.classList.remove("is-dragging");
-    document.body.classList.remove("split-dragging");
-    localStorage.setItem(SPLIT_WIDTH_STORAGE_KEY, String(insightsPanelEl.offsetWidth));
+    stackDividerEl.classList.remove("is-dragging");
+    document.body.classList.remove("stack-dragging");
+    localStorage.setItem(TRANSCRIPT_HEIGHT_STORAGE_KEY, String(transcriptBlockEl.offsetHeight));
   };
 
   window.addEventListener("mouseup", stopDrag);
   window.addEventListener("blur", stopDrag);
 
   window.addEventListener("resize", () => {
-    if (insightsPanelEl.offsetWidth > 0) {
-      applyInsightsWidth(insightsPanelEl.offsetWidth);
+    if (transcriptBlockEl.offsetHeight > 0) {
+      applyTranscriptHeight(transcriptBlockEl.offsetHeight);
+    } else if (layoutBodyEl.clientHeight > 0) {
+      applyTranscriptHeight(Math.round(layoutBodyEl.clientHeight * 0.35));
     }
   });
 }
 
-initSplitDivider();
+function initMiddleDivider() {
+  if (!middleRowEl || !middleDividerEl || !questionsPanelEl) return;
+
+  const saved = localStorage.getItem(MIDDLE_WIDTH_STORAGE_KEY);
+  if (saved) {
+    const parsed = Number(saved);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      applyQuestionsWidth(parsed);
+    }
+  } else if (middleRowEl.clientWidth > 0) {
+    applyQuestionsWidth(Math.round(middleRowEl.clientWidth * 0.5));
+  }
+
+  let dragging = false;
+
+  middleDividerEl.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    dragging = true;
+    middleDividerEl.classList.add("is-dragging");
+    document.body.classList.add("middle-dragging");
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!dragging) return;
+    const rect = middleRowEl.getBoundingClientRect();
+    applyQuestionsWidth(e.clientX - rect.left);
+  });
+
+  const stopDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    middleDividerEl.classList.remove("is-dragging");
+    document.body.classList.remove("middle-dragging");
+    localStorage.setItem(MIDDLE_WIDTH_STORAGE_KEY, String(questionsPanelEl.offsetWidth));
+  };
+
+  window.addEventListener("mouseup", stopDrag);
+  window.addEventListener("blur", stopDrag);
+
+  window.addEventListener("resize", () => {
+    if (questionsPanelEl.offsetWidth > 0) {
+      applyQuestionsWidth(questionsPanelEl.offsetWidth);
+    } else if (middleRowEl.clientWidth > 0) {
+      applyQuestionsWidth(Math.round(middleRowEl.clientWidth * 0.5));
+    }
+  });
+}
+
+initStackDivider();
+initMiddleDivider();
 
 function closeSizeMenu() {
   sizeMenuEl?.classList.add("hidden");
@@ -346,9 +402,9 @@ initSizePresets();
 
 function applyTranscriptVisible(visible) {
   transcriptVisible = visible;
-  contentSplitEl?.classList.toggle("transcript-hidden", !visible);
+  layoutBodyEl?.classList.toggle("transcript-hidden", !visible);
   if (toggleTranscriptBtn) {
-    toggleTranscriptBtn.textContent = visible ? "«" : "»";
+    toggleTranscriptBtn.textContent = visible ? "▾" : "▴";
     toggleTranscriptBtn.title = visible
       ? "隐藏实时字幕 (Ctrl+Shift+H)"
       : "显示实时字幕 (Ctrl+Shift+H)";
@@ -357,15 +413,27 @@ function applyTranscriptVisible(visible) {
   }
   if (!visible) {
     scrollLatestBtn?.classList.add("hidden");
-  } else if (followLatest) {
-    scrollLatestBtn?.classList.add("hidden");
+    if (transcriptBlockEl) {
+      transcriptBlockEl.style.flex = "";
+      transcriptBlockEl.style.height = "";
+    }
   } else {
-    scrollLatestBtn?.classList.remove("hidden");
+    if (followLatest) {
+      scrollLatestBtn?.classList.add("hidden");
+    } else {
+      scrollLatestBtn?.classList.remove("hidden");
+    }
+    const saved = localStorage.getItem(TRANSCRIPT_HEIGHT_STORAGE_KEY);
+    if (saved) {
+      const parsed = Number(saved);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        applyTranscriptHeight(parsed);
+      }
+    } else if (layoutBodyEl?.clientHeight > 0) {
+      applyTranscriptHeight(Math.round(layoutBodyEl.clientHeight * 0.35));
+    }
   }
   localStorage.setItem(TRANSCRIPT_VISIBLE_STORAGE_KEY, visible ? "1" : "0");
-  if (insightsPanelEl?.offsetWidth > 0) {
-    applyInsightsWidth(insightsPanelEl.offsetWidth);
-  }
 }
 
 function toggleTranscriptPanel() {

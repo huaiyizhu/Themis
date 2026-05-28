@@ -54,50 +54,74 @@
         <p id="summary-empty" class="summary-empty">采集中，摘要将约每 20 秒根据全文已知内容更新…</p>
         <div id="summary-text" class="summary-text hidden"></div>
       </section>
-      <div class="content-split" id="content-split">
-        <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
-          <div id="transcript" class="transcript-body"></div>
+      <div class="layout-body" id="layout-body">
+        <div class="middle-row" id="middle-row">
+          <aside id="questions-panel" class="questions-panel" aria-label="Questions">
+            <h2 class="questions-title">Questions</h2>
+            <p id="questions-empty" class="questions-empty">核心问题会实时显示在此栏，无需滚动即可查看。</p>
+            <div id="questions-list" class="question-cards"></div>
+          </aside>
+          <div
+            id="middle-divider"
+            class="middle-divider"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize questions and terms panels"
+            title="Drag to resize questions/terms panels"
+          ></div>
+          <aside id="insights-panel" class="insights-panel" aria-label="Keywords and terms">
+            <h2 class="insights-title">Terms</h2>
+            <p id="insights-empty" class="insights-empty">Keywords and terms appear here after each phrase.</p>
+            <section id="insights-keywords" class="insights-section collapsible hidden">
+              <button
+                type="button"
+                id="keywords-toggle"
+                class="section-toggle"
+                aria-expanded="true"
+                aria-controls="insights-keywords-body"
+              >
+                <span class="section-toggle-label">Keywords</span>
+                <span id="keywords-count" class="section-toggle-count"></span>
+                <span class="section-toggle-chevron" aria-hidden="true"></span>
+              </button>
+              <div id="insights-keywords-body" class="section-body">
+                <div id="insights-keywords-list" class="tag-list"></div>
+              </div>
+            </section>
+            <section id="insights-terms" class="insights-section hidden">
+              <h3>Terms</h3>
+              <div id="insights-terms-list" class="insight-cards"></div>
+            </section>
+          </aside>
         </div>
-        <button
-          type="button"
-          id="toggle-transcript"
-          class="transcript-toggle"
-          title="隐藏实时字幕 (Ctrl+Shift+H)"
-          aria-label="隐藏实时字幕"
-          aria-pressed="false"
-        >
-          «
-        </button>
-        <aside id="questions-panel" class="questions-panel" aria-label="Questions">
-          <h2 class="questions-title">Questions</h2>
-          <p id="questions-empty" class="questions-empty">核心问题会实时显示在此栏，无需滚动即可查看。</p>
-          <div id="questions-list" class="question-cards"></div>
-        </aside>
-        <div id="split-divider" class="split-divider" role="separator" aria-orientation="vertical" aria-label="Resize terms panel" title="Drag to resize terms panel"></div>
-        <aside id="insights-panel" class="insights-panel" aria-label="Keywords and terms">
-          <h2 class="insights-title">Terms</h2>
-          <p id="insights-empty" class="insights-empty">Keywords and terms appear here after each phrase.</p>
-          <section id="insights-keywords" class="insights-section collapsible hidden">
+        <div id="transcript-block" class="transcript-block">
+          <div class="transcript-bar">
             <button
               type="button"
-              id="keywords-toggle"
-              class="section-toggle"
-              aria-expanded="true"
-              aria-controls="insights-keywords-body"
+              id="toggle-transcript"
+              class="transcript-toggle-h"
+              title="隐藏实时字幕 (Ctrl+Shift+H)"
+              aria-label="隐藏实时字幕"
+              aria-pressed="false"
             >
-              <span class="section-toggle-label">Keywords</span>
-              <span id="keywords-count" class="section-toggle-count"></span>
-              <span class="section-toggle-chevron" aria-hidden="true"></span>
+              ▾
             </button>
-            <div id="insights-keywords-body" class="section-body">
-              <div id="insights-keywords-list" class="tag-list"></div>
+            <span class="transcript-bar-label">实时字幕</span>
+          </div>
+          <div
+            id="stack-divider"
+            class="stack-divider"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize transcript panel"
+            title="Drag to resize transcript panel"
+          ></div>
+          <div id="transcript-section" class="transcript-section">
+            <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">
+              <div id="transcript" class="transcript-body"></div>
             </div>
-          </section>
-          <section id="insights-terms" class="insights-section hidden">
-            <h3>Terms</h3>
-            <div id="insights-terms-list" class="insight-cards"></div>
-          </section>
-        </aside>
+          </div>
+        </div>
       </div>
     </div>
     <script type="module" src="/main.js"></script>
