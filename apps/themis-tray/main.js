@@ -26,6 +26,9 @@ let transcriptVisible = true;
 const insightsEmptyEl = document.getElementById("insights-empty");
 const insightsKeywordsSec = document.getElementById("insights-keywords");
 const insightsKeywordsList = document.getElementById("insights-keywords-list");
+const keywordsToggleBtn = document.getElementById("keywords-toggle");
+const keywordsCountEl = document.getElementById("keywords-count");
+const KEYWORDS_COLLAPSED_STORAGE_KEY = "themis-keywords-collapsed";
 const insightsTermsSec = document.getElementById("insights-terms");
 const insightsTermsList = document.getElementById("insights-terms-list");
 const questionsEmptyEl = document.getElementById("questions-empty");
@@ -734,6 +737,42 @@ function resetInsightDwellState() {
   }
 }
 
+function loadKeywordsCollapsed() {
+  try {
+    return localStorage.getItem(KEYWORDS_COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setKeywordsCollapsed(collapsed) {
+  if (!insightsKeywordsSec || !keywordsToggleBtn) return;
+  insightsKeywordsSec.classList.toggle("is-collapsed", collapsed);
+  keywordsToggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  try {
+    localStorage.setItem(KEYWORDS_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+function updateKeywordsCount(count) {
+  if (!keywordsCountEl) return;
+  if (count > 0) {
+    keywordsCountEl.textContent = String(count);
+    keywordsCountEl.classList.remove("hidden");
+  } else {
+    keywordsCountEl.textContent = "";
+    keywordsCountEl.classList.add("hidden");
+  }
+}
+
+keywordsToggleBtn?.addEventListener("click", () => {
+  setKeywordsCollapsed(!insightsKeywordsSec?.classList.contains("is-collapsed"));
+});
+
+setKeywordsCollapsed(loadKeywordsCollapsed());
+
 function renderInsights(insights) {
   if (!insights || (!insights.keywords?.length && !insights.terms?.length && !insights.questions?.length)) {
     return;
@@ -749,6 +788,7 @@ function renderInsights(insights) {
       tag.textContent = kw;
       insightsKeywordsList.appendChild(tag);
     }
+    updateKeywordsCount(insights.keywords.length);
     changed = true;
   }
 
@@ -823,6 +863,7 @@ function clearOverlaySession(placeholderText = "已清空，继续监听中…")
   insightsKeywordsSec.classList.add("hidden");
   insightsTermsSec.classList.add("hidden");
   insightsKeywordsList.replaceChildren();
+  updateKeywordsCount(0);
   insightsTermsList.replaceChildren();
   questionsListEl.replaceChildren();
   setPlaceholder(placeholderText);
