@@ -1,6 +1,8 @@
+mod mini_mode;
 mod overlay_ui;
 mod window_presets;
 
+use mini_mode::{is_mini_mode, toggle_mini_mode, MiniModeState};
 use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
 use window_presets::{apply_preset, list_presets, WindowPresetDto};
 use serde::Serialize;
@@ -148,6 +150,7 @@ struct AppState {
     capturing: Arc<Mutex<bool>>,
     stream_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     overlay: Arc<Mutex<OverlayMirror>>,
+    mini_mode: Arc<std::sync::Mutex<MiniModeState>>,
 }
 
 #[tauri::command]
@@ -402,7 +405,21 @@ fn list_window_presets() -> Vec<WindowPresetDto> {
 
 #[tauri::command]
 fn apply_window_preset(app: AppHandle, preset: String) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    if is_mini_mode(&state.mini_mode) {
+        return Err("exit mini floater mode before changing window size".into());
+    }
     apply_preset(&app, preset.trim())
+}
+
+#[tauri::command]
+fn toggle_overlay_mini_mode(app: AppHandle, state: State<'_, AppState>) -> Result<bool, String> {
+    toggle_mini_mode(&app, &state.mini_mode)
+}
+
+#[tauri::command]
+fn is_overlay_mini_mode(state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(is_mini_mode(&state.mini_mode))
 }
 
 #[tauri::command]
@@ -869,6 +886,7 @@ pub fn run() {
             capturing: Arc::new(Mutex::new(false)),
             stream_task: Arc::new(Mutex::new(None)),
             overlay: Arc::new(Mutex::new(OverlayMirror::default())),
+            mini_mode: Arc::new(std::sync::Mutex::new(MiniModeState::default())),
         })
         .invoke_handler(tauri::generate_handler![
             get_status,
@@ -885,6 +903,8 @@ pub fn run() {
             clear_listening_session,
             list_window_presets,
             apply_window_preset,
+            toggle_overlay_mini_mode,
+            is_overlay_mini_mode,
             expand_insight,
             toggle_overlay_visibility,
             is_overlay_visible,
