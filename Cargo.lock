@@ -4338,6 +4338,7 @@ name = "themis-audio"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cc",
  "cpal",
  "themis-core",
  "tokio",
