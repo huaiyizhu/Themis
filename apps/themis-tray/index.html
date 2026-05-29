@@ -14,7 +14,6 @@
       class="mini-floater hidden"
       role="button"
       tabindex="0"
-      title="拖动移动 · 点击恢复窗口 (Cmd+Shift+M / Cmd+Shift+O 唤醒)"
       aria-label="Themis 桌面浮标，点击恢复窗口"
     >
       <span class="mini-floater-icon" aria-hidden="true">⚖</span>
@@ -31,27 +30,27 @@
         <div class="resize-edge resize-sw" data-tauri-resize="southwest"></div>
       </div>
 
-      <header id="drag-handle" class="overlay-header" title="Drag to move">
+      <header id="drag-handle" class="overlay-header" data-tip="拖动标题栏移动窗口">
         <div class="header-left">
           <span class="brand">Themis</span>
-          <span id="theme-badge" class="theme-badge" title="Style preset">dark</span>
+          <span id="theme-badge" class="theme-badge" data-tip="主题与字号">dark</span>
         </div>
         <div class="header-actions">
-          <button type="button" id="toggle-capture" class="header-btn capture-btn" title="开始系统音频捕捉 (Ctrl+Shift+T)">捕捉</button>
-          <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" title="打开诊断窗口 (Ctrl+Shift+D)" aria-pressed="false">诊断</button>
-          <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" title="术语/问答说明译为中文（点击切换为原文）" aria-pressed="true">中文</button>
-          <button type="button" id="toggle-mini" class="header-btn mini-toggle" title="最小化为桌面浮标，全屏应用上仍可见 (Ctrl+Shift+M)">浮</button>
+          <button type="button" id="toggle-capture" class="header-btn capture-btn">捕捉</button>
+          <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" aria-pressed="false">诊断</button>
+          <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" aria-pressed="true">中文</button>
+          <button type="button" id="toggle-mini" class="header-btn mini-toggle">浮</button>
           <div class="size-presets" id="size-presets">
-            <button type="button" id="size-toggle" class="header-btn size-toggle" title="窗口尺寸预设" aria-expanded="false" aria-haspopup="true">尺寸</button>
+            <button type="button" id="size-toggle" class="header-btn size-toggle" aria-expanded="false" aria-haspopup="true">尺寸</button>
             <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
           </div>
-          <button type="button" id="clear-session" class="header-btn clear-session" title="清空字幕、总结与洞察，从零继续监听">清空</button>
-          <button type="button" id="hide-overlay" class="header-btn close-window" title="隐藏窗口（捕捉继续，托盘可再次打开）">×</button>
-          <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden" title="Jump to latest transcript">↓ Latest</button>
+          <button type="button" id="clear-session" class="header-btn clear-session">清空</button>
+          <button type="button" id="hide-overlay" class="header-btn close-window">×</button>
+          <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden">↓ Latest</button>
         </div>
       </header>
       <p id="status" class="status-line">Connecting…</p>
-      <p id="config-status" class="config-status-line" title="">配置检查…</p>
+      <p id="config-status" class="config-status-line">配置检查…</p>
       <section id="summary-panel" class="summary-panel" aria-label="Full session summary">
         <h2 class="summary-title">全文总结</h2>
         <p id="summary-empty" class="summary-empty">采集中，摘要将约每 20 秒根据全文已知内容更新…</p>
@@ -70,7 +69,6 @@
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize questions and terms panels"
-            title="Drag to resize questions/terms panels"
           ></div>
           <aside id="insights-panel" class="insights-panel" aria-label="Keywords and terms">
             <h2 class="insights-title">Terms</h2>
@@ -103,7 +101,6 @@
               type="button"
               id="toggle-transcript"
               class="transcript-toggle-h"
-              title="隐藏实时字幕 (Ctrl+Shift+H)"
               aria-label="隐藏实时字幕"
               aria-pressed="false"
             >
@@ -117,7 +114,6 @@
             role="separator"
             aria-orientation="horizontal"
             aria-label="Resize transcript panel"
-            title="Drag to resize transcript panel"
           ></div>
           <div id="transcript-section" class="transcript-section">
             <div id="transcript-scroll" class="transcript-scroll" aria-live="polite">

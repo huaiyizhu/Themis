@@ -1,4 +1,4 @@
-/** Format tray ↔ service STT/LLM config cross-check for overlay & diagnose UI. */
+import { setTip } from "./tooltips.js";
 
 function escapeHtml(value) {
   return String(value)
@@ -141,7 +141,7 @@ export function configCrossCheckTitle(config) {
 export function applyConfigStatusEl(el, config) {
   if (!el) return;
   el.innerHTML = renderConfigCrossCheck(config);
-  el.title = configCrossCheckTitle(config);
+  setTip(el, configCrossCheckTitle(config));
   el.classList.toggle("config-mismatch", Boolean(config?.service && !config.in_sync));
   el.classList.toggle("config-offline", !config?.service);
   el.classList.toggle("config-all-ok", isAllOk(config));

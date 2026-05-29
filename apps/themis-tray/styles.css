@@ -141,6 +141,41 @@ body:not(.is-mini-mode) .mini-floater {
   }
 }
 
+.themis-tip {
+  background: rgba(16, 16, 22, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  color: #f2f2f8;
+  font-size: calc(12px * var(--font-scale, 1));
+  left: 0;
+  line-height: 1.45;
+  max-width: min(300px, calc(100vw - 16px));
+  padding: 7px 11px;
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: pre-wrap;
+  word-break: break-word;
+  z-index: 30000;
+}
+
+.themis-tip.is-below {
+  transform: translateX(-50%);
+}
+
+.theme-light-glass .themis-tip,
+.theme-solid-light .themis-tip,
+.theme-paper .themis-tip,
+.theme-cream .themis-tip,
+.theme-high-contrast-light .themis-tip {
+  background: rgba(252, 252, 254, 0.98);
+  border-color: rgba(0, 0, 0, 0.14);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  color: #1a1a22;
+}
+
 /* Resize handles live inside the panel, below the drag header in z-order */
 .resize-layer {
   inset: 0;

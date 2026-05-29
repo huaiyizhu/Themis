@@ -1,5 +1,7 @@
 /** Colored capture state for overlay status line. */
 
+import { setTip } from "./tooltips.js";
+
 const CAP_STATE_CLASSES = [
   "cap-state-capturing",
   "cap-state-idle",
@@ -124,10 +126,12 @@ export function applyCaptureStatusPending(el, action) {
   el.classList.remove(...CAP_STATE_CLASSES);
   el.innerHTML = renderCaptureStatusPending(action);
   el.classList.add(action === "stopping" ? "cap-state-stopping" : "cap-state-starting");
-  el.title =
+  setTip(
+    el,
     action === "stopping"
       ? "Stopping capture — waiting for service…"
-      : "Starting capture — waiting for service…";
+      : "Starting capture — waiting for service…",
+  );
 }
 
 /**
@@ -148,7 +152,7 @@ export function applyCaptureStatusEl(el, payload) {
   if (payload.offline) {
     el.innerHTML = renderCaptureStatusOffline(payload.error);
     el.classList.add("cap-state-offline");
-    el.title = payload.error || "Service offline";
+    setTip(el, payload.error || "Service offline");
     return;
   }
 
@@ -157,5 +161,5 @@ export function applyCaptureStatusEl(el, payload) {
   el.classList.add(`cap-state-${visualState}`);
 
   const detail = payload.capture_detail ? `${payload.capture_detail}\n` : "";
-  el.title = `${detail}${payload.message || ""}`.trim();
+  setTip(el, `${detail}${payload.message || ""}`.trim());
 }

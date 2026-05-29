@@ -6,6 +6,7 @@ import {
   applyCaptureStatusEl,
   applyCaptureStatusPending,
 } from "./capture-status.js";
+import { initTooltips, setTip, tipWithHotkey, hotkey } from "./tooltips.js";
 
 const overlayEl = document.getElementById("overlay");
 const dragHandle = document.getElementById("drag-handle");
@@ -26,6 +27,24 @@ const sizePresetsEl = document.getElementById("size-presets");
 const sizeToggleBtn = document.getElementById("size-toggle");
 const sizeMenuEl = document.getElementById("size-menu");
 const toggleTranscriptBtn = document.getElementById("toggle-transcript");
+
+initTooltips();
+
+function initHeaderTips() {
+  setTip(sizeToggleBtn, "窗口尺寸预设");
+  setTip(clearSessionBtn, "清空字幕、总结与洞察，从零继续监听");
+  setTip(hideOverlayBtn, tipWithHotkey("隐藏窗口（捕捉继续，托盘可再次打开）", "O"));
+  setTip(scrollLatestBtn, "跳转到最新字幕");
+  setTip(toggleMiniBtn, tipWithHotkey("最小化为桌面浮标，全屏应用上仍可见", "M"));
+  setTip(
+    miniFloaterEl,
+    `拖动移动 · 点击恢复 · ${hotkey("M")} 浮标 / ${hotkey("O")} 唤醒`,
+  );
+  setTip(document.getElementById("middle-divider"), "拖动调整 Questions / Terms 宽度");
+  setTip(document.getElementById("stack-divider"), "拖动调整字幕区高度");
+}
+
+initHeaderTips();
 
 const WINDOW_PRESET_STORAGE_KEY = "themis-window-preset";
 const TRANSCRIPT_VISIBLE_STORAGE_KEY = "themis-transcript-visible";
@@ -144,7 +163,7 @@ function setupMiniFloater() {
       try {
         await invoke("toggle_overlay_mini_mode");
       } catch (err) {
-        if (statusEl) statusEl.title = String(err);
+        if (statusEl) setTip(statusEl, String(err));
       }
     }
   };
@@ -172,7 +191,7 @@ function setupMiniFloater() {
     try {
       await invoke("toggle_overlay_mini_mode");
     } catch (err) {
-      if (statusEl) statusEl.title = String(err);
+      if (statusEl) setTip(statusEl, String(err));
     }
   });
 }
@@ -183,7 +202,7 @@ toggleMiniBtn?.addEventListener("click", async () => {
   try {
     await invoke("toggle_overlay_mini_mode");
   } catch (e) {
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 });
 
@@ -191,7 +210,7 @@ hideOverlayBtn?.addEventListener("click", async () => {
   try {
     await invoke("hide_overlay_window");
   } catch (e) {
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 });
 
@@ -349,7 +368,7 @@ async function applyWindowPreset(presetId) {
     markActiveSizePreset(applied);
     closeSizeMenu();
   } catch (e) {
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 }
 
@@ -369,13 +388,16 @@ async function initSizePresets() {
     btn.className = "size-menu-item";
     btn.dataset.preset = p.id;
     btn.setAttribute("role", "menuitem");
-    btn.title = p.fullscreen
-      ? "全屏"
-      : p.id === "center-third"
-        ? "宽 1/3 屏 × 工作区全高，水平居中"
-        : p.id === "current-screen"
-          ? "铺满当前显示器工作区（保留菜单栏/程序坞区域）"
-          : `${p.width}×${p.height}`;
+    setTip(
+      btn,
+      p.fullscreen
+        ? "全屏"
+        : p.id === "center-third"
+          ? "宽 1/3 屏 × 工作区全高，水平居中"
+          : p.id === "current-screen"
+            ? "铺满当前显示器工作区（保留菜单栏/程序坞区域）"
+            : `${p.width}×${p.height}`,
+    );
     btn.textContent =
       p.fullscreen || p.id === "center-third" || p.id === "current-screen"
         ? p.label
@@ -419,9 +441,12 @@ function applyTranscriptVisible(visible) {
   layoutBodyEl?.classList.toggle("transcript-hidden", !visible);
   if (toggleTranscriptBtn) {
     toggleTranscriptBtn.textContent = visible ? "▾" : "▴";
-    toggleTranscriptBtn.title = visible
-      ? "隐藏实时字幕 (Ctrl+Shift+H)"
-      : "显示实时字幕 (Ctrl+Shift+H)";
+    setTip(
+      toggleTranscriptBtn,
+      visible
+        ? tipWithHotkey("隐藏实时字幕", "H")
+        : tipWithHotkey("显示实时字幕", "H"),
+    );
     toggleTranscriptBtn.setAttribute("aria-label", visible ? "隐藏实时字幕" : "显示实时字幕");
     toggleTranscriptBtn.setAttribute("aria-pressed", visible ? "false" : "true");
   }
@@ -552,7 +577,7 @@ function renderTranscript() {
       const kw = document.createElement("span");
       kw.className = "line-kw";
       kw.textContent = ins.keywords.slice(0, 4).join(" · ");
-      kw.title = "Keywords";
+      setTip(kw, "Keywords");
       wrap.appendChild(kw);
     }
     transcriptEl.appendChild(wrap);
@@ -645,9 +670,12 @@ function updateCaptureButton(capturing) {
   toggleCaptureBtn.disabled = false;
   toggleCaptureBtn.classList.toggle("is-capturing", capturing);
   toggleCaptureBtn.textContent = capturing ? "停止" : "捕捉";
-  toggleCaptureBtn.title = capturing
-    ? "停止系统音频捕捉 (Ctrl+Shift+T)"
-    : "开始系统音频捕捉 (Ctrl+Shift+T)";
+  setTip(
+    toggleCaptureBtn,
+    capturing
+      ? tipWithHotkey("停止系统音频捕捉", "T")
+      : tipWithHotkey("开始系统音频捕捉", "T"),
+  );
   toggleCaptureBtn.setAttribute("aria-pressed", capturing ? "true" : "false");
 }
 
@@ -658,10 +686,10 @@ function updateCaptureButtonPending(action) {
   toggleCaptureBtn.disabled = true;
   toggleCaptureBtn.classList.toggle("is-capturing", action === "stopping");
   toggleCaptureBtn.textContent = action === "stopping" ? "停止中…" : "启动中…";
-  toggleCaptureBtn.title =
-    action === "stopping"
-      ? "正在停止捕捉…"
-      : "正在启动捕捉…";
+  setTip(
+    toggleCaptureBtn,
+    action === "stopping" ? "正在停止捕捉…" : "正在启动捕捉…",
+  );
   toggleCaptureBtn.setAttribute(
     "aria-pressed",
     action === "stopping" ? "true" : "false",
@@ -671,9 +699,10 @@ function updateCaptureButtonPending(action) {
 function updateDiagnoseButton(open) {
   if (!toggleDiagnoseBtn) return;
   toggleDiagnoseBtn.classList.toggle("is-open", open);
-  toggleDiagnoseBtn.title = open
-    ? "关闭诊断窗口 (Ctrl+Shift+D)"
-    : "打开诊断窗口 (Ctrl+Shift+D)";
+  setTip(
+    toggleDiagnoseBtn,
+    open ? tipWithHotkey("关闭诊断窗口", "D") : tipWithHotkey("打开诊断窗口", "D"),
+  );
   toggleDiagnoseBtn.setAttribute("aria-pressed", open ? "true" : "false");
 }
 
@@ -923,7 +952,7 @@ function renderInsightPanels() {
     card.className = "question-card";
     if (item.pinned) card.classList.add("is-pinned");
     card.dataset.id = item.id;
-    card.title = item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）";
+    setTip(card, item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）");
     const meta = document.createElement("div");
     meta.className = "insight-meta";
     const pinLabel = item.pinned ? " · 📌" : "";
@@ -952,7 +981,7 @@ function renderInsightPanels() {
     card.className = "insight-card";
     if (item.pinned) card.classList.add("is-pinned");
     card.dataset.id = item.id;
-    card.title = item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）";
+    setTip(card, item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）");
     const meta = document.createElement("div");
     meta.className = "insight-meta";
     const pinLabel = item.pinned ? " · 📌" : "";
@@ -1119,7 +1148,7 @@ clearSessionBtn?.addEventListener("click", async () => {
     await invoke("clear_listening_session");
   } catch (e) {
     clearOverlaySession("已清空（本地）；服务未连接时仅清除界面");
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 });
 
@@ -1147,7 +1176,7 @@ listen("capture-toggle-failed", (event) => {
     message: String(event.payload ?? "toggle failed"),
   });
   updateCaptureButton(wasCapturing);
-  statusEl.title = String(event.payload ?? "");
+  setTip(statusEl, String(event.payload ?? ""));
 });
 
 toggleCaptureBtn?.addEventListener("click", async () => {
@@ -1166,7 +1195,7 @@ toggleCaptureBtn?.addEventListener("click", async () => {
       message: String(e),
     });
     updateCaptureButton(wasCapturing);
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 });
 
@@ -1175,7 +1204,7 @@ toggleDiagnoseBtn?.addEventListener("click", async () => {
     const open = await invoke("toggle_diagnose_window");
     updateDiagnoseButton(Boolean(open));
   } catch (e) {
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 });
 
@@ -1221,9 +1250,12 @@ function applyOverlayUi(payload) {
   const scalePct = Math.round(fontScale * 100);
   const saved = payload.theme && payload.theme !== theme ? ` · saved ${payload.theme}` : "";
   themeBadgeEl.textContent = themeShortLabel(theme);
-  themeBadgeEl.title = payload.adaptive
-    ? `${theme}${saved} (auto contrast) · text ${scalePct}% · Ctrl+Shift+S cycle`
-    : `${theme} · text ${scalePct}% · Ctrl+Shift+S cycle · Ctrl+Shift+−/+ size`;
+  setTip(
+    themeBadgeEl,
+    payload.adaptive
+      ? `${theme}${saved} (自动对比度) · 字号 ${scalePct}% · ${hotkey("S")} 切换样式`
+      : `${theme} · 字号 ${scalePct}% · ${hotkey("S")} 切换样式 · ${hotkey("−")}/${hotkey("+")} 调字号`,
+  );
 }
 
 listen("overlay-ui", (event) => {
@@ -1264,9 +1296,12 @@ function updateLocalizeButton(localizeZh) {
   insightLocalizeZh = Boolean(localizeZh);
   toggleLocalizeBtn.classList.toggle("is-localized", insightLocalizeZh);
   toggleLocalizeBtn.textContent = insightLocalizeZh ? "中文" : "原文";
-  toggleLocalizeBtn.title = insightLocalizeZh
-    ? "术语/问答说明译为中文（点击切换为原文）"
-    : "保持术语/问答原文（点击切换为中文说明）";
+  setTip(
+    toggleLocalizeBtn,
+    insightLocalizeZh
+      ? "术语/问答说明译为中文（点击切换为原文）"
+      : "保持术语/问答原文（点击切换为中文说明）",
+  );
   toggleLocalizeBtn.setAttribute("aria-pressed", insightLocalizeZh ? "true" : "false");
 }
 
@@ -1275,7 +1310,7 @@ toggleLocalizeBtn?.addEventListener("click", async () => {
     const s = await invoke("set_insight_localize", { localizeZh: !insightLocalizeZh });
     updateLocalizeButton(s.localize_zh);
   } catch (e) {
-    statusEl.title = String(e);
+    setTip(statusEl, String(e));
   }
 });
 
