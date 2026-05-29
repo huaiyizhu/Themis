@@ -95,31 +95,9 @@ body:not(.is-mini-mode) .mini-floater {
   border-color: rgba(140, 190, 255, 0.45);
 }
 
-.header-btn.hide-window {
-  align-items: center;
-  display: inline-flex;
-  justify-content: center;
-  min-width: 26px;
-  padding: 2px 8px;
-}
-
-.header-icon-hide {
-  background: currentColor;
-  border-radius: 1px;
-  display: block;
-  height: 2px;
-  width: 12px;
-}
-
 .header-btn.hide-window:hover {
   background: rgba(140, 190, 255, 0.18);
-  border-color: rgba(140, 190, 255, 0.4);
-}
-
-.header-btn.quit-btn {
-  font-size: 11px;
-  min-width: 34px;
-  padding: 2px 8px;
+  border-color: rgba(140, 190, 255, 0.38);
 }
 
 .header-btn.quit-btn:hover {
