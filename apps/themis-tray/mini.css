@@ -22,18 +22,20 @@ body {
   background: transparent;
   border: none;
   border-radius: 50%;
+  clip-path: circle(50% at 50% 50%);
   cursor: grab;
   display: block;
   filter: drop-shadow(0 4px 12px rgba(8, 20, 36, 0.42));
-  height: 46px;
+  height: 100%;
   outline: none;
+  overflow: hidden;
   padding: 0;
   touch-action: none;
   transition:
     filter 0.18s ease,
     transform 0.18s ease;
   user-select: none;
-  width: 46px;
+  width: 100%;
   -webkit-app-region: no-drag;
 }
 
@@ -50,9 +52,9 @@ body {
 
 .mini-floater-mark {
   display: block;
-  height: 46px;
+  height: 100%;
   pointer-events: none;
   user-select: none;
-  width: 46px;
+  width: 100%;
   -webkit-user-drag: none;
 }

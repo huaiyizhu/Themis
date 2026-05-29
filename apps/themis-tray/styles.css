@@ -35,22 +35,20 @@ body.is-mini-mode #overlay {
   border: none;
   border-radius: 50%;
   box-shadow: none;
-  clip-path: none;
+  clip-path: circle(50% at 50% 50%);
   cursor: grab;
   display: block;
   flex-shrink: 0;
-  height: 46px;
+  height: 100%;
   outline: none;
+  overflow: hidden;
   padding: 0;
   position: relative;
   touch-action: none;
   user-select: none;
-  width: 46px;
+  width: 100%;
   -webkit-app-region: no-drag;
-  filter: drop-shadow(0 4px 12px rgba(8, 20, 36, 0.42));
-  transition:
-    filter 0.18s ease,
-    transform 0.18s ease;
+  transition: transform 0.18s ease;
 }
 
 .mini-floater.hidden {
@@ -62,8 +60,6 @@ body:not(.is-mini-mode) .mini-floater {
 }
 
 .mini-floater:hover {
-  filter: drop-shadow(0 6px 18px rgba(8, 20, 36, 0.48))
-    drop-shadow(0 0 14px rgba(90, 170, 240, 0.32));
   transform: scale(1.05);
 }
 
@@ -74,10 +70,10 @@ body:not(.is-mini-mode) .mini-floater {
 
 .mini-floater-mark {
   display: block;
-  height: 46px;
+  height: 100%;
   pointer-events: none;
   user-select: none;
-  width: 46px;
+  width: 100%;
   -webkit-user-drag: none;
 }
 
@@ -87,12 +83,9 @@ body:not(.is-mini-mode) .mini-floater {
 
 @keyframes mini-wake-pulse {
   0% {
-    filter: drop-shadow(0 0 0 3px rgba(120, 200, 255, 0.95))
-      drop-shadow(0 0 24px rgba(80, 160, 255, 0.65));
     transform: scale(1.08);
   }
   100% {
-    filter: drop-shadow(0 4px 12px rgba(8, 20, 36, 0.42));
     transform: scale(1);
   }
 }

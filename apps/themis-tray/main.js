@@ -126,11 +126,13 @@ function setupWindowDrag() {
 setupWindowDrag();
 
 function applyMiniMode(active) {
-  // Overlay is hidden while mini floater runs in its own window.
-  document.body.classList.toggle("is-mini-mode", false);
-  document.documentElement.classList.toggle("is-mini-mode", false);
-  miniFloaterEl?.classList.add("hidden");
-  if (!active) {
+  document.body.classList.toggle("is-mini-mode", active);
+  document.documentElement.classList.toggle("is-mini-mode", active);
+  miniFloaterEl?.classList.toggle("hidden", !active);
+  if (active) {
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+  } else {
     document.documentElement.style.background = "";
     document.body.style.background = "";
   }

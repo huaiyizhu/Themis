@@ -48,10 +48,45 @@ fn overlay_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .ok_or_else(|| "overlay window missing".to_string())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(all(not(target_os = "macos"), not(windows)))]
 fn mini_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     app.get_webview_window("mini")
         .ok_or_else(|| "mini window missing".to_string())
+}
+
+const MINI_FLOATER_SIZE: f32 = 52.0;
+
+fn mini_floater_position(overlay: &WebviewWindow) -> Result<(f32, f32), String> {
+    let scale = overlay.scale_factor().map_err(|e| e.to_string())? as f32;
+    let pos = overlay.outer_position().map_err(|e| e.to_string())?;
+    let size = overlay.outer_size().map_err(|e| e.to_string())?;
+    let w = size.width as f32 / scale;
+    let h = size.height as f32 / scale;
+    let x = pos.x as f32 / scale + (w - MINI_FLOATER_SIZE) / 2.0;
+    let y = pos.y as f32 / scale + (h - MINI_FLOATER_SIZE) / 2.0;
+    Ok((x.max(0.0), y.max(0.0)))
+}
+
+fn enable_overlay_mini_ui(overlay: &WebviewWindow) -> Result<(), String> {
+    overlay
+        .eval(
+            "document.body.classList.add('is-mini-mode');\
+             document.documentElement.classList.add('is-mini-mode');\
+             const f=document.getElementById('mini-floater');\
+             if(f)f.classList.remove('hidden');",
+        )
+        .map_err(|e| e.to_string())
+}
+
+fn disable_overlay_mini_ui(overlay: &WebviewWindow) -> Result<(), String> {
+    overlay
+        .eval(
+            "document.body.classList.remove('is-mini-mode');\
+             document.documentElement.classList.remove('is-mini-mode');\
+             const f=document.getElementById('mini-floater');\
+             if(f)f.classList.add('hidden');",
+        )
+        .map_err(|e| e.to_string())
 }
 
 fn read_geometry(window: &WebviewWindow) -> Result<SavedGeometry, String> {
@@ -69,12 +104,8 @@ fn read_geometry(window: &WebviewWindow) -> Result<SavedGeometry, String> {
 }
 
 fn floater_position(overlay: &WebviewWindow) -> Result<(f64, f64), String> {
-    let scale = overlay.scale_factor().map_err(|e| e.to_string())? as f64;
-    let pos = overlay.outer_position().map_err(|e| e.to_string())?;
-    let size = overlay.outer_size().map_err(|e| e.to_string())?;
-    let x = pos.x as f64 / scale + (size.width as f64 / scale - 52.0) / 2.0;
-    let y = pos.y as f64 / scale + (size.height as f64 / scale - 52.0) / 2.0;
-    Ok((x.max(0.0), y.max(0.0)))
+    let (x, y) = mini_floater_position(overlay)?;
+    Ok((x as f64, y as f64))
 }
 
 #[cfg(target_os = "macos")]
@@ -123,27 +154,63 @@ fn enter_mini(
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn enter_mini(
+    _app: &AppHandle,
+    overlay: &WebviewWindow,
+    _state: &mut MiniModeState,
+) -> Result<(), String> {
+    use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
+
+    overlay.set_fullscreen(false).map_err(|e| e.to_string())?;
+    let (x, y) = mini_floater_position(overlay)?;
+    enable_overlay_mini_ui(overlay)?;
+    overlay.set_resizable(false).map_err(|e| e.to_string())?;
+    overlay
+        .set_max_size(Some(LogicalSize::new(
+            MINI_FLOATER_SIZE,
+            MINI_FLOATER_SIZE,
+        )))
+        .map_err(|e| e.to_string())?;
+    overlay
+        .set_min_size(Some(LogicalSize::new(
+            MINI_FLOATER_SIZE,
+            MINI_FLOATER_SIZE,
+        )))
+        .map_err(|e| e.to_string())?;
+    overlay
+        .set_size(LogicalSize::new(MINI_FLOATER_SIZE, MINI_FLOATER_SIZE))
+        .map_err(|e| e.to_string())?;
+    overlay
+        .set_position(LogicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+    apply_overlay_transparency(overlay);
+    set_mini_circular_clip(overlay, true);
+    set_macos_mini_floater_elevated(overlay, true)?;
+    overlay.show().map_err(|e| e.to_string())?;
+    set_mini_circular_clip(overlay, true);
+    MINI_MODE_ACTIVE.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+#[cfg(all(not(target_os = "macos"), not(windows)))]
 fn enter_mini(
     app: &AppHandle,
     overlay: &WebviewWindow,
-    state: &mut MiniModeState,
+    _state: &mut MiniModeState,
 ) -> Result<(), String> {
     use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
     let mini = mini_window(app)?;
     overlay.set_fullscreen(false).map_err(|e| e.to_string())?;
-    let scale = overlay.scale_factor().map_err(|e| e.to_string())? as f32;
-    let pos = overlay.outer_position().map_err(|e| e.to_string())?;
-    let size = overlay.outer_size().map_err(|e| e.to_string())?;
-    let x = pos.x as f32 / scale + (size.width as f32 / scale - 52.0) / 2.0;
-    let y = pos.y as f32 / scale + (size.height as f32 / scale - 52.0) / 2.0;
-    mini.set_position(LogicalPosition::new(x.max(0.0), y.max(0.0)))
+    let (x, y) = mini_floater_position(overlay)?;
+    mini.set_position(LogicalPosition::new(x, y))
         .map_err(|e| e.to_string())?;
     apply_overlay_transparency(&mini);
     set_mini_circular_clip(&mini, true);
     set_macos_mini_floater_elevated(&mini, true)?;
     overlay.hide().map_err(|e| e.to_string())?;
     mini.show().map_err(|e| e.to_string())?;
+    set_mini_circular_clip(&mini, true);
     MINI_MODE_ACTIVE.store(true, Ordering::Relaxed);
     Ok(())
 }
@@ -155,7 +222,18 @@ fn exit_mini(overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), Strin
     restore_overlay(overlay, saved)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn exit_mini(_app: &AppHandle, overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
+    use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
+
+    MINI_MODE_ACTIVE.store(false, Ordering::Relaxed);
+    disable_overlay_mini_ui(overlay)?;
+    set_macos_mini_floater_elevated(overlay, false)?;
+    set_mini_circular_clip(overlay, false);
+    restore_overlay(overlay, saved)
+}
+
+#[cfg(all(not(target_os = "macos"), not(windows)))]
 fn exit_mini(app: &AppHandle, overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
     use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
     let mini = mini_window(app)?;
@@ -240,13 +318,20 @@ pub fn exit_mini_mode_without_restore(
     MINI_MODE_ACTIVE.store(false, Ordering::Relaxed);
     #[cfg(target_os = "macos")]
     hide_mini_panel()?;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(not(target_os = "macos"), not(windows)))]
     {
         use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
         let mini = mini_window(app)?;
         set_macos_mini_floater_elevated(&mini, false)?;
         set_mini_circular_clip(&mini, false);
         mini.hide().map_err(|e| e.to_string())?;
+    }
+    #[cfg(windows)]
+    {
+        use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
+        set_macos_mini_floater_elevated(&overlay, false)?;
+        set_mini_circular_clip(&overlay, false);
+        disable_overlay_mini_ui(&overlay)?;
     }
     apply_overlay_transparency(&overlay);
     overlay.set_resizable(true).map_err(|e| e.to_string())?;
@@ -272,7 +357,13 @@ pub fn refresh_mini_floater(app: &AppHandle) -> Result<(), String> {
         let _ = app;
         return refresh_mini_panel();
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        use crate::macos_window::set_macos_mini_floater_elevated;
+        let overlay = overlay_window(app)?;
+        return set_macos_mini_floater_elevated(&overlay, true);
+    }
+    #[cfg(all(not(target_os = "macos"), not(windows)))]
     {
         use crate::macos_window::set_macos_mini_floater_elevated;
         let mini = mini_window(app)?;

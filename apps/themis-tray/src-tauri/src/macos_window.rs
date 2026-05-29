@@ -196,7 +196,10 @@ pub fn apply_overlay_transparency(window: &WebviewWindow) {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn apply_overlay_transparency(_window: &WebviewWindow) {}
+pub fn apply_overlay_transparency(window: &WebviewWindow) {
+    #[cfg(windows)]
+    crate::windows_window::apply_overlay_transparency(window);
+}
 
 #[cfg(target_os = "macos")]
 pub fn set_mini_circular_clip(window: &WebviewWindow, active: bool) {
@@ -238,4 +241,7 @@ pub fn set_mini_circular_clip(window: &WebviewWindow, active: bool) {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn set_mini_circular_clip(_window: &WebviewWindow, _active: bool) {}
+pub fn set_mini_circular_clip(window: &WebviewWindow, active: bool) {
+    #[cfg(windows)]
+    crate::windows_window::set_mini_circular_clip(window, active);
+}

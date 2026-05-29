@@ -5,6 +5,8 @@ mod mini_mode;
 mod overlay_ui;
 mod window_presets;
 mod window_wake;
+#[cfg(windows)]
+mod windows_window;
 
 use macos_window::{apply_overlay_transparency, set_mini_circular_clip};
 #[cfg(target_os = "macos")]
@@ -457,9 +459,17 @@ fn wake_overlay(app: &AppHandle, expand_to_current_screen: bool) -> Result<(), S
             return Ok(());
         }
         #[cfg(not(target_os = "macos"))]
-        if let Some(mini) = app.get_webview_window("mini") {
-            mini.show().map_err(|e| e.to_string())?;
-            let _ = mini.set_focus();
+        {
+            #[cfg(windows)]
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                overlay.show().map_err(|e| e.to_string())?;
+                let _ = overlay.set_focus();
+            }
+            #[cfg(all(not(target_os = "macos"), not(windows)))]
+            if let Some(mini) = app.get_webview_window("mini") {
+                mini.show().map_err(|e| e.to_string())?;
+                let _ = mini.set_focus();
+            }
         }
         let _ = app.emit("overlay-visibility", true);
         if expand_to_current_screen {
@@ -494,8 +504,18 @@ fn set_overlay_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
             let _ = hide_mini_panel();
         }
         #[cfg(not(target_os = "macos"))]
-        if let Some(mini) = app.get_webview_window("mini") {
-            mini.hide().map_err(|e| e.to_string())?;
+        {
+            #[cfg(windows)]
+            {
+                let w = app
+                    .get_webview_window("overlay")
+                    .ok_or_else(|| "overlay window missing".to_string())?;
+                w.hide().map_err(|e| e.to_string())?;
+            }
+            #[cfg(all(not(target_os = "macos"), not(windows)))]
+            if let Some(mini) = app.get_webview_window("mini") {
+                mini.hide().map_err(|e| e.to_string())?;
+            }
         }
     }
     let w = app
@@ -527,8 +547,18 @@ fn is_overlay_visible(app: AppHandle) -> Result<bool, String> {
         #[cfg(target_os = "macos")]
         return Ok(is_mini_panel_visible());
         #[cfg(not(target_os = "macos"))]
-        if let Some(mini) = app.get_webview_window("mini") {
-            return mini.is_visible().map_err(|e| e.to_string());
+        {
+            #[cfg(windows)]
+            {
+                let w = app
+                    .get_webview_window("overlay")
+                    .ok_or_else(|| "overlay window missing".to_string())?;
+                return w.is_visible().map_err(|e| e.to_string());
+            }
+            #[cfg(all(not(target_os = "macos"), not(windows)))]
+            if let Some(mini) = app.get_webview_window("mini") {
+                return mini.is_visible().map_err(|e| e.to_string());
+            }
         }
     }
     let w = app
@@ -1097,7 +1127,7 @@ pub fn run() {
                 set_accessory_activation_policy();
                 install_panel_app(app.handle().clone());
             }
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(all(not(target_os = "macos"), not(windows)))]
             if let Some(mini) = app.get_webview_window("mini") {
                 apply_overlay_transparency(&mini);
                 set_mini_circular_clip(&mini, true);
