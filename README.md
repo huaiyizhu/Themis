@@ -157,10 +157,13 @@ npm run tauri dev   # 若缺 icon.icns：./scripts/themis.sh icons
 | 操作 | Windows | macOS |
 |------|---------|-------|
 | 开始/停止采集 | `Ctrl+Shift+T` | `Cmd+Shift+T` |
+| **唤醒/置顶浮层（居中⅓屏）** | `Ctrl+Shift+O` | `Cmd+Shift+O` |
 | 延迟诊断窗口 | `Ctrl+Shift+D` | `Cmd+Shift+D` |
 | 浮层透明度 − / + | `Ctrl+Shift+[` / `]` | `Cmd+Shift+[` / `]` |
 | 切换浮层风格 | `Ctrl+Shift+S` | `Cmd+Shift+S` |
 | 背景自适应对比 | `Ctrl+Shift+A` | `Cmd+Shift+A` |
+| 显示/隐藏字幕区 | `Ctrl+Shift+H` | `Cmd+Shift+H` |
+| 迷你浮标模式 | `Ctrl+Shift+M` | `Cmd+Shift+M` |
 | 退出托盘应用 | `Ctrl+Shift+Q` | `Cmd+Shift+Q` |
 | 显示/隐藏浮层 | 左键托盘图标 | 同左 |
 | 移动浮层 | 拖动标题栏 | 同左 |

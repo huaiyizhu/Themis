@@ -116,3 +116,30 @@ pub fn toggle_mini_mode(app: &AppHandle, state: &Arc<Mutex<MiniModeState>>) -> R
 pub fn is_mini_mode(state: &Arc<Mutex<MiniModeState>>) -> bool {
     state.lock().map(|g| g.active).unwrap_or(false)
 }
+
+/// Leave mini floater without restoring the geometry saved before mini mode.
+pub fn exit_mini_mode_without_restore(
+    app: &AppHandle,
+    state: &Arc<Mutex<MiniModeState>>,
+) -> Result<(), String> {
+    let mut guard = state
+        .lock()
+        .map_err(|_| "mini mode lock poisoned".to_string())?;
+    if !guard.active {
+        return Ok(());
+    }
+    let window = overlay_window(app)?;
+    set_mini_circular_clip(&window, false);
+    apply_overlay_transparency(&window);
+    window.set_resizable(true).map_err(|e| e.to_string())?;
+    window
+        .set_max_size(None::<LogicalSize<f32>>)
+        .map_err(|e| e.to_string())?;
+    window
+        .set_min_size(Some(LogicalSize::new(280.0, 160.0)))
+        .map_err(|e| e.to_string())?;
+    guard.active = false;
+    guard.saved = None;
+    let _ = app.emit("mini-mode-changed", false);
+    Ok(())
+}

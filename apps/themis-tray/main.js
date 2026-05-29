@@ -458,6 +458,23 @@ listen("toggle-transcript-panel", () => {
   toggleTranscriptPanel();
 });
 
+listen("overlay-woken", () => {
+  const pulseTarget =
+    document.body.classList.contains("is-mini-mode") ? miniFloaterEl : overlayEl;
+  if (!pulseTarget) return;
+  pulseTarget.classList.remove("overlay-wake-pulse");
+  void pulseTarget.offsetWidth;
+  pulseTarget.classList.add("overlay-wake-pulse");
+  window.setTimeout(() => pulseTarget.classList.remove("overlay-wake-pulse"), 1300);
+});
+
+listen("window-preset-applied", (event) => {
+  const presetId = event.payload;
+  if (!presetId) return;
+  localStorage.setItem(WINDOW_PRESET_STORAGE_KEY, presetId);
+  markActiveSizePreset(presetId);
+});
+
 function renderSessionSummary(summary) {
   const text = String(summary ?? "").trim();
   if (!text) {

@@ -5,7 +5,7 @@
 - **System audio output**: WASAPI **loopback** on the default **playback (render)** endpoint — the digital mix of all apps Windows sends to that output (headphones, HDMI, USB audio, virtual devices). Not the microphone; not tied to physical speakers or volume sliders. Optional `THEMIS_AUDIO_OUTPUT_DEVICE` in `.env` (friendly name substring or endpoint ID) if you route audio through a specific virtual device. Falls back to a stub tone when loopback is unavailable (dev/CI).
 - **Voice/video calls (dual capture)**: When `THEMIS_AUDIO_CAPTURE_MODE=auto` and a known call app is running, Themis captures **output loopback + microphone** mixed for STT. Force with `call` or `dual`. Optional `THEMIS_AUDIO_INPUT_DEVICE` for mic selection.
 - **Service**: Install with `themis-cli service install` (Administrator). See [packaging/windows/themis-service.md](../packaging/windows/themis-service.md).
-- **Hotkey**: `Ctrl+Shift+T` toggles capture.
+- **Hotkey**: `Ctrl+Shift+O` wakes the overlay to the front and applies **居中⅓屏** layout; `Ctrl+Shift+T` toggles capture.
 - **Overlay adaptive contrast**: samples desktop pixels behind the overlay (`Ctrl+Shift+A`).
 
 ## macOS
@@ -40,7 +40,7 @@
 - Scripts: `./scripts/themis.sh` (or `./dev.sh`, `./tray.sh`). Logs: `~/Library/Logs/Themis`.
 - First Tauri build needs `icon.icns`: `./scripts/themis.sh icons` (or run `tray`, which auto-generates).
 - `THEMIS_AUDIO_OUTPUT_DEVICE` is **Windows-only** (WASAPI endpoint hint).
-- **Hotkey**: `Cmd+Shift+T` toggles capture.
+- **Hotkey**: `Cmd+Shift+O` wakes the overlay to the front and applies **居中⅓屏** layout; `Cmd+Shift+T` toggles capture.
 - **Overlay adaptive contrast**: not available (no desktop sampling API wired yet); style presets still work (`Cmd+Shift+S`).
 
 ### LaunchAgent

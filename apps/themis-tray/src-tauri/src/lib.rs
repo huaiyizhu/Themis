@@ -2,11 +2,14 @@ mod macos_window;
 mod mini_mode;
 mod overlay_ui;
 mod window_presets;
+mod window_wake;
 
 use macos_window::apply_overlay_transparency;
-use mini_mode::{is_mini_mode, toggle_mini_mode, MiniModeState};
+use mini_mode::{exit_mini_mode_without_restore, is_mini_mode, toggle_mini_mode, MiniModeState};
 use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
-use window_presets::{apply_preset, list_presets, WindowPresetDto};
+use window_presets::{
+    apply_center_mode, apply_preset, list_presets, WindowPresetDto, CENTER_MODE_PRESET_ID,
+};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{
@@ -344,18 +347,41 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
     })
 }
 
-fn set_overlay_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
+fn wake_overlay(app: &AppHandle, center: bool) -> Result<(), String> {
+    if center {
+        let state = app.state::<AppState>();
+        exit_mini_mode_without_restore(app, &state.mini_mode)?;
+        apply_center_mode(app)?;
+    }
+
     let w = app
         .get_webview_window("overlay")
         .ok_or_else(|| "overlay window missing".to_string())?;
-    if visible {
-        w.show().map_err(|e| e.to_string())?;
-        w.set_focus().map_err(|e| e.to_string())?;
-    } else {
-        w.hide().map_err(|e| e.to_string())?;
+    window_wake::wake_overlay_window(&w)?;
+    let _ = app.emit("overlay-visibility", true);
+    if center {
+        let _ = app.emit("window-preset-applied", CENTER_MODE_PRESET_ID);
     }
-    let _ = app.emit("overlay-visibility", visible);
-    Ok(visible)
+    let _ = app.emit("overlay-woken", ());
+    Ok(())
+}
+
+fn set_overlay_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
+    if visible {
+        wake_overlay(app, false)?;
+        return Ok(true);
+    }
+    let w = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window missing".to_string())?;
+    w.hide().map_err(|e| e.to_string())?;
+    let _ = app.emit("overlay-visibility", false);
+    Ok(false)
+}
+
+#[tauri::command]
+fn wake_overlay_window(app: AppHandle) -> Result<(), String> {
+    wake_overlay(&app, true)
 }
 
 #[tauri::command]
@@ -737,6 +763,11 @@ pub fn run() {
     } else {
         "Ctrl+Shift+KeyH"
     };
+    let hotkey_wake = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyO"
+    } else {
+        "Ctrl+Shift+KeyO"
+    };
     let hotkey_mini = if cfg!(target_os = "macos") {
         "Command+Shift+KeyM"
     } else {
@@ -776,6 +807,9 @@ pub fn run() {
     let sc_overlay_visibility: tauri_plugin_global_shortcut::Shortcut = hotkey_overlay_visibility
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_overlay_visibility}: {e}"));
+    let sc_wake: tauri_plugin_global_shortcut::Shortcut = hotkey_wake
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_wake}: {e}"));
     let sc_mini: tauri_plugin_global_shortcut::Shortcut = hotkey_mini
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_mini}: {e}"));
@@ -797,6 +831,7 @@ pub fn run() {
                     hotkey_font_up,
                     hotkey_font_reset,
                     hotkey_overlay_visibility,
+                    hotkey_wake,
                     hotkey_mini,
                 ])
                 .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
@@ -839,6 +874,8 @@ pub fn run() {
                             let _ = apply_overlay_ui(app, &s);
                         } else if shortcut == &sc_overlay_visibility {
                             let _ = app.emit("toggle-transcript-panel", ());
+                        } else if shortcut == &sc_wake {
+                            let _ = wake_overlay(app, true);
                         } else if shortcut == &sc_mini {
                             let state = app.state::<AppState>();
                             let _ = toggle_mini_mode(app, &state.mini_mode);
@@ -857,7 +894,17 @@ pub fn run() {
             let settings = ui_state.get();
             let _ = apply_overlay_ui(&app.handle(), &settings);
             spawn_adaptive_poll(app.handle().clone(), Arc::clone(&ui_state));
-            let show_i = MenuItem::with_id(app, "show", "Show overlay", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(
+                app,
+                "show",
+                if cfg!(target_os = "macos") {
+                    "Show overlay (Cmd+Shift+O)"
+                } else {
+                    "Show overlay (Ctrl+Shift+O)"
+                },
+                true,
+                None::<&str>,
+            )?;
             let hide_i = MenuItem::with_id(
                 app,
                 "hide_overlay",
@@ -891,7 +938,7 @@ pub fn run() {
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
-                        let _ = set_overlay_visible(app, true);
+                        let _ = wake_overlay(app, true);
                     }
                     "hide_overlay" => {
                         let _ = set_overlay_visible(app, false);
@@ -957,6 +1004,7 @@ pub fn run() {
             expand_insight,
             toggle_overlay_visibility,
             is_overlay_visible,
+            wake_overlay_window,
             hide_overlay_window,
             quit_app
         ])

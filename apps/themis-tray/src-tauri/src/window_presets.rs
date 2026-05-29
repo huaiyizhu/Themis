@@ -59,6 +59,8 @@ const PRESETS: &[WindowPreset] = &[
 const CENTER_THIRD_ID: &str = "center-third";
 const CENTER_QUARTER_LEGACY_ID: &str = "center-quarter";
 
+pub const CENTER_MODE_PRESET_ID: &str = CENTER_THIRD_ID;
+
 pub fn list_presets() -> Vec<WindowPresetDto> {
     let mut out: Vec<WindowPresetDto> = PRESETS
         .iter()
@@ -174,4 +176,9 @@ pub fn apply_preset(app: &AppHandle, preset_id: &str) -> Result<String, String> 
         .map_err(|e| e.to_string())?;
 
     Ok(preset.id.to_string())
+}
+
+pub fn apply_center_mode(app: &AppHandle) -> Result<(), String> {
+    let window = overlay_window(app)?;
+    apply_center_third(&window)
 }
