@@ -31,24 +31,26 @@ body.is-mini-mode #overlay {
 }
 
 .mini-floater {
-  align-items: center;
-  background: linear-gradient(145deg, rgba(42, 96, 150, 0.96), rgba(18, 44, 82, 0.98));
-  border: 1.5px solid rgba(155, 220, 255, 0.55);
+  background: transparent;
+  border: none;
   border-radius: 50%;
   box-shadow: none;
-  clip-path: circle(50% at 50% 50%);
+  clip-path: none;
   cursor: grab;
-  display: flex;
+  display: block;
   flex-shrink: 0;
   height: 46px;
-  justify-content: center;
   outline: none;
-  overflow: hidden;
+  padding: 0;
+  position: relative;
   touch-action: none;
   user-select: none;
   width: 46px;
   -webkit-app-region: no-drag;
-  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.38));
+  filter: drop-shadow(0 4px 12px rgba(8, 20, 36, 0.42));
+  transition:
+    filter 0.18s ease,
+    transform 0.18s ease;
 }
 
 .mini-floater.hidden {
@@ -60,20 +62,23 @@ body:not(.is-mini-mode) .mini-floater {
 }
 
 .mini-floater:hover {
-  border-color: rgba(190, 235, 255, 0.85);
-  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.42))
-    drop-shadow(0 0 10px rgba(120, 190, 255, 0.28));
+  filter: drop-shadow(0 6px 18px rgba(8, 20, 36, 0.48))
+    drop-shadow(0 0 14px rgba(90, 170, 240, 0.32));
+  transform: scale(1.05);
 }
 
 .mini-floater:active {
   cursor: grabbing;
+  transform: scale(0.97);
 }
 
-.mini-floater-icon {
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
-  font-size: 24px;
-  line-height: 1;
+.mini-floater-mark {
+  display: block;
+  height: 46px;
   pointer-events: none;
+  user-select: none;
+  width: 46px;
+  -webkit-user-drag: none;
 }
 
 .mini-floater.overlay-wake-pulse {
@@ -84,9 +89,11 @@ body:not(.is-mini-mode) .mini-floater {
   0% {
     filter: drop-shadow(0 0 0 3px rgba(120, 200, 255, 0.95))
       drop-shadow(0 0 24px rgba(80, 160, 255, 0.65));
+    transform: scale(1.08);
   }
   100% {
-    filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.38));
+    filter: drop-shadow(0 4px 12px rgba(8, 20, 36, 0.42));
+    transform: scale(1);
   }
 }
 
