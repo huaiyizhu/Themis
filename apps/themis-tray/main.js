@@ -367,9 +367,11 @@ async function initSizePresets() {
       ? "全屏"
       : p.id === "center-third"
         ? "宽 1/3 屏 × 工作区全高，水平居中"
-        : `${p.width}×${p.height}`;
+        : p.id === "current-screen"
+          ? "铺满当前显示器工作区（保留菜单栏/程序坞区域）"
+          : `${p.width}×${p.height}`;
     btn.textContent =
-      p.fullscreen || p.id === "center-third"
+      p.fullscreen || p.id === "center-third" || p.id === "current-screen"
         ? p.label
         : `${p.label} ${p.width}×${p.height}`;
     btn.addEventListener("click", (e) => {

@@ -58,8 +58,10 @@ const PRESETS: &[WindowPreset] = &[
 
 const CENTER_THIRD_ID: &str = "center-third";
 const CENTER_QUARTER_LEGACY_ID: &str = "center-quarter";
+const CURRENT_SCREEN_ID: &str = "current-screen";
 
-pub const CENTER_MODE_PRESET_ID: &str = CENTER_THIRD_ID;
+/// Layout applied when the wake shortcut (Cmd/Ctrl+Shift+O) is pressed.
+pub const WAKE_LAYOUT_PRESET_ID: &str = CENTER_THIRD_ID;
 
 pub fn list_presets() -> Vec<WindowPresetDto> {
     let mut out: Vec<WindowPresetDto> = PRESETS
@@ -75,6 +77,13 @@ pub fn list_presets() -> Vec<WindowPresetDto> {
     out.push(WindowPresetDto {
         id: CENTER_THIRD_ID.into(),
         label: "居中⅓屏".into(),
+        width: 0,
+        height: 0,
+        fullscreen: false,
+    });
+    out.push(WindowPresetDto {
+        id: CURRENT_SCREEN_ID.into(),
+        label: "当前屏全屏".into(),
         width: 0,
         height: 0,
         fullscreen: false,
@@ -107,13 +116,63 @@ fn monitor_for_window(window: &WebviewWindow) -> Result<tauri::Monitor, String> 
         .ok_or_else(|| "no monitor detected".to_string())
 }
 
-fn apply_center_third(window: &WebviewWindow) -> Result<(), String> {
+fn apply_current_screen(window: &WebviewWindow) -> Result<(), String> {
     window.set_fullscreen(false).map_err(|e| e.to_string())?;
     window
         .set_max_size(None::<LogicalSize<f32>>)
         .map_err(|e| e.to_string())?;
 
     let monitor = monitor_for_window(window)?;
+    let scale = monitor.scale_factor();
+    let work = monitor.work_area();
+
+    let width = work.size.width as f64 / scale;
+    let height = work.size.height as f64 / scale;
+    let x = work.position.x as f64 / scale;
+    let y = work.position.y as f64 / scale;
+
+    window
+        .set_min_size(Some(LogicalSize::new(280.0, 160.0)))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_resizable(true)
+        .map_err(|e| e.to_string())?;
+    window
+        .set_size(LogicalSize::new(width, height))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_position(LogicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn monitor_under_cursor(app: &AppHandle) -> Result<tauri::Monitor, String> {
+    let cursor = app.cursor_position().map_err(|e| e.to_string())?;
+    for monitor in app.available_monitors().map_err(|e| e.to_string())? {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let left = pos.x as f64;
+        let top = pos.y as f64;
+        let right = left + size.width as f64;
+        let bottom = top + size.height as f64;
+        if cursor.x >= left && cursor.x < right && cursor.y >= top && cursor.y < bottom {
+            return Ok(monitor);
+        }
+    }
+    app.primary_monitor()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "no monitor detected".to_string())
+}
+
+fn apply_center_third_on_monitor(
+    window: &WebviewWindow,
+    monitor: &tauri::Monitor,
+) -> Result<(), String> {
+    window.set_fullscreen(false).map_err(|e| e.to_string())?;
+    window
+        .set_max_size(None::<LogicalSize<f32>>)
+        .map_err(|e| e.to_string())?;
+
     let scale = monitor.scale_factor();
     let work = monitor.work_area();
 
@@ -131,12 +190,19 @@ fn apply_center_third(window: &WebviewWindow) -> Result<(), String> {
         .set_min_size(Some(LogicalSize::new(280.0, 160.0)))
         .map_err(|e| e.to_string())?;
     window
+        .set_resizable(true)
+        .map_err(|e| e.to_string())?;
+    window
         .set_size(LogicalSize::new(width, height))
         .map_err(|e| e.to_string())?;
     window
         .set_position(LogicalPosition::new(x, y))
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn apply_center_third(window: &WebviewWindow) -> Result<(), String> {
+    apply_center_third_on_monitor(window, &monitor_for_window(window)?)
 }
 
 pub fn apply_preset(app: &AppHandle, preset_id: &str) -> Result<String, String> {
@@ -152,6 +218,11 @@ pub fn apply_preset(app: &AppHandle, preset_id: &str) -> Result<String, String> 
     if preset_id == CENTER_THIRD_ID || preset_id == CENTER_QUARTER_LEGACY_ID {
         apply_center_third(&window)?;
         return Ok(CENTER_THIRD_ID.into());
+    }
+
+    if preset_id == CURRENT_SCREEN_ID {
+        apply_current_screen(&window)?;
+        return Ok(CURRENT_SCREEN_ID.into());
     }
 
     let preset = PRESETS
@@ -178,7 +249,16 @@ pub fn apply_preset(app: &AppHandle, preset_id: &str) -> Result<String, String> 
     Ok(preset.id.to_string())
 }
 
-pub fn apply_center_mode(app: &AppHandle) -> Result<(), String> {
+pub fn apply_wake_layout(app: &AppHandle) -> Result<(), String> {
     let window = overlay_window(app)?;
-    apply_center_third(&window)
+    #[cfg(target_os = "macos")]
+    {
+        let monitor = monitor_under_cursor(app)?;
+        apply_center_third_on_monitor(&window, &monitor)?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        apply_center_third(&window)?;
+    }
+    Ok(())
 }

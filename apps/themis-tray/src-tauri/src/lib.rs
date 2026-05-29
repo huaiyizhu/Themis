@@ -8,7 +8,7 @@ use macos_window::apply_overlay_transparency;
 use mini_mode::{exit_mini_mode_without_restore, is_mini_mode, toggle_mini_mode, MiniModeState};
 use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
 use window_presets::{
-    apply_center_mode, apply_preset, list_presets, WindowPresetDto, CENTER_MODE_PRESET_ID,
+    apply_preset, apply_wake_layout, list_presets, WindowPresetDto, WAKE_LAYOUT_PRESET_ID,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -347,11 +347,11 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
     })
 }
 
-fn wake_overlay(app: &AppHandle, center: bool) -> Result<(), String> {
-    if center {
+fn wake_overlay(app: &AppHandle, expand_to_current_screen: bool) -> Result<(), String> {
+    if expand_to_current_screen {
         let state = app.state::<AppState>();
         exit_mini_mode_without_restore(app, &state.mini_mode)?;
-        apply_center_mode(app)?;
+        apply_wake_layout(app)?;
     }
 
     let w = app
@@ -359,8 +359,8 @@ fn wake_overlay(app: &AppHandle, center: bool) -> Result<(), String> {
         .ok_or_else(|| "overlay window missing".to_string())?;
     window_wake::wake_overlay_window(&w)?;
     let _ = app.emit("overlay-visibility", true);
-    if center {
-        let _ = app.emit("window-preset-applied", CENTER_MODE_PRESET_ID);
+    if expand_to_current_screen {
+        let _ = app.emit("window-preset-applied", WAKE_LAYOUT_PRESET_ID);
     }
     let _ = app.emit("overlay-woken", ());
     Ok(())
