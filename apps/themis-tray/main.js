@@ -100,7 +100,9 @@ setupWindowDrag();
 
 function applyMiniMode(active) {
   document.body.classList.toggle("is-mini-mode", active);
+  document.documentElement.classList.toggle("is-mini-mode", active);
   document.documentElement.style.background = active ? "transparent" : "";
+  document.body.style.background = active ? "transparent" : "";
   miniFloaterEl?.classList.toggle("hidden", !active);
   if (active) {
     requestAnimationFrame(() => miniFloaterEl?.focus());

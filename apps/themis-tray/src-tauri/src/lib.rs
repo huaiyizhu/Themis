@@ -1,7 +1,9 @@
+mod macos_window;
 mod mini_mode;
 mod overlay_ui;
 mod window_presets;
 
+use macos_window::apply_overlay_transparency;
 use mini_mode::{is_mini_mode, toggle_mini_mode, MiniModeState};
 use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
 use window_presets::{apply_preset, list_presets, WindowPresetDto};
@@ -876,8 +878,7 @@ pub fn run() {
 
             if let Some(w) = app.get_webview_window("overlay") {
                 let _ = w.set_always_on_top(true);
-                let _ = w.set_shadow(false);
-                let _ = w.set_background_color(Some(tauri::window::Color(0, 0, 0, 0)));
+                apply_overlay_transparency(&w);
             }
 
             let icon = app

@@ -1,3 +1,4 @@
+use crate::macos_window::{apply_overlay_transparency, set_mini_circular_clip};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, WebviewWindow};
 
@@ -49,9 +50,7 @@ fn read_geometry(window: &WebviewWindow) -> Result<SavedGeometry, String> {
 
 fn enter_mini(window: &WebviewWindow) -> Result<(), String> {
     window.set_fullscreen(false).map_err(|e| e.to_string())?;
-    window
-        .set_background_color(Some(tauri::window::Color(0, 0, 0, 0)))
-        .map_err(|e| e.to_string())?;
+    apply_overlay_transparency(window);
     let mini = LogicalSize::new(MINI_LOGICAL, MINI_LOGICAL);
     window
         .set_min_size(Some(mini))
@@ -61,10 +60,13 @@ fn enter_mini(window: &WebviewWindow) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     window.set_resizable(false).map_err(|e| e.to_string())?;
     window.set_size(mini).map_err(|e| e.to_string())?;
+    set_mini_circular_clip(window, true);
     Ok(())
 }
 
 fn exit_mini(window: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
+    set_mini_circular_clip(window, false);
+    apply_overlay_transparency(window);
     window.set_resizable(true).map_err(|e| e.to_string())?;
     window
         .set_max_size(None::<LogicalSize<f32>>)

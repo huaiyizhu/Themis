@@ -12,12 +12,18 @@ body {
   overflow: hidden;
 }
 
+html.is-mini-mode {
+  background: transparent !important;
+}
+
 body.is-mini-mode {
   align-items: center;
-  background: rgba(0, 0, 0, 0) !important;
+  background: transparent !important;
   display: flex;
+  height: 100%;
   justify-content: center;
   overflow: hidden;
+  width: 100%;
 }
 
 body.is-mini-mode #overlay {
