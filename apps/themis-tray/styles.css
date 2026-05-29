@@ -76,6 +76,20 @@ body:not(.is-mini-mode) .mini-floater {
   pointer-events: none;
 }
 
+.mini-floater.overlay-wake-pulse {
+  animation: mini-wake-pulse 1.2s ease-out;
+}
+
+@keyframes mini-wake-pulse {
+  0% {
+    filter: drop-shadow(0 0 0 3px rgba(120, 200, 255, 0.95))
+      drop-shadow(0 0 24px rgba(80, 160, 255, 0.65));
+  }
+  100% {
+    filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.38));
+  }
+}
+
 .header-btn.mini-toggle:hover {
   background: rgba(140, 190, 255, 0.22);
   border-color: rgba(140, 190, 255, 0.45);
@@ -110,6 +124,21 @@ body:not(.is-mini-mode) .mini-floater {
     background 0.2s ease,
     color 0.2s ease,
     box-shadow 0.2s ease;
+}
+
+#overlay.overlay-wake-pulse {
+  animation: overlay-wake-pulse 1.2s ease-out;
+}
+
+@keyframes overlay-wake-pulse {
+  0% {
+    box-shadow:
+      0 0 0 3px rgba(120, 200, 255, 0.95),
+      0 0 28px rgba(80, 160, 255, 0.55);
+  }
+  100% {
+    box-shadow: none;
+  }
 }
 
 /* Resize handles live inside the panel, below the drag header in z-order */
