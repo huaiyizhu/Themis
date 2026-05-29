@@ -1,11 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { applyConfigStatusEl } from "./config-status.js";
+import {
+  applyCaptureStatusEl,
+  applyCaptureStatusPending,
+} from "./capture-status.js";
 
 const overlayEl = document.getElementById("overlay");
 const dragHandle = document.getElementById("drag-handle");
 const themeBadgeEl = document.getElementById("theme-badge");
 const statusEl = document.getElementById("status");
+const configStatusEl = document.getElementById("config-status");
 const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
 const scrollLatestBtn = document.getElementById("scroll-latest");
@@ -99,13 +105,13 @@ function setupWindowDrag() {
 setupWindowDrag();
 
 function applyMiniMode(active) {
-  document.body.classList.toggle("is-mini-mode", active);
-  document.documentElement.classList.toggle("is-mini-mode", active);
-  document.documentElement.style.background = active ? "transparent" : "";
-  document.body.style.background = active ? "transparent" : "";
-  miniFloaterEl?.classList.toggle("hidden", !active);
-  if (active) {
-    requestAnimationFrame(() => miniFloaterEl?.focus());
+  // Overlay is hidden while mini floater runs in its own window.
+  document.body.classList.toggle("is-mini-mode", false);
+  document.documentElement.classList.toggle("is-mini-mode", false);
+  miniFloaterEl?.classList.add("hidden");
+  if (!active) {
+    document.documentElement.style.background = "";
+    document.body.style.background = "";
   }
 }
 
@@ -575,16 +581,40 @@ function setPlaceholder(text) {
   requestAnimationFrame(() => scrollToLatest(false));
 }
 
+async function refreshConfigStatus(configFromStatus) {
+  try {
+    const config =
+      configFromStatus ?? (await invoke("get_config_crosscheck"));
+    applyConfigStatusEl(configStatusEl, config);
+  } catch {
+    applyConfigStatusEl(configStatusEl, null);
+  }
+}
+
+/** @type {"starting" | "stopping" | null} */
+let capturePending = null;
+
+function beginCapturePending(action) {
+  if (capturePending === action) return;
+  capturePending = action;
+  applyCaptureStatusPending(statusEl, action);
+  updateCaptureButtonPending(action);
+  if (action === "starting") {
+    setPlaceholder("Starting capture…");
+  }
+}
+
+function endCapturePending() {
+  capturePending = null;
+  toggleCaptureBtn?.classList.remove("is-busy");
+}
+
 async function refreshStatus() {
+  if (capturePending) return;
   try {
     const s = await invoke("get_status");
-    const short =
-      s.state === "capturing"
-        ? `● ${s.state} · ${s.capture_mode || "?"} · peak ${s.audio_peak ?? 0} · frames ${s.audio_frames ?? 0}`
-        : `● ${s.state}`;
-    statusEl.textContent = short;
-    const detail = s.capture_detail ? `${s.capture_detail}\n` : "";
-    statusEl.title = `${detail}${s.message || ""}`.trim();
+    applyCaptureStatusEl(statusEl, s);
+    applyConfigStatusEl(configStatusEl, s.config);
     updateCaptureButton(s.state === "capturing");
 
     if (s.state === "idle") {
@@ -604,19 +634,38 @@ async function refreshStatus() {
       setPlaceholder(hint);
     }
   } catch (e) {
-    statusEl.textContent = `Service offline`;
-    statusEl.title = String(e);
+    applyCaptureStatusEl(statusEl, { offline: true, error: String(e) });
+    await refreshConfigStatus();
   }
 }
 
 function updateCaptureButton(capturing) {
   if (!toggleCaptureBtn) return;
+  toggleCaptureBtn.classList.remove("is-busy");
+  toggleCaptureBtn.disabled = false;
   toggleCaptureBtn.classList.toggle("is-capturing", capturing);
   toggleCaptureBtn.textContent = capturing ? "停止" : "捕捉";
   toggleCaptureBtn.title = capturing
     ? "停止系统音频捕捉 (Ctrl+Shift+T)"
     : "开始系统音频捕捉 (Ctrl+Shift+T)";
   toggleCaptureBtn.setAttribute("aria-pressed", capturing ? "true" : "false");
+}
+
+/** @param {"starting" | "stopping"} action */
+function updateCaptureButtonPending(action) {
+  if (!toggleCaptureBtn) return;
+  toggleCaptureBtn.classList.add("is-busy");
+  toggleCaptureBtn.disabled = true;
+  toggleCaptureBtn.classList.toggle("is-capturing", action === "stopping");
+  toggleCaptureBtn.textContent = action === "stopping" ? "停止中…" : "启动中…";
+  toggleCaptureBtn.title =
+    action === "stopping"
+      ? "正在停止捕捉…"
+      : "正在启动捕捉…";
+  toggleCaptureBtn.setAttribute(
+    "aria-pressed",
+    action === "stopping" ? "true" : "false",
+  );
 }
 
 function updateDiagnoseButton(open) {
@@ -1039,9 +1088,11 @@ listen("transcript", (event) => {
 });
 
 listen("capture-stopped", () => {
+  endCapturePending();
   updateCaptureButton(false);
   partialText = "";
   renderTranscript();
+  refreshStatus();
 });
 
 function clearOverlaySession(placeholderText = "已清空，继续监听中…") {
@@ -1077,15 +1128,44 @@ listen("session-cleared", () => {
 });
 
 listen("capture-started", () => {
+  endCapturePending();
   updateCaptureButton(true);
   clearOverlaySession("Capture started — transcript builds below…");
+  refreshStatus();
+});
+
+listen("capture-toggle-pending", (event) => {
+  const action = event.payload === "stopping" ? "stopping" : "starting";
+  beginCapturePending(action);
+});
+
+listen("capture-toggle-failed", (event) => {
+  const wasCapturing = capturePending === "stopping";
+  endCapturePending();
+  applyCaptureStatusEl(statusEl, {
+    state: wasCapturing ? "capturing" : "idle",
+    message: String(event.payload ?? "toggle failed"),
+  });
+  updateCaptureButton(wasCapturing);
+  statusEl.title = String(event.payload ?? "");
 });
 
 toggleCaptureBtn?.addEventListener("click", async () => {
+  const action =
+    toggleCaptureBtn.getAttribute("aria-pressed") === "true"
+      ? "stopping"
+      : "starting";
+  beginCapturePending(action);
   try {
-    const capturing = await invoke("toggle_capture");
-    updateCaptureButton(Boolean(capturing));
+    await invoke("toggle_capture");
   } catch (e) {
+    const wasCapturing = action === "stopping";
+    endCapturePending();
+    applyCaptureStatusEl(statusEl, {
+      state: wasCapturing ? "capturing" : "idle",
+      message: String(e),
+    });
+    updateCaptureButton(wasCapturing);
     statusEl.title = String(e);
   }
 });

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Themis Overlay</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/config-status.css" />
+    <link rel="stylesheet" href="/capture-status.css" />
   </head>
   <body>
     <div
@@ -38,7 +40,7 @@
           <button type="button" id="toggle-capture" class="header-btn capture-btn" title="开始系统音频捕捉 (Ctrl+Shift+T)">捕捉</button>
           <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" title="打开诊断窗口 (Ctrl+Shift+D)" aria-pressed="false">诊断</button>
           <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" title="术语/问答说明译为中文（点击切换为原文）" aria-pressed="true">中文</button>
-          <button type="button" id="toggle-mini" class="header-btn mini-toggle" title="最小化为桌面浮标 (Ctrl+Shift+M)">浮</button>
+          <button type="button" id="toggle-mini" class="header-btn mini-toggle" title="最小化为桌面浮标，全屏应用上仍可见 (Ctrl+Shift+M)">浮</button>
           <div class="size-presets" id="size-presets">
             <button type="button" id="size-toggle" class="header-btn size-toggle" title="窗口尺寸预设" aria-expanded="false" aria-haspopup="true">尺寸</button>
             <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
@@ -49,6 +51,7 @@
         </div>
       </header>
       <p id="status" class="status-line">Connecting…</p>
+      <p id="config-status" class="config-status-line" title="">配置检查…</p>
       <section id="summary-panel" class="summary-panel" aria-label="Full session summary">
         <h2 class="summary-title">全文总结</h2>
         <p id="summary-empty" class="summary-empty">采集中，摘要将约每 20 秒根据全文已知内容更新…</p>

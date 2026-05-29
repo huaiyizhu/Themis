@@ -29,6 +29,25 @@
         "visible": true
       },
       {
+        "label": "mini",
+        "title": "Themis Mini",
+        "url": "mini.html",
+        "width": 52,
+        "height": 52,
+        "minWidth": 52,
+        "minHeight": 52,
+        "maxWidth": 52,
+        "maxHeight": 52,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": false,
+        "skipTaskbar": true,
+        "visible": false
+      },
+      {
         "label": "diagnose",
         "title": "Themis Diagnostics",
         "url": "diagnose.html",
@@ -56,6 +75,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "macOS": {
+      "infoPlist": "Info.plist"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

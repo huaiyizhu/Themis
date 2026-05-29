@@ -1,11 +1,20 @@
+#[cfg(target_os = "macos")]
+mod macos_mini_panel;
 mod macos_window;
 mod mini_mode;
 mod overlay_ui;
 mod window_presets;
 mod window_wake;
 
-use macos_window::apply_overlay_transparency;
-use mini_mode::{exit_mini_mode_without_restore, is_mini_mode, toggle_mini_mode, MiniModeState};
+use macos_window::{apply_overlay_transparency, set_mini_circular_clip};
+#[cfg(target_os = "macos")]
+use macos_mini_panel::{
+    install_panel_app, is_mini_panel_visible, set_accessory_activation_policy,
+};
+use mini_mode::{
+    exit_mini_mode_without_restore, is_mini_mode, refresh_mini_floater, toggle_mini_mode,
+    MiniModeState,
+};
 use overlay_ui::{apply_overlay_ui, spawn_adaptive_poll, OverlayUiSettings, OverlayUiState};
 use window_presets::{
     apply_preset, apply_wake_layout, list_presets, WindowPresetDto, WAKE_LAYOUT_PRESET_ID,
@@ -15,9 +24,9 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, State,
+    AppHandle, Emitter, Listener, Manager, State,
 };
-use themis_core::{AnalysisPrefs, ThemisConfig};
+use themis_core::{AnalysisPrefs, ConfigStatusSnapshot, ThemisConfig};
 use themis_ipc::client::connect;
 use themis_ipc::{
     ExpandInsightRequest, GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest,
@@ -36,6 +45,61 @@ struct StatusDto {
     capture_mode: String,
     audio_sessions: u32,
     capture_detail: String,
+    config: ConfigCrossCheckDto,
+}
+
+#[derive(Clone, Serialize, PartialEq, Eq)]
+struct ConfigStatusDto {
+    stt_configured: bool,
+    stt_mode: String,
+    llm_configured: bool,
+    speech_region: String,
+    foundry_deployment: String,
+    analysis_enabled: bool,
+}
+
+#[derive(Clone, Serialize)]
+struct ConfigCrossCheckDto {
+    tray: ConfigStatusDto,
+    service: Option<ConfigStatusDto>,
+    in_sync: bool,
+}
+
+fn config_status_dto(snapshot: &ConfigStatusSnapshot) -> ConfigStatusDto {
+    ConfigStatusDto {
+        stt_configured: snapshot.stt_configured,
+        stt_mode: snapshot.stt_mode.clone(),
+        llm_configured: snapshot.llm_configured,
+        speech_region: snapshot.speech_region.clone(),
+        foundry_deployment: snapshot.foundry_deployment.clone(),
+        analysis_enabled: snapshot.analysis_enabled,
+    }
+}
+
+fn config_from_proto(proto: &themis_ipc::proto::ConfigStatus) -> ConfigStatusDto {
+    ConfigStatusDto {
+        stt_configured: proto.stt_configured,
+        stt_mode: proto.stt_mode.clone(),
+        llm_configured: proto.llm_configured,
+        speech_region: proto.speech_region.clone(),
+        foundry_deployment: proto.foundry_deployment.clone(),
+        analysis_enabled: proto.analysis_enabled,
+    }
+}
+
+fn build_config_crosscheck(
+    tray: &ThemisConfig,
+    service: Option<ConfigStatusDto>,
+) -> ConfigCrossCheckDto {
+    let tray_dto = config_status_dto(&tray.config_snapshot());
+    let in_sync = service
+        .as_ref()
+        .is_some_and(|svc| svc == &tray_dto);
+    ConfigCrossCheckDto {
+        tray: tray_dto,
+        service,
+        in_sync,
+    }
 }
 
 #[derive(Clone, Serialize, serde::Deserialize, Default)]
@@ -135,6 +199,7 @@ struct DiagnosticsDto {
     records: Vec<LatencyRecordDto>,
     analysis_summary: AnalysisSummaryDto,
     analysis_records: Vec<AnalysisInsightRecordDto>,
+    config: ConfigCrossCheckDto,
 }
 
 #[derive(Default)]
@@ -221,6 +286,20 @@ fn set_insight_localize(localize_zh: bool) -> Result<InsightSettingsDto, String>
 }
 
 #[tauri::command]
+async fn get_config_crosscheck(state: State<'_, AppState>) -> Result<ConfigCrossCheckDto, String> {
+    let service = match connect(state.config.grpc_port).await {
+        Ok(mut client) => client
+            .get_status(GetStatusRequest {})
+            .await
+            .ok()
+            .and_then(|r| r.into_inner().service_config)
+            .map(|p| config_from_proto(&p)),
+        Err(_) => None,
+    };
+    Ok(build_config_crosscheck(&state.config, service))
+}
+
+#[tauri::command]
 async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
     let mut client = connect(state.config.grpc_port)
         .await
@@ -230,6 +309,10 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
         .await
         .map_err(|e| e.to_string())?
         .into_inner();
+    let service_config = resp
+        .service_config
+        .as_ref()
+        .map(config_from_proto);
     Ok(StatusDto {
         state: resp.state,
         message: resp.message,
@@ -238,6 +321,7 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
         capture_mode: resp.capture_mode,
         audio_sessions: resp.audio_sessions,
         capture_detail: resp.capture_detail,
+        config: build_config_crosscheck(&state.config, service_config),
     })
 }
 
@@ -324,6 +408,11 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
         })
         .collect();
 
+    let service_config = resp
+        .service_config
+        .as_ref()
+        .map(config_from_proto);
+
     Ok(DiagnosticsDto {
         overlay_display,
         partial,
@@ -344,6 +433,7 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
             last_llm_status: a_sum.last_llm_status,
         },
         analysis_records,
+        config: build_config_crosscheck(&state.config, service_config),
     })
 }
 
@@ -352,6 +442,31 @@ fn wake_overlay(app: &AppHandle, expand_to_current_screen: bool) -> Result<(), S
         let state = app.state::<AppState>();
         exit_mini_mode_without_restore(app, &state.mini_mode)?;
         apply_wake_layout(app)?;
+    }
+
+    let state = app.state::<AppState>();
+    if is_mini_mode(&state.mini_mode) {
+        refresh_mini_floater(app)?;
+        #[cfg(target_os = "macos")]
+        {
+            let _ = app.emit("overlay-visibility", true);
+            if expand_to_current_screen {
+                let _ = app.emit("window-preset-applied", WAKE_LAYOUT_PRESET_ID);
+            }
+            let _ = app.emit("overlay-woken", ());
+            return Ok(());
+        }
+        #[cfg(not(target_os = "macos"))]
+        if let Some(mini) = app.get_webview_window("mini") {
+            mini.show().map_err(|e| e.to_string())?;
+            let _ = mini.set_focus();
+        }
+        let _ = app.emit("overlay-visibility", true);
+        if expand_to_current_screen {
+            let _ = app.emit("window-preset-applied", WAKE_LAYOUT_PRESET_ID);
+        }
+        let _ = app.emit("overlay-woken", ());
+        return Ok(());
     }
 
     let w = app
@@ -370,6 +485,18 @@ fn set_overlay_visible(app: &AppHandle, visible: bool) -> Result<bool, String> {
     if visible {
         wake_overlay(app, false)?;
         return Ok(true);
+    }
+    let state = app.state::<AppState>();
+    if is_mini_mode(&state.mini_mode) {
+        #[cfg(target_os = "macos")]
+        {
+            use macos_mini_panel::hide_mini_panel;
+            let _ = hide_mini_panel();
+        }
+        #[cfg(not(target_os = "macos"))]
+        if let Some(mini) = app.get_webview_window("mini") {
+            mini.hide().map_err(|e| e.to_string())?;
+        }
     }
     let w = app
         .get_webview_window("overlay")
@@ -395,6 +522,15 @@ fn toggle_overlay_visibility(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 fn is_overlay_visible(app: AppHandle) -> Result<bool, String> {
+    let state = app.state::<AppState>();
+    if is_mini_mode(&state.mini_mode) {
+        #[cfg(target_os = "macos")]
+        return Ok(is_mini_panel_visible());
+        #[cfg(not(target_os = "macos"))]
+        if let Some(mini) = app.get_webview_window("mini") {
+            return mini.is_visible().map_err(|e| e.to_string());
+        }
+    }
     let w = app
         .get_webview_window("overlay")
         .ok_or_else(|| "overlay window missing".to_string())?;
@@ -547,21 +683,34 @@ async fn auto_start_capture(app: AppHandle) {
 async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let capturing = *state.capturing.lock().await;
+    let pending = if capturing { "stopping" } else { "starting" };
+    let _ = app.emit("capture-toggle-pending", pending);
+
     let mut client = connect(state.config.grpc_port)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            let msg = e.to_string();
+            let _ = app.emit("capture-toggle-failed", &msg);
+            msg
+        })?;
 
     if capturing {
-        client
+        if let Err(e) = client
             .stop_capture(StopCaptureRequest {})
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())
+        {
+            let _ = app.emit("capture-toggle-failed", &e);
+            return Err(e);
+        }
         *state.capturing.lock().await = false;
         stop_transcript_stream(state.inner()).await;
         let _ = app.emit("capture-stopped", ());
         Ok(false)
+    } else if let Err(e) = start_capture_services(&app, state.inner()).await {
+        let _ = app.emit("capture-toggle-failed", &e);
+        Err(e)
     } else {
-        start_capture_services(&app, state.inner()).await?;
         Ok(true)
     }
 }
@@ -660,6 +809,9 @@ async fn stop_transcript_stream(state: &AppState) {
 
 fn spawn_service_if_needed(config: &ThemisConfig) {
     let port = config.grpc_port;
+    let foundry_endpoint = config.foundry_endpoint.clone();
+    let foundry_api_key = config.foundry_api_key.clone();
+    let foundry_deployment = config.foundry_deployment.clone();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         if rt.block_on(connect(port)).is_ok() {
@@ -667,7 +819,20 @@ fn spawn_service_if_needed(config: &ThemisConfig) {
         }
         if let Some(path) = find_service_binary() {
             info!(path = %path.display(), "spawning themis-service");
-            let _ = std::process::Command::new(path).spawn();
+            let mut cmd = std::process::Command::new(path);
+            if let Some(dir) = themis_core::find_dotenv_directory() {
+                cmd.current_dir(dir);
+            }
+            if let Some(v) = foundry_endpoint {
+                cmd.env("FOUNDRY_ENDPOINT", v);
+            }
+            if let Some(v) = foundry_api_key {
+                cmd.env("FOUNDRY_API_KEY", v);
+            }
+            if let Some(v) = foundry_deployment {
+                cmd.env("FOUNDRY_DEPLOYMENT", v);
+            }
+            let _ = cmd.spawn();
             std::thread::sleep(std::time::Duration::from_secs(2));
         }
     });
@@ -927,6 +1092,22 @@ pub fn run() {
                 let _ = w.set_always_on_top(true);
                 apply_overlay_transparency(&w);
             }
+            #[cfg(target_os = "macos")]
+            {
+                set_accessory_activation_policy();
+                install_panel_app(app.handle().clone());
+            }
+            #[cfg(not(target_os = "macos"))]
+            if let Some(mini) = app.get_webview_window("mini") {
+                apply_overlay_transparency(&mini);
+                set_mini_circular_clip(&mini, true);
+            }
+
+            let app_for_panel = app.handle().clone();
+            app.handle().listen("mini-panel-clicked", move |_event| {
+                let state = app_for_panel.state::<AppState>();
+                let _ = toggle_mini_mode(&app_for_panel, &state.mini_mode);
+            });
 
             let icon = app
                 .default_window_icon()
@@ -986,6 +1167,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_status,
+            get_config_crosscheck,
             toggle_capture,
             get_diagnostics,
             toggle_diagnose_window,

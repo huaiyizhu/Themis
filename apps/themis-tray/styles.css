@@ -429,6 +429,22 @@ body.adaptive-on .theme-badge::after {
   border-color: rgba(255, 120, 100, 0.45);
 }
 
+.header-btn.capture-btn.is-busy {
+  cursor: wait;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.header-btn.capture-btn.is-busy.is-capturing {
+  background: rgba(255, 184, 108, 0.18);
+  border-color: rgba(255, 184, 108, 0.45);
+}
+
+.header-btn.capture-btn.is-busy:not(.is-capturing) {
+  background: rgba(255, 184, 108, 0.14);
+  border-color: rgba(255, 184, 108, 0.4);
+}
+
 .header-btn.diagnose-btn.is-open {
   background: rgba(155, 180, 255, 0.22);
   border-color: rgba(155, 180, 255, 0.45);
@@ -642,11 +658,31 @@ body.adaptive-on .theme-badge::after {
   flex-shrink: 0;
   font-size: calc(11px * var(--font-scale));
   line-height: 1.35;
-  margin: 4px 0 6px;
+  margin: 4px 0 2px;
   max-height: 2.8em;
-  opacity: 0.7;
+  color: #9aa0a6;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-status-line {
+  flex-shrink: 0;
+  font-size: calc(10px * var(--font-scale));
+  line-height: 1.35;
+  margin: 0 0 6px;
+  color: #9aa0a6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-status-line.config-mismatch {
+  color: #9aa0a6;
+}
+
+.config-status-line.config-offline {
+  color: #9aa0a6;
 }
 
 .summary-panel {

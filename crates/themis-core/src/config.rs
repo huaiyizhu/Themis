@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Non-secret view of STT / LLM configuration (for tray ↔ service cross-check).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ConfigStatusSnapshot {
+    pub stt_configured: bool,
+    /// `azure` or `mock`
+    pub stt_mode: String,
+    pub llm_configured: bool,
+    pub speech_region: String,
+    pub foundry_deployment: String,
+    pub analysis_enabled: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThemisConfig {
     pub azure_speech_key: Option<String>,
@@ -84,22 +96,40 @@ fn parse_insight_dwell_secs(raw: Option<String>) -> u32 {
     }
 }
 
+fn non_empty_env(key: &str) -> Option<String> {
+    std::env::var(key).ok().filter(|s| !s.trim().is_empty())
+}
+
+/// Directory containing `.env`, searched from cwd then the running executable path.
+pub fn find_dotenv_directory() -> Option<PathBuf> {
+    let mut search_roots = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        search_roots.push(cwd);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            search_roots.push(parent.to_path_buf());
+        }
+    }
+    for mut dir in search_roots {
+        for _ in 0..8 {
+            if dir.join(".env").is_file() {
+                return Some(dir);
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+    }
+    None
+}
+
 fn load_dotenv() {
     if dotenvy::dotenv().is_ok() {
         return;
     }
-    let Ok(mut dir) = std::env::current_dir() else {
-        return;
-    };
-    for _ in 0..8 {
-        let candidate = dir.join(".env");
-        if candidate.is_file() {
-            let _ = dotenvy::from_path(candidate);
-            return;
-        }
-        if !dir.pop() {
-            break;
-        }
+    if let Some(dir) = find_dotenv_directory() {
+        let _ = dotenvy::from_path(dir.join(".env"));
     }
 }
 
@@ -122,9 +152,9 @@ impl ThemisConfig {
         Self {
             azure_speech_key: key,
             azure_speech_region: region,
-            foundry_endpoint: std::env::var("FOUNDRY_ENDPOINT").ok(),
-            foundry_api_key: std::env::var("FOUNDRY_API_KEY").ok(),
-            foundry_deployment: std::env::var("FOUNDRY_DEPLOYMENT").ok(),
+            foundry_endpoint: non_empty_env("FOUNDRY_ENDPOINT"),
+            foundry_api_key: non_empty_env("FOUNDRY_API_KEY"),
+            foundry_deployment: non_empty_env("FOUNDRY_DEPLOYMENT"),
             grpc_port: std::env::var("THEMIS_GRPC_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())
@@ -158,6 +188,39 @@ impl ThemisConfig {
             session_summary_interval_secs: parse_session_summary_interval_secs(
                 std::env::var("THEMIS_SESSION_SUMMARY_INTERVAL_SECS").ok(),
             ),
+        }
+    }
+
+    /// True when Azure OpenAI (`FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY`) is available for Insights LLM.
+    pub fn llm_configured(&self) -> bool {
+        self.foundry_endpoint
+            .as_ref()
+            .is_some_and(|s| !s.trim().is_empty())
+            && self
+                .foundry_api_key
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty())
+    }
+
+    /// Non-secret snapshot for UI / gRPC (STT + LLM config cross-check).
+    pub fn config_snapshot(&self) -> ConfigStatusSnapshot {
+        ConfigStatusSnapshot {
+            stt_configured: !self.use_mock_speech,
+            stt_mode: if self.use_mock_speech {
+                "mock".into()
+            } else {
+                "azure".into()
+            },
+            llm_configured: self.llm_configured(),
+            speech_region: self.azure_speech_region.clone().unwrap_or_default(),
+            foundry_deployment: if self.llm_configured() {
+                self.foundry_deployment
+                    .clone()
+                    .unwrap_or_else(|| "gpt-4o-mini".into())
+            } else {
+                String::new()
+            },
+            analysis_enabled: self.analysis_enabled,
         }
     }
 
@@ -221,5 +284,29 @@ mod tests {
         assert_eq!(parse_insight_dwell_secs(Some("3".into())), 20);
         assert_eq!(parse_insight_dwell_secs(Some("999".into())), 300);
         assert_eq!(parse_insight_dwell_secs(Some("bad".into())), 20);
+    }
+
+    #[test]
+    fn dotenv_loads_foundry_after_quoted_corrections() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        std::env::set_current_dir(root).unwrap();
+        for k in [
+            "AZURE_SPEECH_KEY",
+            "FOUNDRY_ENDPOINT",
+            "FOUNDRY_API_KEY",
+            "FOUNDRY_DEPLOYMENT",
+        ] {
+            unsafe { std::env::remove_var(k) };
+        }
+        load_dotenv();
+        let cfg = ThemisConfig::from_env();
+        assert!(
+            cfg.llm_configured(),
+            "FOUNDRY_* must parse from .env (quote AZURE_SPEECH_CORRECTIONS if it contains spaces)"
+        );
     }
 }

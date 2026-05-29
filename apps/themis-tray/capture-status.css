@@ -1,0 +1,169 @@
+/* Capture state colors (overlay status line). */
+
+.status-line {
+  --cap-capturing: #6ee7a8;
+  --cap-idle: #8eb4ff;
+  --cap-error: #ff7b7b;
+  --cap-failed: #ff8f8f;
+  --cap-offline: #8b939c;
+  --cap-connecting: #ffb86c;
+  --cap-mode: #6ec1ff;
+  --cap-metric: #b0b8c0;
+  --cap-sep: #5f6770;
+  --cap-peak-strong: #6ee7a8;
+  --cap-peak-ok: #9be8c0;
+  --cap-peak-quiet: #ffb86c;
+  --cap-peak-silent: #ff7b7b;
+}
+
+.status-line.cap-state-capturing,
+.status-line.cap-state-idle,
+.status-line.cap-state-error,
+.status-line.cap-state-failed,
+.status-line.cap-state-offline,
+.status-line.cap-state-connecting,
+.status-line.cap-state-warning {
+  opacity: 1;
+}
+
+.status-line .cap-dot {
+  border-radius: 50%;
+  display: inline-block;
+  height: 7px;
+  margin-right: 5px;
+  vertical-align: middle;
+  width: 7px;
+}
+
+.status-line.cap-state-capturing .cap-dot {
+  animation: cap-pulse 1.6s ease-in-out infinite;
+  background: var(--cap-capturing);
+  box-shadow: 0 0 6px rgba(110, 231, 168, 0.65);
+}
+
+.status-line.cap-state-idle .cap-dot {
+  background: var(--cap-idle);
+}
+
+.status-line.cap-state-error .cap-dot,
+.status-line.cap-state-failed .cap-dot {
+  background: var(--cap-error);
+  box-shadow: 0 0 5px rgba(255, 123, 123, 0.55);
+}
+
+.status-line.cap-state-offline .cap-dot {
+  background: var(--cap-offline);
+}
+
+.status-line.cap-state-connecting .cap-dot {
+  animation: cap-pulse 1.2s ease-in-out infinite;
+  background: var(--cap-connecting);
+}
+
+.status-line.cap-state-starting .cap-dot,
+.status-line.cap-state-stopping .cap-dot {
+  animation: cap-pulse 1s ease-in-out infinite;
+  background: var(--cap-connecting);
+  box-shadow: 0 0 6px rgba(255, 184, 108, 0.55);
+}
+
+.status-line .cap-state-label.cap-starting,
+.status-line .cap-state-label.cap-stopping {
+  color: var(--cap-connecting);
+  font-weight: 700;
+}
+
+.status-line.cap-state-warning .cap-dot {
+  animation: cap-pulse 1.8s ease-in-out infinite;
+  background: var(--cap-peak-quiet);
+}
+
+.status-line .cap-state-label.cap-capturing {
+  color: var(--cap-capturing);
+  font-weight: 700;
+}
+
+.status-line .cap-state-label.cap-idle {
+  color: var(--cap-idle);
+  font-weight: 600;
+}
+
+.status-line .cap-state-label.cap-error,
+.status-line .cap-state-label.cap-failed {
+  color: var(--cap-failed);
+  font-weight: 700;
+}
+
+.status-line .cap-state-label.cap-offline {
+  color: var(--cap-offline);
+  font-style: italic;
+}
+
+.status-line .cap-state-label.cap-connecting {
+  color: var(--cap-connecting);
+  font-weight: 600;
+}
+
+.status-line .cap-mode {
+  color: var(--cap-mode);
+  font-weight: 600;
+}
+
+.status-line .cap-metric {
+  color: var(--cap-metric);
+}
+
+.status-line .cap-peak-strong {
+  color: var(--cap-peak-strong);
+  font-weight: 700;
+}
+
+.status-line .cap-peak-ok {
+  color: var(--cap-peak-ok);
+  font-weight: 600;
+}
+
+.status-line .cap-peak-quiet {
+  color: var(--cap-peak-quiet);
+  font-weight: 600;
+}
+
+.status-line .cap-peak-silent {
+  color: var(--cap-peak-silent);
+  font-weight: 700;
+}
+
+.status-line .cap-signal {
+  font-weight: 600;
+}
+
+.status-line .cap-signal.cap-signal-strong,
+.status-line .cap-signal.cap-signal-ok {
+  color: var(--cap-peak-strong);
+}
+
+.status-line .cap-signal.cap-signal-quiet {
+  color: var(--cap-peak-quiet);
+}
+
+.status-line .cap-signal.cap-signal-silent {
+  color: var(--cap-peak-silent);
+}
+
+.status-line .cap-sep {
+  color: var(--cap-sep);
+  margin: 0 3px;
+}
+
+@keyframes cap-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.45;
+    transform: scale(0.88);
+  }
+}

@@ -299,8 +299,13 @@ impl CaptureEngine {
         subject: &str,
         brief: &str,
     ) -> anyhow::Result<String> {
-        let llm = LlmAnalyzer::from_config(&self.config)
-            .ok_or_else(|| anyhow::anyhow!("LLM not configured (set FOUNDRY_* in .env)"))?;
+        let llm = LlmAnalyzer::from_config(&self.config).ok_or_else(|| {
+            anyhow::anyhow!(
+                "LLM not configured in running themis-service. \
+                 Set FOUNDRY_ENDPOINT + FOUNDRY_API_KEY in .env, then run: \
+                 ./scripts/themis.sh restart (macOS) or .\\scripts\\themis.ps1 restart (Windows)"
+            )
+        })?;
         let context = self.session_context().await;
         llm.expand_insight_detail(kind, subject, brief, &context)
             .await?

@@ -1,16 +1,16 @@
 use crate::proto::{
-    themis_service_server::ThemisService, ExpandInsightRequest, ExpandInsightResponse,
-    GetDiagnosticsRequest, GetDiagnosticsResponse, GetStatusRequest, GetStatusResponse,
-    LatencyBreakdown as ProtoLatencyBreakdown, LatencyRecord as ProtoLatencyRecord,
-    LatencySummary as ProtoLatencySummary, ResetSessionRequest, ResetSessionResponse,
-    StartCaptureRequest, StartCaptureResponse, StopCaptureRequest, StopCaptureResponse,
-    SubscribeTranscriptsRequest, TranscriptMessage,
+    themis_service_server::ThemisService, ConfigStatus as ProtoConfigStatus,
+    ExpandInsightRequest, ExpandInsightResponse, GetDiagnosticsRequest, GetDiagnosticsResponse,
+    GetStatusRequest, GetStatusResponse, LatencyBreakdown as ProtoLatencyBreakdown,
+    LatencyRecord as ProtoLatencyRecord, LatencySummary as ProtoLatencySummary,
+    ResetSessionRequest, ResetSessionResponse, StartCaptureRequest, StartCaptureResponse,
+    StopCaptureRequest, StopCaptureResponse, SubscribeTranscriptsRequest, TranscriptMessage,
 };
 use std::pin::Pin;
 use std::sync::Arc;
 use themis_core::{
-    AnalysisDiagnostics, CaptureDiagnostics, CaptureState, LatencyBreakdown, LatencyDiagnostics,
-    StateMachine, TranscriptEvent,
+    AnalysisDiagnostics, CaptureDiagnostics, CaptureState, ConfigStatusSnapshot,
+    LatencyBreakdown, LatencyDiagnostics, StateMachine, TranscriptEvent,
 };
 use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
@@ -25,6 +25,18 @@ pub struct CaptureService {
     pub latency_diag: Arc<LatencyDiagnostics>,
     pub analysis_diag: Arc<AnalysisDiagnostics>,
     pub engine: Arc<dyn CaptureEngineHandle + Send + Sync>,
+    pub config_snapshot: ConfigStatusSnapshot,
+}
+
+fn config_to_proto(snapshot: &ConfigStatusSnapshot) -> ProtoConfigStatus {
+    ProtoConfigStatus {
+        stt_configured: snapshot.stt_configured,
+        stt_mode: snapshot.stt_mode.clone(),
+        llm_configured: snapshot.llm_configured,
+        speech_region: snapshot.speech_region.clone(),
+        foundry_deployment: snapshot.foundry_deployment.clone(),
+        analysis_enabled: snapshot.analysis_enabled,
+    }
 }
 
 fn breakdown_to_proto(b: &LatencyBreakdown) -> ProtoLatencyBreakdown {
@@ -144,6 +156,7 @@ impl ThemisService for ThemisGrpcServer {
             capture_mode: diag.mode,
             audio_sessions: diag.sessions,
             capture_detail: diag.detail,
+            service_config: Some(config_to_proto(&self.service.config_snapshot)),
         }))
     }
 
@@ -203,6 +216,7 @@ impl ThemisService for ThemisGrpcServer {
                 last_llm_status: a_sum.last_llm_status,
             }),
             analysis_records,
+            service_config: Some(config_to_proto(&self.service.config_snapshot)),
         }))
     }
 

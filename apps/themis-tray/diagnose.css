@@ -73,6 +73,26 @@ kbd {
   color: var(--muted);
 }
 
+.config-crosscheck {
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(124, 184, 255, 0.08);
+  border: 1px solid rgba(124, 184, 255, 0.25);
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.config-crosscheck.config-mismatch {
+  background: rgba(255, 184, 108, 0.1);
+  border-color: rgba(255, 184, 108, 0.45);
+}
+
+.config-crosscheck.config-offline {
+  border-color: var(--border);
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

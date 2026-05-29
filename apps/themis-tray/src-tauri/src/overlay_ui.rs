@@ -4,6 +4,9 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use tracing::warn;
 
+use crate::macos_window::apply_overlay_topmost;
+use crate::mini_mode::mini_mode_active;
+
 pub const THEMES: &[&str] = &[
     // Glass (translucent)
     "dark-glass",
@@ -195,7 +198,7 @@ pub fn overlay_window(app: &AppHandle) -> Option<WebviewWindow> {
 
 pub fn apply_overlay_ui(app: &AppHandle, settings: &OverlayUiSettings) -> Result<(), String> {
     let window = overlay_window(app).ok_or_else(|| "overlay window missing".to_string())?;
-    let _ = window.set_always_on_top(true);
+    apply_overlay_topmost(&window, mini_mode_active())?;
 
     let effective_theme = if settings.adaptive {
         adaptive_theme_for_window(&window)

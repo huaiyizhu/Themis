@@ -20,7 +20,7 @@ pub use analysis_diag::{
     AnalysisInsightRecord,
 };
 pub use capture_diag::{CaptureDiagnostics, CaptureDiagnosticsSnapshot};
-pub use config::ThemisConfig;
+pub use config::{find_dotenv_directory, ConfigStatusSnapshot, ThemisConfig};
 pub use frame::{AudioFrame, SampleFormat};
 pub use gain::normalize_pcm16;
 pub use latency::{

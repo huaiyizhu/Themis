@@ -42,6 +42,16 @@ message GetStatusResponse {
   /// Active Windows audio sessions (process loopback).
   uint32 audio_sessions = 7;
   string capture_detail = 8;
+  ConfigStatus service_config = 9;
+}
+
+message ConfigStatus {
+  bool stt_configured = 1;
+  string stt_mode = 2;
+  bool llm_configured = 3;
+  string speech_region = 4;
+  string foundry_deployment = 5;
+  bool analysis_enabled = 6;
 }
 
 message SubscribeTranscriptsRequest {}
@@ -85,6 +95,7 @@ message GetDiagnosticsResponse {
   LatencySummary summary = 2;
   AnalysisDiagnosticsSummary analysis_summary = 3;
   repeated AnalysisInsightRecord analysis_records = 4;
+  ConfigStatus service_config = 5;
 }
 
 message AnalysisDiagnosticsSummary {

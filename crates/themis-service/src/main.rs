@@ -40,6 +40,8 @@ async fn main() -> anyhow::Result<()> {
         speech_mode = %speech_mode,
         mock = config.use_mock_speech,
         grpc_port = config.grpc_port,
+        llm = config.llm_configured(),
+        analysis = config.analysis_enabled,
         "themis-service starting"
     );
 
@@ -62,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
         latency_diag,
         analysis_diag,
         engine: Arc::new(EngineHandle(Arc::clone(&engine))),
+        config_snapshot: config.config_snapshot(),
     };
 
     let addr = format!("127.0.0.1:{}", config.grpc_port).parse()?;

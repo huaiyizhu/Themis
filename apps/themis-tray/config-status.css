@@ -1,0 +1,92 @@
+/* Shared STT/LLM config cross-check colors (overlay + diagnose). */
+
+.config-status-line,
+.config-crosscheck {
+  --cfg-stt: #6ec1ff;
+  --cfg-llm: #c9a0ff;
+  --cfg-ok: #6ee7a8;
+  --cfg-fail: #ff7b7b;
+  --cfg-warn: #ffb86c;
+  --cfg-offline: #8b939c;
+  --cfg-detail: #b8c0c8;
+  --cfg-sep: #5f6770;
+}
+
+.config-status-line .cfg-chip,
+.config-crosscheck .cfg-chip {
+  white-space: nowrap;
+}
+
+.config-status-line .cfg-kind,
+.config-crosscheck .cfg-kind {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-right: 4px;
+}
+
+.config-status-line .cfg-chip.cfg-stt .cfg-kind,
+.config-crosscheck .cfg-chip.cfg-stt .cfg-kind {
+  color: var(--cfg-stt);
+}
+
+.config-status-line .cfg-chip.cfg-llm .cfg-kind,
+.config-crosscheck .cfg-chip.cfg-llm .cfg-kind {
+  color: var(--cfg-llm);
+}
+
+.config-status-line .cfg-ok,
+.config-crosscheck .cfg-ok {
+  color: var(--cfg-ok);
+  font-weight: 700;
+}
+
+.config-status-line .cfg-fail,
+.config-crosscheck .cfg-fail {
+  color: var(--cfg-fail);
+  font-weight: 700;
+}
+
+.config-status-line .cfg-detail,
+.config-crosscheck .cfg-detail {
+  color: var(--cfg-detail);
+}
+
+.config-status-line .cfg-dot,
+.config-status-line .cfg-pipe,
+.config-crosscheck .cfg-dot,
+.config-crosscheck .cfg-pipe {
+  color: var(--cfg-sep);
+  margin: 0 3px;
+}
+
+.config-status-line .cfg-offline-tag,
+.config-crosscheck .cfg-offline-tag {
+  color: var(--cfg-offline);
+  font-style: italic;
+}
+
+.config-status-line .cfg-side-offline,
+.config-crosscheck .cfg-side-offline {
+  color: var(--cfg-offline);
+}
+
+.config-status-line .cfg-warn,
+.config-crosscheck .cfg-warn {
+  color: var(--cfg-warn);
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.config-status-line.config-all-ok,
+.config-crosscheck.config-all-ok {
+  opacity: 1;
+}
+
+.config-status-line.config-all-ok {
+  color: #c5d4dc;
+}
+
+.config-crosscheck.config-all-ok {
+  background: rgba(110, 231, 168, 0.1);
+  border-color: rgba(110, 231, 168, 0.35);
+}

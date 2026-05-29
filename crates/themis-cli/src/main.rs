@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use themis_core::ThemisConfig;
+use themis_core::{find_dotenv_directory, ThemisConfig};
 use themis_ipc::client::connect;
 use tracing_subscriber::EnvFilter;
 
@@ -274,6 +274,25 @@ async fn cmd_doctor(config: &ThemisConfig) -> anyhow::Result<()> {
         }
     } else {
         println!("  azure:    not configured");
+    }
+
+    if config.llm_configured() {
+        let deployment = config
+            .foundry_deployment
+            .as_deref()
+            .unwrap_or("gpt-4o-mini");
+        println!("  foundry:  configured (deployment: {deployment})");
+        println!("            restart themis-service after editing FOUNDRY_* in .env");
+    } else {
+        let hint = find_dotenv_directory()
+            .and_then(|dir| std::fs::read_to_string(dir.join(".env")).ok())
+            .is_some_and(|body| body.contains("FOUNDRY_ENDPOINT"));
+        if hint {
+            println!("  foundry:  in .env but not loaded — quote values that contain spaces");
+            println!("            (e.g. AZURE_SPEECH_CORRECTIONS=\"Reg:RAG,L L M:LLM\"), then restart");
+        } else {
+            println!("  foundry:  not configured (set FOUNDRY_ENDPOINT + FOUNDRY_API_KEY)");
+        }
     }
 
     print!("  grpc:     ");

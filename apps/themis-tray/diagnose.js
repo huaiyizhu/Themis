@@ -1,7 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { applyConfigStatusEl } from "./config-status.js";
 
 const overlayEl = document.getElementById("overlay-text");
 const overlayMetaEl = document.getElementById("overlay-meta");
+const configCrosscheckEl = document.getElementById("config-crosscheck");
 const analysisMetaEl = document.getElementById("analysis-meta");
 const summaryEl = document.getElementById("summary");
 const recordsEl = document.getElementById("records");
@@ -180,9 +182,11 @@ async function refresh() {
 
     const aSum = d.analysis_summary || {};
     const llmLine = aSum.llm_configured
-      ? `LLM configured · last status: ${aSum.last_llm_status || "?"} · ${aSum.count || 0} phrases analyzed`
-      : `LLM not configured (heuristic only) · ${aSum.count || 0} phrases analyzed`;
+      ? `LLM runtime active · last: ${aSum.last_llm_status || "?"} · ${aSum.count || 0} phrases`
+      : `LLM runtime inactive (heuristic only) · ${aSum.count || 0} phrases`;
     analysisMetaEl.textContent = llmLine;
+
+    applyConfigStatusEl(configCrosscheckEl, d.config);
 
     renderSummary(d.summary);
     renderRecords(d.records);
@@ -193,6 +197,12 @@ async function refresh() {
     summaryEl.innerHTML = "";
     recordsEl.replaceChildren();
     analysisRecordsEl.replaceChildren();
+    try {
+      const config = await invoke("get_config_crosscheck");
+      applyConfigStatusEl(configCrosscheckEl, config);
+    } catch {
+      applyConfigStatusEl(configCrosscheckEl, null);
+    }
   }
 }
 

@@ -188,7 +188,7 @@ npm run tauri dev   # 若缺 icon.icns：./scripts/themis.sh icons
 | `AZURE_SPEECH_LANGUAGE` | 建议 | **`auto`**（默认，中英自动）\| `en-US` \| `zh-CN` \| `en-US,zh-CN` |
 | `AZURE_SPEECH_MODE` | 否 | `streaming`（整句流式）或 `rest`（默认，**2 秒**分块） |
 | `THEMIS_STT_FIXUP` | 否 | 默认 `true`：STT 后术语纠错（如 Reg→RAG） |
-| `AZURE_SPEECH_CORRECTIONS` | 否 | 额外纠错对，如 `Reg:RAG,某词:正确词` |
+| `AZURE_SPEECH_CORRECTIONS` | 否 | 额外纠错对；**值含空格时必须加双引号**（见下方注意事项） |
 | `THEMIS_AUDIO_CAPTURE_MODE` | 否 | **Windows**：`auto`（默认；检测到通话 app 时自动双路）\| `process` \| `endpoint` \| `call` \| `dual` |
 | | | **macOS**：`auto`（默认；检测到通话 app 时 process tap + 麦克风）\| `process_tap` \| `input` \| `call` \| `dual` |
 | `THEMIS_AUDIO_INPUT_DEVICE` | 否 | **双路/输入模式**：麦克风设备名子串（如 `Jabra`）；macOS 在 `input` 或 dual 时生效 |
@@ -205,6 +205,18 @@ npm run tauri dev   # 若缺 icon.icns：./scripts/themis.sh icons
 \* 缺 Key/Region 时自动 Mock。Insights **不依赖** Foundry：未配置时仍可用内置启发式与词表。
 
 修改 `.env` 后请执行 `.\scripts\themis.ps1 restart`（Windows）或 `./scripts/themis.sh restart`（macOS）。
+
+### `.env` 注意事项
+
+- **含空格的值必须加双引号**。否则 dotenv 解析会在该行失败，**该行之后的变量（含 `FOUNDRY_*`）都不会被加载**，浮层里会误报 `LLM not configured`，尽管你在文件后面已经写了配置。
+- 典型例子：`AZURE_SPEECH_CORRECTIONS` 里若有 `L L M:LLM` 这类带空格的纠错对，应写成：
+
+```bash
+AZURE_SPEECH_CORRECTIONS="Reg:RAG,Regs:RAG,REG:RAG,L L M:LLM,G P T:GPT,GPT4:GPT-4"
+```
+
+- 改完 `.env` 后务必 **`restart` `themis-service`**（只重启 tray 不够）。
+- 可用 `./scripts/themis.sh doctor`（或 `cargo run -p themis-cli -- doctor`）确认：`foundry: configured` 表示 LLM 已被正确读取。
 
 ---
 
@@ -504,7 +516,8 @@ Azure 听中文视频里的英文缩写时，常把 **RAG** 听成 **Reg**（发
 2. 说的内容是否在**词表**里，或是否为可识别的**问句**（见 [Insights 洞察](#insights-洞察关键词--术语--问答)）。画面字幕不会自动进入 Insights。  
 3. 确认 `THEMIS_ANALYSIS_ENABLED` 未设为 `false`；改 `.env` 后 **`restart`**。  
 4. 需要更强解释时配置 `FOUNDRY_*`（Azure OpenAI），不是 Speech Key。  
-5. 若刚改过 `glossary.rs` / 分析逻辑，必须重新编译服务（`restart` 脚本会编译）。
+5. 浮层展开术语报 **`LLM not configured`** 但已配 `FOUNDRY_*`：检查 `.env` 里 **`AZURE_SPEECH_CORRECTIONS` 等含空格的值是否加了双引号**（见上文「`.env` 注意事项」），然后 `restart`。  
+6. 若刚改过 `glossary.rs` / 分析逻辑，必须重新编译服务（`restart` 脚本会编译）。
 
 ### 想用 Mock 测 UI
 
