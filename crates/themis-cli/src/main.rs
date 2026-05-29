@@ -117,7 +117,8 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
     #[cfg(target_os = "macos")]
     println!(
         "Play sound (e.g. YouTube). Using Core Audio process tap (no BlackHole). \
-         Allow System Audio Recording if macOS prompts.\n"
+         In call apps (Zoom/Teams), auto mode captures output + mic. \
+         Allow System Audio Recording and Microphone if macOS prompts.\n"
     );
 
     let config = ThemisConfig::from_env();
@@ -128,6 +129,7 @@ async fn cmd_audio_probe(seconds: u64) -> anyhow::Result<()> {
         1,
         SystemAudioOptions {
             capture_mode: config.audio_capture_mode.clone(),
+            input_device: config.audio_input_device.clone(),
             gain_max: config.audio_gain_max,
             diagnostics: Some(Arc::clone(&diag)),
             ..SystemAudioOptions::default()
@@ -200,6 +202,7 @@ async fn cmd_stt_probe(config: &ThemisConfig, seconds: u64) -> anyhow::Result<()
         1,
         SystemAudioOptions {
             capture_mode: config.audio_capture_mode.clone(),
+            input_device: config.audio_input_device.clone(),
             gain_max: config.audio_gain_max,
             diagnostics: Some(Arc::clone(&diag)),
             ..SystemAudioOptions::default()

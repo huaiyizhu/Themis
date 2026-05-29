@@ -1,5 +1,7 @@
 mod source;
 pub(crate) mod stub;
+mod call_detect;
+mod composite;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -17,7 +19,10 @@ use themis_core::CaptureDiagnostics;
 pub struct SystemAudioOptions {
     /// Windows: friendly name substring or endpoint device ID.
     pub output_device: Option<String>,
-    /// `auto` | `process` | `endpoint` (Windows). Default: `auto`.
+    /// macOS / Windows: optional input device name substring for microphone capture.
+    pub input_device: Option<String>,
+    /// `auto` | `process` | `endpoint` | `call` | `dual` (Windows).
+    /// macOS: `auto` | `process_tap` | `input` | `call` | `dual`.
     pub capture_mode: String,
     /// Auto-gain ceiling for quiet loopback (see `THEMIS_AUDIO_GAIN_MAX`).
     pub gain_max: f32,
@@ -29,6 +34,7 @@ impl Default for SystemAudioOptions {
     fn default() -> Self {
         Self {
             output_device: None,
+            input_device: None,
             capture_mode: "auto".into(),
             gain_max: 16.0,
             diagnostics: None,
@@ -43,11 +49,32 @@ pub fn create_loopback(
 ) -> anyhow::Result<Box<dyn AudioSource + Send>> {
     #[cfg(windows)]
     {
-        Ok(Box::new(windows::WasapiSystemOutput::new(
-            sample_rate,
-            channels,
-            options,
-        )?))
+        use crate::call_detect;
+        use crate::composite::CompositeAudioSource;
+        use crate::windows::{WasapiMicCapture, WasapiSystemOutput};
+
+        let mode = options.capture_mode.trim().to_lowercase();
+        let want_dual = call_detect::wants_dual_capture(&mode)
+            || (mode == "auto" && call_detect::voice_call_active());
+
+        let output = WasapiSystemOutput::new(sample_rate, channels, options.clone())?;
+        if want_dual {
+            let mic = WasapiMicCapture::new(options.input_device.clone(), options.gain_max);
+            let detail = if call_detect::voice_call_active() {
+                "call detected: output loopback + microphone".into()
+            } else {
+                "output loopback + microphone".into()
+            };
+            return Ok(Box::new(CompositeAudioSource::new(
+                vec![Box::new(output), Box::new(mic)],
+                "dual",
+                detail,
+                sample_rate,
+                channels,
+                options.diagnostics,
+            )));
+        }
+        Ok(Box::new(output))
     }
     #[cfg(target_os = "macos")]
     {
@@ -55,9 +82,7 @@ pub fn create_loopback(
             sample_rate,
             channels,
             options.diagnostics,
-            std::env::var("THEMIS_AUDIO_INPUT_DEVICE")
-                .ok()
-                .filter(|s| !s.is_empty()),
+            options.input_device,
             &options.capture_mode,
         )
     }

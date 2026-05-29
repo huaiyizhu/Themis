@@ -126,7 +126,7 @@ chmod +x scripts/themis.sh dev.sh restart.sh tray.sh
 日志：`~/Library/Logs/Themis`  
 数据：`~/Library/Application Support/Themis`
 
-macOS 上 `THEMIS_AUDIO_CAPTURE_MODE` / `THEMIS_AUDIO_OUTPUT_DEVICE` **无效**（仅 Windows WASAPI）；采集走**系统默认输入设备**。
+macOS 默认 `THEMIS_AUDIO_CAPTURE_MODE=auto` 使用 **Process Tap** 采集系统播放；检测到 Zoom/Teams 等通话 app 时会**同时采集麦克风**。`THEMIS_AUDIO_OUTPUT_DEVICE` 仅 Windows 有效。
 
 ### 3. 手动运行（两个终端）
 
@@ -186,7 +186,9 @@ npm run tauri dev   # 若缺 icon.icns：./scripts/themis.sh icons
 | `AZURE_SPEECH_MODE` | 否 | `streaming`（整句流式）或 `rest`（默认，**2 秒**分块） |
 | `THEMIS_STT_FIXUP` | 否 | 默认 `true`：STT 后术语纠错（如 Reg→RAG） |
 | `AZURE_SPEECH_CORRECTIONS` | 否 | 额外纠错对，如 `Reg:RAG,某词:正确词` |
-| `THEMIS_AUDIO_CAPTURE_MODE` | 否 | **Windows**：`auto`（默认，优先进程 loopback）\| `process` \| `endpoint` |
+| `THEMIS_AUDIO_CAPTURE_MODE` | 否 | **Windows**：`auto`（默认；检测到通话 app 时自动双路）\| `process` \| `endpoint` \| `call` \| `dual` |
+| | | **macOS**：`auto`（默认；检测到通话 app 时 process tap + 麦克风）\| `process_tap` \| `input` \| `call` \| `dual` |
+| `THEMIS_AUDIO_INPUT_DEVICE` | 否 | **双路/输入模式**：麦克风设备名子串（如 `Jabra`）；macOS 在 `input` 或 dual 时生效 |
 | `THEMIS_AUDIO_OUTPUT_DEVICE` | 否 | **仅 endpoint 模式**：播放设备友好名子串或 endpoint ID |
 | `THEMIS_AUDIO_GAIN_MAX` | 否 | 自动增益上限，默认 `16` |
 | `THEMIS_GRPC_PORT` | 否 | 默认 `50051` |

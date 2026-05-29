@@ -3,6 +3,7 @@
 ## Windows
 
 - **System audio output**: WASAPI **loopback** on the default **playback (render)** endpoint — the digital mix of all apps Windows sends to that output (headphones, HDMI, USB audio, virtual devices). Not the microphone; not tied to physical speakers or volume sliders. Optional `THEMIS_AUDIO_OUTPUT_DEVICE` in `.env` (friendly name substring or endpoint ID) if you route audio through a specific virtual device. Falls back to a stub tone when loopback is unavailable (dev/CI).
+- **Voice/video calls (dual capture)**: When `THEMIS_AUDIO_CAPTURE_MODE=auto` and a known call app is running, Themis captures **output loopback + microphone** mixed for STT. Force with `call` or `dual`. Optional `THEMIS_AUDIO_INPUT_DEVICE` for mic selection.
 - **Service**: Install with `themis-cli service install` (Administrator). See [packaging/windows/themis-service.md](../packaging/windows/themis-service.md).
 - **Hotkey**: `Ctrl+Shift+T` toggles capture.
 - **Overlay adaptive contrast**: samples desktop pixels behind the overlay (`Ctrl+Shift+A`).
@@ -10,6 +11,7 @@
 ## macOS
 
 - **System audio (recommended, macOS 14.2+)**: **Core Audio Process Tap** — captures all apps’ playback without BlackHole. Enabled when `THEMIS_AUDIO_CAPTURE_MODE` is `auto` (default) or `process_tap` / `tap` / `process`. Requires **System Audio Recording** permission (prompt on first capture).
+- **Voice/video calls (dual capture)**: When `THEMIS_AUDIO_CAPTURE_MODE=auto` and a known call app is running (Zoom, Teams, FaceTime, Discord, etc.), Themis captures **both** system playback (process tap) **and** the microphone, mixed into one stream for STT. Force dual anytime with `call` or `dual`. Optional `THEMIS_AUDIO_INPUT_DEVICE` selects the mic (name substring).
 - **Fallback — input device**: `THEMIS_AUDIO_CAPTURE_MODE=input` uses the default **microphone / input** via cpal (same as older builds). Optional `THEMIS_AUDIO_INPUT_DEVICE=BlackHole` if you use a virtual device.
 
 ### Process tap (no BlackHole)
@@ -37,7 +39,7 @@
 
 - Scripts: `./scripts/themis.sh` (or `./dev.sh`, `./tray.sh`). Logs: `~/Library/Logs/Themis`.
 - First Tauri build needs `icon.icns`: `./scripts/themis.sh icons` (or run `tray`, which auto-generates).
-- `THEMIS_AUDIO_CAPTURE_MODE` / `THEMIS_AUDIO_OUTPUT_DEVICE` in `.env` are **ignored** on macOS.
+- `THEMIS_AUDIO_OUTPUT_DEVICE` is **Windows-only** (WASAPI endpoint hint).
 - **Hotkey**: `Cmd+Shift+T` toggles capture.
 - **Overlay adaptive contrast**: not available (no desktop sampling API wired yet); style presets still work (`Cmd+Shift+S`).
 

@@ -95,6 +95,7 @@ impl CaptureEngine {
             self.config.channels,
             SystemAudioOptions {
                 output_device: self.config.audio_output_device.clone(),
+                input_device: self.config.audio_input_device.clone(),
                 capture_mode: self.config.audio_capture_mode.clone(),
                 gain_max: self.config.audio_gain_max,
                 diagnostics: Some(Arc::clone(&self.capture_diag)),

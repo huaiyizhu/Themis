@@ -22,7 +22,8 @@ pub struct ThemisConfig {
     pub audio_input_device: Option<String>,
     /// Max gain applied when loopback signal is quiet (default 16).
     pub audio_gain_max: f32,
-    /// Windows capture strategy: `auto` | `process` | `endpoint`
+    /// Windows capture strategy: `auto` | `process` | `endpoint` | `call` | `dual`
+    /// macOS: `auto` | `process_tap` | `input` | `call` | `dual` — `auto` uses dual capture when a call app is detected.
     pub audio_capture_mode: String,
     /// Enable transcript insight extraction (keywords, terms, Q&A).
     pub analysis_enabled: bool,
