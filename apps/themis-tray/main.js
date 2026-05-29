@@ -22,6 +22,7 @@ const toggleDiagnoseBtn = document.getElementById("toggle-diagnose");
 const toggleLocalizeBtn = document.getElementById("toggle-localize");
 const toggleMiniBtn = document.getElementById("toggle-mini");
 const hideOverlayBtn = document.getElementById("hide-overlay");
+const quitAppBtn = document.getElementById("quit-app");
 const miniFloaterEl = document.getElementById("mini-floater");
 const sizePresetsEl = document.getElementById("size-presets");
 const sizeToggleBtn = document.getElementById("size-toggle");
@@ -34,6 +35,7 @@ function initHeaderTips() {
   setTip(sizeToggleBtn, "窗口尺寸预设");
   setTip(clearSessionBtn, "清空字幕、总结与洞察，从零继续监听");
   setTip(hideOverlayBtn, tipWithHotkey("隐藏窗口（捕捉继续，托盘可再次打开）", "O"));
+  setTip(quitAppBtn, tipWithHotkey("退出 Themis（停止托盘与捕捉）", "Q"));
   setTip(scrollLatestBtn, "跳转到最新字幕");
   setTip(toggleMiniBtn, tipWithHotkey("最小化为桌面浮标，全屏应用上仍可见", "M"));
   setTip(
@@ -209,6 +211,14 @@ toggleMiniBtn?.addEventListener("click", async () => {
 hideOverlayBtn?.addEventListener("click", async () => {
   try {
     await invoke("hide_overlay_window");
+  } catch (e) {
+    setTip(statusEl, String(e));
+  }
+});
+
+quitAppBtn?.addEventListener("click", async () => {
+  try {
+    await invoke("quit_app");
   } catch (e) {
     setTip(statusEl, String(e));
   }

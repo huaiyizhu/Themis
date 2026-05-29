@@ -95,15 +95,34 @@ body:not(.is-mini-mode) .mini-floater {
   border-color: rgba(140, 190, 255, 0.45);
 }
 
-.header-btn.close-window {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1;
-  min-width: 24px;
-  padding: 2px 7px;
+.header-btn.hide-window {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 26px;
+  padding: 2px 8px;
 }
 
-.header-btn.close-window:hover {
+.header-icon-hide {
+  background: currentColor;
+  border-radius: 1px;
+  display: block;
+  height: 2px;
+  width: 12px;
+}
+
+.header-btn.hide-window:hover {
+  background: rgba(140, 190, 255, 0.18);
+  border-color: rgba(140, 190, 255, 0.4);
+}
+
+.header-btn.quit-btn {
+  font-size: 11px;
+  min-width: 34px;
+  padding: 2px 8px;
+}
+
+.header-btn.quit-btn:hover {
   background: rgba(255, 120, 100, 0.22);
   border-color: rgba(255, 120, 100, 0.45);
 }
