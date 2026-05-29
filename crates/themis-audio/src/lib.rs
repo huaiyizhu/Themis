@@ -61,9 +61,9 @@ pub fn create_loopback(
         if want_dual {
             let mic = WasapiMicCapture::new(options.input_device.clone(), options.gain_max);
             let detail = if call_detect::voice_call_active() {
-                "call detected: output loopback + microphone".into()
+                "call detected: output loopback + microphone"
             } else {
-                "output loopback + microphone".into()
+                "output loopback + microphone"
             };
             return Ok(Box::new(CompositeAudioSource::new(
                 vec![Box::new(output), Box::new(mic)],

@@ -4,7 +4,7 @@ use crate::windows::pcm;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use themis_core::{normalize_pcm16, AudioFrame, CaptureDiagnostics};
+use themis_core::{normalize_pcm16, AudioFrame};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 use wasapi::*;
