@@ -92,6 +92,7 @@ jobs:
             ! -name '*.tar.gz' \
             ! -name '*.sig' \
             -exec cp {} release-upload/ \;
+          cp packaging/RELEASE-INDEX.md release-upload/README.md
           echo "Uploading:"
           ls -la release-upload/
 

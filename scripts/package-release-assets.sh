@@ -45,7 +45,22 @@ copy_installers() {
     done
 }
 
+copy_docs() {
+  local guide=""
+  case "$name" in
+    windows-*) guide="packaging/release-user-guide-windows.md" ;;
+    macos-*) guide="packaging/release-user-guide-macos.md" ;;
+  esac
+  if [[ -n "$guide" && -f "$guide" ]]; then
+    cp "$guide" "${out}/${name}-README.md"
+  fi
+  if [[ -f ".env.example" ]]; then
+    cp ".env.example" "${out}/${name}-env.example"
+  fi
+}
+
 copy_binaries
+copy_docs
 if bundle="$(find_bundle_dir)"; then
   copy_installers "$bundle"
 fi
