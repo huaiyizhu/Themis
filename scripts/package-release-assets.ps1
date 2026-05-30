@@ -32,7 +32,9 @@ function Copy-Docs {
 foreach ($base in @("target/$Target/release", "target/release")) {
     if (-not (Test-Path $base)) { continue }
     foreach ($pattern in @("themis-service*", "themis-cli*", "themis-tray*")) {
-        Get-ChildItem $base -Filter $pattern -File -ErrorAction SilentlyContinue | ForEach-Object {
+        Get-ChildItem $base -Filter $pattern -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -ne ".d" } |
+            ForEach-Object {
             Copy-WithPrefix $_.FullName
         }
     }

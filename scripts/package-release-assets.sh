@@ -15,6 +15,7 @@ copy_binaries() {
     for pattern in themis-service themis-cli themis-tray; do
       for f in "${base}/${pattern}"*; do
         [[ -f "$f" ]] || continue
+        case "$f" in *.d) continue ;; esac
         cp "$f" "${out}/${name}-$(basename "$f")"
       done
     done

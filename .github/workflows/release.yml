@@ -11,6 +11,10 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   THEMIS_USE_MOCK_SPEECH: "true"
+  # CI-only: thin LTO + parallel codegen — much faster links (esp. Windows MSVC)
+  # with negligible runtime/size impact for desktop binaries.
+  CARGO_PROFILE_RELEASE_LTO: thin
+  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 16
 
 jobs:
   build:
@@ -21,12 +25,18 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: windows-x86_64
+            bundles: nsis
+            rustflags: "-C link-arg=-fuse-ld=lld-link"
           - os: macos-latest
             target: aarch64-apple-darwin
             name: macos-aarch64
+            bundles: dmg
+            rustflags: ""
           - os: macos-latest
             target: x86_64-apple-darwin
             name: macos-x86_64
+            bundles: dmg
+            rustflags: ""
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -36,27 +46,38 @@ jobs:
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
-
-      - name: Build Rust release
-        run: |
-          cargo build --release -p themis-service -p themis-cli --target ${{ matrix.target }}
+        with:
+          # Single cargo build step; cache workspace + target/${{ matrix.target }}.
+          shared-key: release-${{ matrix.target }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/themis-tray/package-lock.json
 
       - name: Prepare macOS Tauri icons
         if: runner.os == 'macOS'
         run: bash scripts/prepare-macos-icons.sh
 
-      - name: Build Tauri bundle
+      - name: Build frontend
         working-directory: apps/themis-tray
         run: |
-          npm install
+          npm ci
           npm run icons
-          npm run tauri build -- --target ${{ matrix.target }}
+          npm run build
+
+      - name: Build Rust release binaries
+        run: cargo build --release -p themis-service -p themis-cli -p themis-tray --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+
+      - name: Bundle Tauri installers
+        working-directory: apps/themis-tray
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config '{"build":{"beforeBuildCommand":""}}'
         env:
           CI: "true"
+          RUSTFLAGS: ${{ matrix.rustflags }}
 
       - name: Package release assets (Unix)
         if: runner.os != 'Windows'
