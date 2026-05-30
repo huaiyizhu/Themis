@@ -1,4 +1,63 @@
-# Themis 使用说明（Windows）
+#!/usr/bin/env python3
+"""Regenerate packaging/*.md and .env.example with UTF-8 Chinese (safe on Windows)."""
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+ENV_EXAMPLE = r"""# =============================================================================
+# Themis 配置模板 — 复制本文件为 .env（与 themis-tray 同目录），然后填写密钥
+# =============================================================================
+
+# --- Azure Speech（实时字幕，必填才有真实听写）---
+# 在 Azure Portal 创建 Speech 资源后获取
+AZURE_SPEECH_KEY=your_speech_key_here
+# 区域，如 eastus、westus2、southeastasia
+AZURE_SPEECH_REGION=eastus
+# 识别语言：auto（推荐，中英自动）| en-US | zh-CN | en-US,zh-CN
+AZURE_SPEECH_LANGUAGE=auto
+# STT 模式：rest（默认，稳定）| streaming（实验性 WebSocket）
+AZURE_SPEECH_MODE=rest
+
+# --- STT 后处理纠错 ---
+# 内置 Reg→RAG 等；设为 false 可关闭
+# THEMIS_STT_FIXUP=true
+# 自定义听错→正确 映射，逗号分隔；值含空格时整行加双引号
+# AZURE_SPEECH_CORRECTIONS="Reg:RAG,Regs:RAG,L L M:LLM,G P T:GPT"
+# AZURE_SPEECH_CORRECTIONS="Reg:RAG,拉格:RAG,瑞格:RAG"
+
+# --- Azure OpenAI（Insights：术语 / 问题 / 全文总结，强烈建议）---
+# 与 AZURE_SPEECH_* 是不同资源、不同 Key；不配时仅有内置词表
+FOUNDRY_ENDPOINT=https://your-resource.openai.azure.com
+FOUNDRY_API_KEY=your_openai_key
+FOUNDRY_DEPLOYMENT=gpt-4o-mini
+# false 可关闭全部 Insights 分析
+THEMIS_ANALYSIS_ENABLED=true
+# Terms/Questions 卡片最短停留秒数，默认 20，范围 5–300
+# THEMIS_INSIGHT_DWELL_SECS=20
+# 全文总结刷新间隔（秒），默认 20，范围 10–120
+# THEMIS_SESSION_SUMMARY_INTERVAL_SECS=20
+
+# --- 音频采集 ---
+# Windows: auto | process | endpoint | call | dual
+# macOS:   auto | process_tap | input | call | dual
+# auto：默认抓系统播放；检测到 Zoom/Teams 等通话 app 时自动加麦克风
+THEMIS_AUDIO_CAPTURE_MODE=auto
+# 仅 Windows endpoint 模式：指定播放设备名子串
+# THEMIS_AUDIO_OUTPUT_DEVICE=Voicemeeter Input
+# 双路/通话模式下的麦克风设备名子串
+# THEMIS_AUDIO_INPUT_DEVICE=Jabra
+# 自动增益上限（loopback 音量过小时），默认 16
+# THEMIS_AUDIO_GAIN_MAX=16
+
+# --- 服务 ---
+THEMIS_GRPC_PORT=50051
+THEMIS_LOG_LEVEL=info
+
+# 缺 Speech Key 时是否 Mock（默认：缺 Key 则自动 Mock，出现 [mock] 假字幕）
+# THEMIS_USE_MOCK_SPEECH=true
+"""
+
+WINDOWS_GUIDE = r"""# Themis 使用说明（Windows）
 
 **Themis（忒弥斯）** 在电脑**播放声音**时实时生成字幕，并在浮层中展示术语解释、问题初答与会话摘要。适合网课、播客、技术视频，以及 Zoom / Teams 等线上会议。
 
@@ -211,3 +270,127 @@
 → 完全退出后只启动一次。
 
 更多文档：GitHub 仓库 README。
+"""
+
+MACOS_GUIDE = r"""# Themis 使用说明（macOS）
+
+**Themis（忒弥斯）** 在 Mac **播放声音**时实时生成字幕，并在浮层中展示术语解释、问题初答与会话摘要。
+
+> 默认采集系统播放；检测到 Zoom、Teams 等时会自动加麦克风。首次运行需授予**系统音频录制**权限。
+
+---
+
+## 一、产品能做什么
+
+与 Windows 版相同：实时字幕、Insights（关键词/术语/问题）、全文总结、诊断窗口、迷你浮标、可调透明度与字号。
+
+**不适合：** 仅画面字幕（无 OCR）；完全离线。
+
+---
+
+## 二、快速开始
+
+1. 将 **`*-env.example`** 复制为 **`.env`**（与 `themis-tray` 同目录）。
+2. 填写 `AZURE_SPEECH_KEY`、`AZURE_SPEECH_REGION`；Insights 建议填 `FOUNDRY_*`。
+3. 运行 `./themis-tray`；菜单栏出现图标后按 **`Ctrl+Shift+T`**（macOS 上为 **Cmd+Shift+T**）开始采集。
+4. `./themis-cli doctor` 验证配置。
+
+未配 `.env` → Mock 假字幕，不能真实听写。
+
+---
+
+## 三、浮层按钮与快捷键
+
+布局与按钮含义与 Windows 版相同（见 Windows README 第四、五节）。
+
+macOS 快捷键使用 **Cmd+Shift+** 代替 Ctrl+Shift+：
+
+| 操作 | 键 |
+|------|-----|
+| 开始/停止采集 | `T` |
+| 唤醒浮层 | `O` |
+| 诊断 | `D` |
+| 隐藏字幕区 | `H` |
+| 迷你浮标 | `M` |
+| 透明度 − / + | `[` / `]` |
+| 字号 − / + / 重置 | `-` / `=` / `0` |
+| 退出 | `Q` |
+
+---
+
+## 四、`.env` 配置说明
+
+字段含义与 Windows 版 **`windows-x86_64-env.example`** 内注释一致。macOS 差异：
+
+| 变量 | 说明 |
+|------|------|
+| `THEMIS_AUDIO_CAPTURE_MODE` | `auto` / `process_tap` / `input` / `call` / `dual` |
+| `THEMIS_AUDIO_OUTPUT_DEVICE` | macOS 上忽略 |
+
+Process Tap 不可用时可用 `input` 模式并指定 `THEMIS_AUDIO_INPUT_DEVICE`。
+
+---
+
+## 五、常见问题
+
+**没有字幕** → 检查 `.env`、系统音频录制权限、`./themis-cli audio-probe`。
+
+**Insights 空** → 配置 `FOUNDRY_*`；`doctor` 显示 foundry configured。
+
+详见 GitHub README。
+"""
+
+RELEASE_INDEX = r"""# Themis Release 下载说明
+
+**Themis（忒弥斯）** — 在电脑播放声音时实时显示字幕，并在浮层中提供术语解释、问题初答与会话摘要。适合网课、播客、技术视频与 Zoom / Teams 会议。
+
+---
+
+## 快速开始
+
+1. 下载与你系统**匹配前缀**的全部文件到**同一文件夹**（如 `windows-x86_64-*`）。
+2. 打开 **平台 README**（见下表），将 **`*-env.example`** 复制为 **`.env`** 并填入密钥。
+3. 运行 `*-themis-tray` / `*-themis-tray.exe`；用 `*-themis-cli doctor` 确认配置。
+
+> **未创建 `.env` 时听写为 Mock（假字幕），不能用于真实场景。**
+
+---
+
+## 平台用户手册（含产品介绍、按钮说明、`.env` 字段详解）
+
+| 系统 | 文件名 |
+|------|--------|
+| Windows 64 位 | `windows-x86_64-README.md` |
+| macOS Apple Silicon | `macos-aarch64-README.md` |
+| macOS Intel | `macos-x86_64-README.md` |
+
+配置模板：同前缀的 **`*-env.example`** → 复制为 **`.env`**。
+
+---
+
+## 你需要准备
+
+1. **Azure Speech**（`AZURE_SPEECH_*`）→ 实时字幕  
+2. **Azure OpenAI**（`FOUNDRY_*`）→ Insights 核心（术语 / 问题 / 总结），强烈建议一并配置  
+
+源码与开发者文档：GitHub 仓库 README。
+"""
+
+
+def main() -> None:
+    files = {
+        ROOT / ".env.example": ENV_EXAMPLE,
+        ROOT / "packaging" / "release-user-guide-windows.md": WINDOWS_GUIDE,
+        ROOT / "packaging" / "release-user-guide-macos.md": MACOS_GUIDE,
+        ROOT / "packaging" / "RELEASE-INDEX.md": RELEASE_INDEX,
+    }
+    for path, content in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content.strip() + "\n", encoding="utf-8", newline="\n")
+        b = path.read_bytes()
+        non_ascii = sum(1 for x in b if x > 127)
+        print(f"Wrote {path.relative_to(ROOT)} ({len(b)} bytes, {non_ascii} non-ASCII)")
+
+
+if __name__ == "__main__":
+    main()
