@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Themis 配置</title>
+    <link rel="stylesheet" href="settings.css" />
+    <link rel="stylesheet" href="config-status.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Themis 配置</h1>
+      <p class="hint">
+        编辑后点击<strong>保存并重新加载</strong>，会写入本地 <code>.env</code> 并重启
+        <code>themis-service</code>。若正在采集，会先停止再恢复。
+      </p>
+      <p id="env-path" class="env-path">—</p>
+    </header>
+
+    <div id="config-crosscheck" class="config-crosscheck">配置检查…</div>
+    <p id="save-status" class="save-status" role="status"></p>
+
+    <form id="settings-form">
+      <section class="panel">
+        <h2>Azure Speech（实时字幕）</h2>
+        <div class="field">
+          <label for="azure_speech_key">AZURE_SPEECH_KEY</label>
+          <input id="azure_speech_key" name="azure_speech_key" type="password" autocomplete="off" />
+          <span class="field-hint">必填；缺 Key 时使用 Mock 假字幕</span>
+        </div>
+        <div class="field">
+          <label for="azure_speech_region">AZURE_SPEECH_REGION</label>
+          <input id="azure_speech_region" name="azure_speech_region" type="text" placeholder="eastus" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="azure_speech_language">AZURE_SPEECH_LANGUAGE</label>
+            <input id="azure_speech_language" name="azure_speech_language" type="text" placeholder="auto" />
+          </div>
+          <div class="field">
+            <label for="azure_speech_mode">AZURE_SPEECH_MODE</label>
+            <input id="azure_speech_mode" name="azure_speech_mode" type="text" placeholder="rest" />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>听写纠错</h2>
+        <div class="field-row">
+          <div class="field">
+            <label for="themis_stt_fixup">THEMIS_STT_FIXUP</label>
+            <input id="themis_stt_fixup" name="themis_stt_fixup" type="text" placeholder="true" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="azure_speech_corrections">AZURE_SPEECH_CORRECTIONS</label>
+          <input id="azure_speech_corrections" name="azure_speech_corrections" type="text" />
+          <span class="field-hint">含空格须加引号，如 "Reg:RAG,L L M:LLM"</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Azure OpenAI（Insights）</h2>
+        <div class="field">
+          <label for="foundry_endpoint">FOUNDRY_ENDPOINT</label>
+          <input id="foundry_endpoint" name="foundry_endpoint" type="url" placeholder="https://xxx.openai.azure.com" />
+        </div>
+        <div class="field">
+          <label for="foundry_api_key">FOUNDRY_API_KEY</label>
+          <input id="foundry_api_key" name="foundry_api_key" type="password" autocomplete="off" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="foundry_deployment">FOUNDRY_DEPLOYMENT</label>
+            <input id="foundry_deployment" name="foundry_deployment" type="text" placeholder="gpt-4o-mini" />
+          </div>
+          <div class="field">
+            <label for="themis_analysis_enabled">THEMIS_ANALYSIS_ENABLED</label>
+            <input id="themis_analysis_enabled" name="themis_analysis_enabled" type="text" placeholder="true" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="themis_insight_dwell_secs">THEMIS_INSIGHT_DWELL_SECS</label>
+            <input id="themis_insight_dwell_secs" name="themis_insight_dwell_secs" type="text" placeholder="20" />
+          </div>
+          <div class="field">
+            <label for="themis_session_summary_interval_secs">THEMIS_SESSION_SUMMARY_INTERVAL_SECS</label>
+            <input id="themis_session_summary_interval_secs" name="themis_session_summary_interval_secs" type="text" placeholder="20" />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>音频采集</h2>
+        <div class="field">
+          <label for="themis_audio_capture_mode">THEMIS_AUDIO_CAPTURE_MODE</label>
+          <input id="themis_audio_capture_mode" name="themis_audio_capture_mode" type="text" placeholder="auto" />
+          <span class="field-hint">Win: auto/process/endpoint/call/dual · macOS: auto/process_tap/input/call/dual</span>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="themis_audio_output_device">THEMIS_AUDIO_OUTPUT_DEVICE</label>
+            <input id="themis_audio_output_device" name="themis_audio_output_device" type="text" />
+          </div>
+          <div class="field">
+            <label for="themis_audio_input_device">THEMIS_AUDIO_INPUT_DEVICE</label>
+            <input id="themis_audio_input_device" name="themis_audio_input_device" type="text" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="themis_audio_gain_max">THEMIS_AUDIO_GAIN_MAX</label>
+          <input id="themis_audio_gain_max" name="themis_audio_gain_max" type="text" placeholder="16" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>服务</h2>
+        <div class="field-row">
+          <div class="field">
+            <label for="themis_grpc_port">THEMIS_GRPC_PORT</label>
+            <input id="themis_grpc_port" name="themis_grpc_port" type="text" placeholder="50051" />
+          </div>
+          <div class="field">
+            <label for="themis_log_level">THEMIS_LOG_LEVEL</label>
+            <input id="themis_log_level" name="themis_log_level" type="text" placeholder="info" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="themis_use_mock_speech">THEMIS_USE_MOCK_SPEECH</label>
+          <input id="themis_use_mock_speech" name="themis_use_mock_speech" type="text" placeholder="留空=自动" />
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="submit" id="save-btn" class="btn primary">保存并重新加载</button>
+        <button type="button" id="reload-btn" class="btn">从磁盘重新加载</button>
+      </div>
+    </form>
+
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>
