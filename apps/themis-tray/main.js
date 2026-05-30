@@ -28,6 +28,18 @@ const sizePresetsEl = document.getElementById("size-presets");
 const sizeToggleBtn = document.getElementById("size-toggle");
 const sizeMenuEl = document.getElementById("size-menu");
 const toggleTranscriptBtn = document.getElementById("toggle-transcript");
+const opacityDownBtn = document.getElementById("opacity-down");
+const opacityUpBtn = document.getElementById("opacity-up");
+const fontDownBtn = document.getElementById("font-down");
+const fontUpBtn = document.getElementById("font-up");
+const fontResetBtn = document.getElementById("font-reset");
+
+const FONT_SCALE_MIN = 0.75;
+const FONT_SCALE_MAX = 1.5;
+const OPACITY_MIN = 0.35;
+const OPACITY_MAX = 1;
+const OPACITY_STEP = 0.05;
+const FONT_SCALE_STEP = 0.1;
 
 initTooltips();
 
@@ -38,6 +50,11 @@ function initHeaderTips() {
   setTip(quitAppBtn, tipWithHotkey("退出 Themis（停止托盘与捕捉）", "Q"));
   setTip(scrollLatestBtn, "跳转到最新字幕");
   setTip(toggleMiniBtn, tipWithHotkey("最小化为桌面浮标，全屏应用上仍可见", "M"));
+  setTip(opacityDownBtn, tipWithHotkey("降低浮层透明度", "["));
+  setTip(opacityUpBtn, tipWithHotkey("提高浮层透明度", "]"));
+  setTip(fontDownBtn, tipWithHotkey("缩小字号", "−"));
+  setTip(fontUpBtn, tipWithHotkey("放大字号", "+"));
+  setTip(fontResetBtn, tipWithHotkey("重置字号为 100%", "0"));
   setTip(
     miniFloaterEl,
     `拖动移动 · 点击恢复 · ${hotkey("M")} 浮标 / ${hotkey("O")} 唤醒`,
@@ -225,6 +242,37 @@ quitAppBtn?.addEventListener("click", async () => {
     setTip(statusEl, String(e));
   }
 });
+
+async function adjustOpacity(delta) {
+  try {
+    await invoke("adjust_overlay_opacity", { delta });
+  } catch (e) {
+    setTip(statusEl, String(e));
+  }
+}
+
+opacityDownBtn?.addEventListener("click", () => adjustOpacity(-OPACITY_STEP));
+opacityUpBtn?.addEventListener("click", () => adjustOpacity(OPACITY_STEP));
+
+async function adjustFontScale(delta) {
+  try {
+    await invoke("adjust_overlay_font_scale", { delta });
+  } catch (e) {
+    setTip(statusEl, String(e));
+  }
+}
+
+async function resetFontScale() {
+  try {
+    await invoke("reset_overlay_font_scale");
+  } catch (e) {
+    setTip(statusEl, String(e));
+  }
+}
+
+fontDownBtn?.addEventListener("click", () => adjustFontScale(-FONT_SCALE_STEP));
+fontUpBtn?.addEventListener("click", () => adjustFontScale(FONT_SCALE_STEP));
+fontResetBtn?.addEventListener("click", () => resetFontScale());
 
 listen("mini-mode-changed", (event) => {
   applyMiniMode(Boolean(event.payload));
@@ -1250,23 +1298,47 @@ function applyOverlayUi(payload) {
   overlayEl.className = `theme-${theme}`;
   const opacity =
     typeof payload.opacity === "number"
-      ? Math.min(1, Math.max(0.35, payload.opacity))
+      ? Math.min(OPACITY_MAX, Math.max(OPACITY_MIN, payload.opacity))
       : 0.92;
   overlayEl.style.opacity = String(opacity);
+  const opacityPct = Math.round(opacity * 100);
+  if (opacityDownBtn) {
+    opacityDownBtn.disabled = opacity <= OPACITY_MIN + 0.001;
+    setTip(opacityDownBtn, tipWithHotkey(`降低浮层透明度（当前 ${opacityPct}%）`, "["));
+  }
+  if (opacityUpBtn) {
+    opacityUpBtn.disabled = opacity >= OPACITY_MAX - 0.001;
+    setTip(opacityUpBtn, tipWithHotkey(`提高浮层透明度（当前 ${opacityPct}%）`, "]"));
+  }
   const fontScale =
     typeof payload.font_scale === "number"
-      ? Math.min(1.5, Math.max(0.75, payload.font_scale))
+      ? Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, payload.font_scale))
       : 1;
   overlayEl.style.setProperty("--font-scale", String(fontScale));
-  document.body.classList.toggle("adaptive-on", Boolean(payload.adaptive));
   const scalePct = Math.round(fontScale * 100);
+  if (fontDownBtn) {
+    fontDownBtn.disabled = fontScale <= FONT_SCALE_MIN + 0.001;
+    setTip(fontDownBtn, tipWithHotkey(`缩小字号（当前 ${scalePct}%）`, "−"));
+  }
+  if (fontUpBtn) {
+    fontUpBtn.disabled = fontScale >= FONT_SCALE_MAX - 0.001;
+    setTip(fontUpBtn, tipWithHotkey(`放大字号（当前 ${scalePct}%）`, "+"));
+  }
+  if (fontResetBtn) {
+    fontResetBtn.disabled = Math.abs(fontScale - 1) < 0.001;
+    setTip(
+      fontResetBtn,
+      tipWithHotkey(`重置字号为 100%（当前 ${scalePct}%）`, "0"),
+    );
+  }
+  document.body.classList.toggle("adaptive-on", Boolean(payload.adaptive));
   const saved = payload.theme && payload.theme !== theme ? ` · saved ${payload.theme}` : "";
   themeBadgeEl.textContent = themeShortLabel(theme);
   setTip(
     themeBadgeEl,
     payload.adaptive
-      ? `${theme}${saved} (自动对比度) · 字号 ${scalePct}% · ${hotkey("S")} 切换样式`
-      : `${theme} · 字号 ${scalePct}% · ${hotkey("S")} 切换样式 · ${hotkey("−")}/${hotkey("+")} 调字号`,
+      ? `${theme}${saved} · 自动对比度 · ${hotkey("S")} 切换样式 · ${hotkey("A")} 自适应`
+      : `${theme}${saved} · ${hotkey("S")} 切换样式 · ${hotkey("A")} 自适应对比`,
   );
 }
 

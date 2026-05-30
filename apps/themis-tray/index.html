@@ -31,23 +31,78 @@
       </div>
 
       <header id="drag-handle" class="overlay-header" data-tip="拖动标题栏移动窗口">
-        <div class="header-left">
-          <span class="brand">Themis</span>
-          <span id="theme-badge" class="theme-badge" data-tip="主题与字号">dark</span>
-        </div>
-        <div class="header-actions">
-          <button type="button" id="toggle-capture" class="header-btn capture-btn">捕捉</button>
-          <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" aria-pressed="false">诊断</button>
-          <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" aria-pressed="true">中文</button>
-          <button type="button" id="toggle-mini" class="header-btn mini-toggle">浮</button>
-          <div class="size-presets" id="size-presets">
-            <button type="button" id="size-toggle" class="header-btn size-toggle" aria-expanded="false" aria-haspopup="true">尺寸</button>
-            <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
+        <div class="header-grid">
+          <div class="header-row header-row-primary">
+            <div class="header-brand-block">
+              <span class="brand">Themis</span>
+              <span id="theme-badge" class="theme-badge" data-tip="主题与样式">dark</span>
+            </div>
+            <div class="header-actions header-actions-primary">
+              <button type="button" id="toggle-capture" class="header-btn capture-btn">捕捉</button>
+              <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" aria-pressed="false">诊断</button>
+              <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" aria-pressed="true">中文</button>
+              <button type="button" id="clear-session" class="header-btn clear-session">清空</button>
+            </div>
           </div>
-          <button type="button" id="clear-session" class="header-btn clear-session">清空</button>
-          <button type="button" id="hide-overlay" class="header-btn hide-window">隐藏</button>
-          <button type="button" id="quit-app" class="header-btn quit-btn">退出</button>
-          <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden">↓ Latest</button>
+          <div class="header-row header-row-secondary">
+            <div class="header-tuning">
+              <div class="header-segment" role="group" aria-label="窗口透明度">
+                <span class="header-segment-label" aria-hidden="true">透</span>
+                <button type="button" id="opacity-down" class="header-segment-step" aria-label="降低透明度">
+                  <svg class="header-segment-icon" viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M2.5 6h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" id="opacity-up" class="header-segment-step" aria-label="提高透明度">
+                  <svg class="header-segment-icon" viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M6 2.5v7M2.5 6h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+              <div class="header-segment" role="group" aria-label="文字大小">
+                <span class="header-segment-label" aria-hidden="true">字</span>
+                <button type="button" id="font-down" class="header-segment-step" aria-label="缩小字号">
+                  <svg class="header-segment-icon" viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M2.5 6h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" id="font-up" class="header-segment-step" aria-label="放大字号">
+                  <svg class="header-segment-icon" viewBox="0 0 12 12" aria-hidden="true">
+                    <path d="M6 2.5v7M2.5 6h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" id="font-reset" class="header-segment-step header-segment-reset" aria-label="重置字号">
+                  <svg class="header-segment-icon" viewBox="0 0 12 12" aria-hidden="true">
+                    <path
+                      d="M6 2.6v1.9M4.4 4.1a3.1 3.1 0 1 0 2.2 5.3"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.45"
+                      stroke-linecap="round"
+                    />
+                    <path
+                      d="M4.6 2.6H6v1.4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.45"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="header-actions header-actions-secondary">
+              <button type="button" id="toggle-mini" class="header-btn mini-toggle">浮</button>
+              <div class="size-presets" id="size-presets">
+                <button type="button" id="size-toggle" class="header-btn size-toggle" aria-expanded="false" aria-haspopup="true">尺寸</button>
+                <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
+              </div>
+              <button type="button" id="hide-overlay" class="header-btn hide-window">隐藏</button>
+              <button type="button" id="quit-app" class="header-btn quit-btn">退出</button>
+              <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden">↓ Latest</button>
+            </div>
+          </div>
         </div>
       </header>
       <p id="status" class="status-line">Connecting…</p>

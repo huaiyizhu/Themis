@@ -243,6 +243,27 @@ fn adjust_overlay_opacity(
 }
 
 #[tauri::command]
+fn adjust_overlay_font_scale(
+    app: AppHandle,
+    ui: State<'_, Arc<OverlayUiState>>,
+    delta: f64,
+) -> Result<OverlayUiSettings, String> {
+    let settings = ui.adjust_font_scale(delta);
+    apply_overlay_ui(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+fn reset_overlay_font_scale(
+    app: AppHandle,
+    ui: State<'_, Arc<OverlayUiState>>,
+) -> Result<OverlayUiSettings, String> {
+    let settings = ui.reset_font_scale();
+    apply_overlay_ui(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
 fn cycle_overlay_theme(
     app: AppHandle,
     ui: State<'_, Arc<OverlayUiState>>,
@@ -1206,6 +1227,8 @@ pub fn run() {
             get_insight_settings,
             set_insight_localize,
             adjust_overlay_opacity,
+            adjust_overlay_font_scale,
+            reset_overlay_font_scale,
             cycle_overlay_theme,
             toggle_overlay_adaptive,
             clear_listening_session,

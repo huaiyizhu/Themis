@@ -377,12 +377,11 @@ body.adaptive-on .theme-badge::after {
 }
 
 .overlay-header {
-  align-items: center;
+  align-items: stretch;
   cursor: grab;
   display: flex;
+  flex-direction: column;
   flex-shrink: 0;
-  gap: 8px;
-  justify-content: space-between;
   position: relative;
   user-select: none;
   z-index: 30;
@@ -393,7 +392,58 @@ body.adaptive-on .theme-badge::after {
   cursor: grabbing;
 }
 
-.overlay-header .header-btn {
+.header-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+.header-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.header-brand-block {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-tuning {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-shrink: 0;
+  gap: 6px;
+  min-width: 0;
+}
+
+.header-actions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.header-actions-primary {
+  max-width: 55%;
+}
+
+.header-actions-secondary {
+  max-width: 72%;
+}
+
+.overlay-header .header-btn,
+.overlay-header .header-segment,
+.overlay-header .size-presets {
   -webkit-app-region: no-drag;
   cursor: pointer;
 }
@@ -424,11 +474,106 @@ body.adaptive-on .theme-badge::after {
   min-width: 0;
 }
 
-.header-actions {
-  align-items: center;
-  display: flex;
+.header-segment {
+  align-items: stretch;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  display: inline-flex;
   flex-shrink: 0;
-  gap: 6px;
+  overflow: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.header-segment-label {
+  align-items: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  color: inherit;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 500;
+  justify-content: center;
+  min-width: 22px;
+  opacity: 0.78;
+  padding: 2px 6px;
+  user-select: none;
+}
+
+.header-segment-step {
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  height: auto;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0;
+  transition: background 0.12s ease;
+  width: 26px;
+}
+
+.header-segment-step + .header-segment-step {
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.header-segment-step:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.header-segment-step:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.header-segment-step:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.header-segment-step:disabled .header-segment-icon {
+  opacity: 0.55;
+}
+
+.header-segment-icon {
+  display: block;
+  flex-shrink: 0;
+  height: 11px;
+  width: 11px;
+}
+
+.theme-light-glass .header-segment,
+.theme-solid-light .header-segment,
+.theme-paper .header-segment,
+.theme-cream .header-segment,
+.theme-high-contrast-light .header-segment {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.theme-light-glass .header-segment-label,
+.theme-solid-light .header-segment-label,
+.theme-paper .header-segment-label,
+.theme-cream .header-segment-label,
+.theme-high-contrast-light .header-segment-label {
+  border-right-color: rgba(0, 0, 0, 0.1);
+  opacity: 0.72;
+}
+
+.theme-light-glass .header-segment-step + .header-segment-step,
+.theme-solid-light .header-segment-step + .header-segment-step,
+.theme-paper .header-segment-step + .header-segment-step,
+.theme-cream .header-segment-step + .header-segment-step,
+.theme-high-contrast-light .header-segment-step + .header-segment-step {
+  border-left-color: rgba(0, 0, 0, 0.1);
+}
+
+.theme-light-glass .header-segment-step:hover:not(:disabled),
+.theme-solid-light .header-segment-step:hover:not(:disabled),
+.theme-paper .header-segment-step:hover:not(:disabled),
+.theme-cream .header-segment-step:hover:not(:disabled),
+.theme-high-contrast-light .header-segment-step:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .header-btn {
