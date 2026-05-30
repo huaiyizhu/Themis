@@ -28,7 +28,10 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Listener, Manager, State,
 };
-use themis_core::{AnalysisPrefs, ConfigStatusSnapshot, ThemisConfig};
+use themis_core::{
+    AnalysisPrefs, ConfigStatusSnapshot, EnvSettings, ThemisConfig,
+    read_env_settings, write_env_settings,
+};
 use themis_ipc::client::connect;
 use themis_ipc::{
     ExpandInsightRequest, GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest,
@@ -217,13 +220,40 @@ struct InsightSettingsDto {
     localize_zh: bool,
 }
 
+#[derive(Clone, Serialize)]
+struct EnvSettingsFileDto {
+    path: String,
+    exists: bool,
+    settings: EnvSettings,
+}
+
+#[derive(Clone, Serialize)]
+struct EnvSettingsSaveResult {
+    path: String,
+    config: ConfigCrossCheckDto,
+    message: String,
+}
+
 #[derive(Clone)]
 struct AppState {
-    config: ThemisConfig,
+    config: Arc<std::sync::Mutex<ThemisConfig>>,
     capturing: Arc<Mutex<bool>>,
     stream_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     overlay: Arc<Mutex<OverlayMirror>>,
     mini_mode: Arc<std::sync::Mutex<MiniModeState>>,
+}
+
+impl AppState {
+    fn grpc_port(&self) -> u16 {
+        self.config.lock().unwrap().grpc_port
+    }
+
+    fn config_crosscheck_with(
+        &self,
+        service: Option<ConfigStatusDto>,
+    ) -> ConfigCrossCheckDto {
+        build_config_crosscheck(&self.config.lock().unwrap(), service)
+    }
 }
 
 #[tauri::command]
@@ -291,8 +321,9 @@ fn quit_app(app: AppHandle) {
 #[tauri::command]
 fn get_insight_settings(state: State<'_, AppState>) -> InsightSettingsDto {
     let prefs = AnalysisPrefs::load();
+    let cfg = state.config.lock().unwrap();
     InsightSettingsDto {
-        insight_dwell_ms: state.config.insight_dwell_secs.saturating_mul(1000),
+        insight_dwell_ms: cfg.insight_dwell_secs.saturating_mul(1000),
         localize_zh: prefs.localize_zh,
     }
 }
@@ -310,7 +341,8 @@ fn set_insight_localize(localize_zh: bool) -> Result<InsightSettingsDto, String>
 
 #[tauri::command]
 async fn get_config_crosscheck(state: State<'_, AppState>) -> Result<ConfigCrossCheckDto, String> {
-    let service = match connect(state.config.grpc_port).await {
+    let port = state.grpc_port();
+    let service = match connect(port).await {
         Ok(mut client) => client
             .get_status(GetStatusRequest {})
             .await
@@ -319,12 +351,158 @@ async fn get_config_crosscheck(state: State<'_, AppState>) -> Result<ConfigCross
             .map(|p| config_from_proto(&p)),
         Err(_) => None,
     };
-    Ok(build_config_crosscheck(&state.config, service))
+    Ok(state.config_crosscheck_with(service))
+}
+
+#[tauri::command]
+fn get_env_settings() -> Result<EnvSettingsFileDto, String> {
+    let (path, settings) = read_env_settings()?;
+    let exists = path.is_file();
+    Ok(EnvSettingsFileDto {
+        path: path.display().to_string(),
+        exists,
+        settings,
+    })
+}
+
+fn stop_service_process() {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let _ = std::process::Command::new("taskkill")
+            .args(["/IM", "themis-service.exe", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("pkill")
+            .args(["-x", "themis-service"])
+            .output();
+    }
+}
+
+async fn restart_service_with_config(
+    app: &AppHandle,
+    state: &AppState,
+    cfg: &ThemisConfig,
+) -> Result<(), String> {
+    let was_capturing = *state.capturing.lock().await;
+    if was_capturing {
+        if let Ok(mut client) = connect(state.grpc_port()).await {
+            let _ = client.stop_capture(StopCaptureRequest {}).await;
+        }
+        *state.capturing.lock().await = false;
+        stop_transcript_stream(state).await;
+        let _ = app.emit("capture-stopped", ());
+    }
+
+    stop_service_process();
+    sleep(Duration::from_millis(1200)).await;
+    spawn_service_if_needed(cfg);
+
+    for attempt in 0..20u32 {
+        if connect(state.grpc_port()).await.is_ok() {
+            break;
+        }
+        if attempt == 19 {
+            return Err("themis-service did not come back online after reload".into());
+        }
+        sleep(Duration::from_millis(500)).await;
+    }
+
+    if was_capturing {
+        start_capture_services(app, state).await?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_env_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    settings: EnvSettings,
+) -> Result<EnvSettingsSaveResult, String> {
+    let (path, _) = read_env_settings()?;
+    write_env_settings(&path, &settings)?;
+    let new_cfg = ThemisConfig::reload_from_disk();
+    *state.config.lock().unwrap() = new_cfg.clone();
+    restart_service_with_config(&app, state.inner(), &new_cfg).await?;
+
+    let service = match connect(state.grpc_port()).await {
+        Ok(mut client) => client
+            .get_status(GetStatusRequest {})
+            .await
+            .ok()
+            .and_then(|r| r.into_inner().service_config)
+            .map(|p| config_from_proto(&p)),
+        Err(_) => None,
+    };
+
+    let _ = app.emit("env-settings-saved", ());
+    Ok(EnvSettingsSaveResult {
+        path: path.display().to_string(),
+        config: state.config_crosscheck_with(service),
+        message: "已保存到 .env 并重新加载服务".into(),
+    })
+}
+
+#[tauri::command]
+async fn reload_env_settings(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<EnvSettingsSaveResult, String> {
+    let path = themis_core::env_file_path_or_default();
+    let new_cfg = ThemisConfig::reload_from_disk();
+    *state.config.lock().unwrap() = new_cfg.clone();
+    restart_service_with_config(&app, state.inner(), &new_cfg).await?;
+    let service = match connect(state.grpc_port()).await {
+        Ok(mut client) => client
+            .get_status(GetStatusRequest {})
+            .await
+            .ok()
+            .and_then(|r| r.into_inner().service_config)
+            .map(|p| config_from_proto(&p)),
+        Err(_) => None,
+    };
+    Ok(EnvSettingsSaveResult {
+        path: path.display().to_string(),
+        config: state.config_crosscheck_with(service),
+        message: "已从 .env 重新加载".into(),
+    })
+}
+
+#[tauri::command]
+fn is_settings_visible(app: AppHandle) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("settings")
+        .ok_or_else(|| "settings window not found".to_string())?;
+    w.is_visible().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn toggle_settings_window(app: AppHandle) -> Result<bool, String> {
+    let w = app
+        .get_webview_window("settings")
+        .ok_or_else(|| "settings window not found".to_string())?;
+    let visible = w.is_visible().map_err(|e| e.to_string())?;
+    if visible {
+        w.hide().map_err(|e| e.to_string())?;
+        let _ = app.emit("settings-visibility", false);
+        Ok(false)
+    } else {
+        w.show().map_err(|e| e.to_string())?;
+        w.set_focus().map_err(|e| e.to_string())?;
+        let _ = app.emit("settings-visibility", true);
+        Ok(true)
+    }
 }
 
 #[tauri::command]
 async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
-    let mut client = connect(state.config.grpc_port)
+    let port = state.grpc_port();
+    let mut client = connect(port)
         .await
         .map_err(|e| e.to_string())?;
     let resp = client
@@ -344,7 +522,7 @@ async fn get_status(state: State<'_, AppState>) -> Result<StatusDto, String> {
         capture_mode: resp.capture_mode,
         audio_sessions: resp.audio_sessions,
         capture_detail: resp.capture_detail,
-        config: build_config_crosscheck(&state.config, service_config),
+        config: state.config_crosscheck_with(service_config),
     })
 }
 
@@ -365,7 +543,7 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
     let last_ui_latency_ms = overlay.last_ui_latency_ms;
     drop(overlay);
 
-    let mut client = connect(state.config.grpc_port)
+    let mut client = connect(state.grpc_port())
         .await
         .map_err(|e| e.to_string())?;
     let resp = client
@@ -456,7 +634,7 @@ async fn get_diagnostics(state: State<'_, AppState>) -> Result<DiagnosticsDto, S
             last_llm_status: a_sum.last_llm_status,
         },
         analysis_records,
-        config: build_config_crosscheck(&state.config, service_config),
+        config: state.config_crosscheck_with(service_config),
     })
 }
 
@@ -651,7 +829,7 @@ async fn expand_insight(
     subject: String,
     brief: String,
 ) -> Result<String, String> {
-    let mut client = connect(state.config.grpc_port)
+    let mut client = connect(state.grpc_port())
         .await
         .map_err(|e| e.to_string())?;
     let resp = client
@@ -676,7 +854,7 @@ async fn expand_insight(
 
 #[tauri::command]
 async fn clear_listening_session(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    let mut client = connect(state.config.grpc_port)
+    let mut client = connect(state.grpc_port())
         .await
         .map_err(|e| e.to_string())?;
     let resp = client
@@ -702,7 +880,7 @@ async fn start_capture_services(app: &AppHandle, state: &AppState) -> Result<(),
         *o = OverlayMirror::default();
     }
     start_transcript_stream(app.clone(), state.clone()).await;
-    let mut client = connect(state.config.grpc_port)
+    let mut client = connect(state.grpc_port())
         .await
         .map_err(|e| e.to_string())?;
     client
@@ -737,7 +915,7 @@ async fn toggle_capture(app: AppHandle) -> Result<bool, String> {
     let pending = if capturing { "stopping" } else { "starting" };
     let _ = app.emit("capture-toggle-pending", pending);
 
-    let mut client = connect(state.config.grpc_port)
+    let mut client = connect(state.grpc_port())
         .await
         .map_err(|e| {
             let msg = e.to_string();
@@ -790,7 +968,7 @@ async fn update_overlay_mirror(state: &AppState, text: &str, is_final: bool) {
 }
 
 async fn start_transcript_stream(app: AppHandle, state: AppState) {
-    let port = state.config.grpc_port;
+    let port = state.grpc_port();
     let loop_state = state.clone();
     let handle = tokio::spawn(async move {
         loop {
@@ -1210,7 +1388,7 @@ pub fn run() {
         })
         .manage(ui_state)
         .manage(AppState {
-            config: config.clone(),
+            config: Arc::new(std::sync::Mutex::new(config.clone())),
             capturing: Arc::new(Mutex::new(false)),
             stream_task: Arc::new(Mutex::new(None)),
             overlay: Arc::new(Mutex::new(OverlayMirror::default())),
@@ -1223,6 +1401,11 @@ pub fn run() {
             get_diagnostics,
             toggle_diagnose_window,
             is_diagnose_visible,
+            toggle_settings_window,
+            is_settings_visible,
+            get_env_settings,
+            save_env_settings,
+            reload_env_settings,
             get_overlay_ui,
             get_insight_settings,
             set_insight_localize,

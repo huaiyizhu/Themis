@@ -61,6 +61,21 @@
         "resizable": true,
         "skipTaskbar": false,
         "visible": false
+      },
+      {
+        "label": "settings",
+        "title": "Themis Settings",
+        "url": "settings.html",
+        "width": 760,
+        "height": 720,
+        "minWidth": 560,
+        "minHeight": 480,
+        "alwaysOnTop": false,
+        "decorations": true,
+        "transparent": false,
+        "resizable": true,
+        "skipTaskbar": false,
+        "visible": false
       }
     ],
     "security": {

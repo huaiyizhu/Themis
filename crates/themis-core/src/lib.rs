@@ -3,6 +3,7 @@ mod analysis_diag;
 mod analysis_prefs;
 mod capture_diag;
 mod config;
+mod env_file;
 mod frame;
 mod gain;
 mod latency;
@@ -20,7 +21,11 @@ pub use analysis_diag::{
     AnalysisInsightRecord,
 };
 pub use capture_diag::{CaptureDiagnostics, CaptureDiagnosticsSnapshot};
-pub use config::{find_dotenv_directory, ConfigStatusSnapshot, ThemisConfig};
+pub use config::{find_dotenv_directory, reload_dotenv_override, ConfigStatusSnapshot, ThemisConfig};
+pub use env_file::{
+    env_file_directory, env_file_path, env_file_path_or_default, read_env_settings, write_env_settings,
+    EnvSettings, MANAGED_ENV_KEYS,
+};
 pub use frame::{AudioFrame, SampleFormat};
 pub use gain::normalize_pcm16;
 pub use latency::{

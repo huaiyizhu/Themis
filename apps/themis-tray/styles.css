@@ -622,7 +622,8 @@ body.adaptive-on .theme-badge::after {
   border-color: rgba(255, 184, 108, 0.4);
 }
 
-.header-btn.diagnose-btn.is-open {
+.header-btn.diagnose-btn.is-open,
+.header-btn.settings-btn.is-open {
   background: rgba(155, 180, 255, 0.22);
   border-color: rgba(155, 180, 255, 0.45);
 }
@@ -637,10 +638,15 @@ body.adaptive-on .theme-badge::after {
 }
 
 .theme-light-glass .header-btn.diagnose-btn.is-open,
+.theme-light-glass .header-btn.settings-btn.is-open,
 .theme-solid-light .header-btn.diagnose-btn.is-open,
+.theme-solid-light .header-btn.settings-btn.is-open,
 .theme-paper .header-btn.diagnose-btn.is-open,
+.theme-paper .header-btn.settings-btn.is-open,
 .theme-cream .header-btn.diagnose-btn.is-open,
-.theme-high-contrast-light .header-btn.diagnose-btn.is-open {
+.theme-cream .header-btn.settings-btn.is-open,
+.theme-high-contrast-light .header-btn.diagnose-btn.is-open,
+.theme-high-contrast-light .header-btn.settings-btn.is-open {
   background: rgba(0, 70, 180, 0.12);
   border-color: rgba(0, 70, 180, 0.3);
 }

@@ -133,10 +133,34 @@ fn load_dotenv() {
     }
 }
 
+/// Reload `.env` into the process environment, overriding existing keys.
+pub fn reload_dotenv_override() {
+    if dotenvy::dotenv_override().is_ok() {
+        return;
+    }
+    if let Some(dir) = find_dotenv_directory() {
+        let _ = dotenvy::from_path_override(dir.join(".env"));
+    } else {
+        let path = crate::env_file::env_file_path_or_default();
+        if path.is_file() {
+            let _ = dotenvy::from_path_override(&path);
+        }
+    }
+}
+
 impl ThemisConfig {
     pub fn from_env() -> Self {
         load_dotenv();
+        Self::from_process_env()
+    }
 
+    /// Re-read `.env` from disk and rebuild config (overrides in-process env vars).
+    pub fn reload_from_disk() -> Self {
+        reload_dotenv_override();
+        Self::from_process_env()
+    }
+
+    fn from_process_env() -> Self {
         let key = std::env::var("AZURE_SPEECH_KEY")
             .ok()
             .filter(|s| !s.is_empty());

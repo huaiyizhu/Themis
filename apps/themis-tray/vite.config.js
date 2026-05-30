@@ -13,6 +13,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "index.html"),
         diagnose: resolve(__dirname, "diagnose.html"),
+        settings: resolve(__dirname, "settings.html"),
         mini: resolve(__dirname, "mini.html"),
       },
     },

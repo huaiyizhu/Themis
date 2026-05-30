@@ -19,6 +19,7 @@ const scrollLatestBtn = document.getElementById("scroll-latest");
 const clearSessionBtn = document.getElementById("clear-session");
 const toggleCaptureBtn = document.getElementById("toggle-capture");
 const toggleDiagnoseBtn = document.getElementById("toggle-diagnose");
+const toggleSettingsBtn = document.getElementById("toggle-settings");
 const toggleLocalizeBtn = document.getElementById("toggle-localize");
 const toggleMiniBtn = document.getElementById("toggle-mini");
 const hideOverlayBtn = document.getElementById("hide-overlay");
@@ -775,6 +776,22 @@ async function syncDiagnoseButton() {
   }
 }
 
+function updateSettingsButton(open) {
+  if (!toggleSettingsBtn) return;
+  toggleSettingsBtn.classList.toggle("is-open", open);
+  setTip(toggleSettingsBtn, open ? "关闭配置窗口" : "编辑 .env 配置");
+  toggleSettingsBtn.setAttribute("aria-pressed", open ? "true" : "false");
+}
+
+async function syncSettingsButton() {
+  try {
+    const open = await invoke("is_settings_visible");
+    updateSettingsButton(Boolean(open));
+  } catch {
+    /* not in tauri shell */
+  }
+}
+
 function formatInsightTime(ms) {
   return new Date(ms).toLocaleTimeString("zh-CN", {
     hour: "2-digit",
@@ -1272,6 +1289,23 @@ listen("diagnose-visibility", (event) => {
   updateDiagnoseButton(Boolean(event.payload));
 });
 
+toggleSettingsBtn?.addEventListener("click", async () => {
+  try {
+    const open = await invoke("toggle_settings_window");
+    updateSettingsButton(Boolean(open));
+  } catch (e) {
+    setTip(statusEl, String(e));
+  }
+});
+
+listen("settings-visibility", (event) => {
+  updateSettingsButton(Boolean(event.payload));
+});
+
+listen("env-settings-saved", () => {
+  refreshConfigStatus();
+});
+
 const THEME_SHORT_LABELS = {
   "dark-glass": "dark",
   "light-glass": "light",
@@ -1401,6 +1435,7 @@ toggleLocalizeBtn?.addEventListener("click", async () => {
 loadOverlayUi();
 loadInsightSettings();
 syncDiagnoseButton();
+syncSettingsButton();
 syncMiniMode();
 refreshStatus();
 setInterval(refreshStatus, 5000);
