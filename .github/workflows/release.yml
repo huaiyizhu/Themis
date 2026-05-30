@@ -74,7 +74,10 @@ jobs:
 
       - name: Bundle Tauri installers
         working-directory: apps/themis-tray
-        run: npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config '{"build":{"beforeBuildCommand":""}}'
+        shell: bash
+        run: |
+          # bash avoids PowerShell stripping JSON quotes in --config on Windows.
+          npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config '{"build":{"beforeBuildCommand":""}}'
         env:
           CI: "true"
           RUSTFLAGS: ${{ matrix.rustflags }}
