@@ -119,18 +119,16 @@ Themis **默认只抓系统播放声**（输出）；在特定模式或检测到
 1. 打开 GitHub 仓库 **Releases** 页（标签形如 `v0.1.0` 的发布）。
 2. 若尚无 Release，需维护者先 [触发 Release Pipeline](#3-触发-release-pipeline)；在此之前只能从 [源码构建](#4-本地编译与调试)。
 
-| 平台 | 下载文件 | 说明 |
-|------|----------|------|
-| **Windows x64** | `themis-windows-x86_64.zip` | 含 `themis-service.exe`、`themis-cli.exe`、Tauri 安装包目录 |
-| **macOS Apple Silicon** | `themis-macos-aarch64.zip` | 同上 + `.app` / `.dmg` 等 bundle |
-| **macOS Intel** | `themis-macos-x86_64.zip` | 同上 |
+| 平台 | 文件名前缀 | 典型文件 |
+|------|------------|----------|
+| **Windows x64** | `themis-windows-x86_64-` | `themis-tray.exe`、`themis-service.exe`、`*-setup.exe`（NSIS 安装程序） |
+| **macOS Apple Silicon** | `themis-macos-aarch64-` | `themis-tray`、`themis-service`、`.dmg` |
+| **macOS Intel** | `themis-macos-x86_64-` | 同上 |
 
-zip 内 `tauri-bundle/` 通常包含：
+Release 页直接提供**多个文件**（不再套一层 zip）。按需下载：
 
-- **Windows**：`.msi`（WiX）或 `.exe`（NSIS 安装程序）
-- **macOS**：`.dmg` 或 `.app`
-
-也可 **免安装便携运行**：解压后直接使用其中的 `themis-tray` 可执行文件（见下文）。
+- **安装**：Windows 用 `*-setup.exe`；macOS 用 `.dmg`
+- **便携**：同前缀的 `themis-tray` / `themis-service` / `themis-cli` 放在同一目录，配好 `.env` 后运行 `themis-tray`
 
 ### 2.2 环境要求
 
@@ -289,10 +287,7 @@ git push origin v0.1.0
 推送标签后：
 
 1. 打开 GitHub → **Actions** → **Release**，查看运行进度
-2. 成功后 **Releases** 页会出现 `v0.1.0`，附件含：
-   - `themis-windows-x86_64.zip`
-   - `themis-macos-aarch64.zip`
-   - `themis-macos-x86_64.zip`
+2. 成功后 **Releases** 页会出现 `v0.1.0`，附件为各平台**扁平文件**（如 `themis-windows-x86_64-themis-tray.exe`、`*-setup.exe`、`.dmg` 等，**不再**提供套 zip 的 monolithic 包）
 3. Release 说明由 `generate_release_notes: true` 自动生成
 
 ### 3.3 Release 构建内容（各 job）
@@ -307,13 +302,13 @@ push tag v*
 │  · macos-latest    → aarch64-apple-darwin                │
 │  · macos-latest    → x86_64-apple-darwin                 │
 │    ① cargo build --release themis-service + themis-cli   │
-│    ② npm install + tauri build（含 NSIS/MSI 或 dmg）      │
-│    ③ 打包 zip → upload-artifact                          │
+│    ② npm install + tauri build（NSIS + dmg）              │
+│    ③ 收集 exe / 安装包（跳过 .zip 更新包）→ upload-artifact │
 └───────────────────────────┬─────────────────────────────┘
                             ▼
 ┌─────────────────────────────────────────────────────────┐
 │  release (ubuntu-latest)                                 │
-│    合并 artifacts → softprops/action-gh-release 上传      │
+│    合并 artifacts → 直接上传 GitHub Release（无外层 zip） │
 └─────────────────────────────────────────────────────────┘
 ```
 

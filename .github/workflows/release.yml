@@ -58,65 +58,21 @@ jobs:
         env:
           CI: "true"
 
-      - name: Package artifacts (Unix)
+      - name: Package release assets (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: |
-          set -euo pipefail
-          target="${{ matrix.target }}"
-          mkdir -p dist
-          for base in "target/${target}/release" "target/release"; do
-            shopt -s nullglob
-            for f in "${base}"/themis-service* "${base}"/themis-cli* "${base}"/themis-tray*; do
-              [ -e "$f" ] && cp "$f" dist/
-            done
-          done
-          for bundle in \
-            "target/${target}/release/bundle" \
-            "target/release/bundle" \
-            "apps/themis-tray/src-tauri/target/${target}/release/bundle"; do
-            if [ -d "$bundle" ]; then
-              cp -r "$bundle" dist/tauri-bundle
-              break
-            fi
-          done
-          cd dist && zip -r "../themis-${{ matrix.name }}.zip" .
+        run: bash scripts/package-release-assets.sh "${{ matrix.target }}" "${{ matrix.name }}"
 
-      - name: Package artifacts (Windows)
+      - name: Package release assets (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $target = "${{ matrix.target }}"
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          foreach ($base in @("target/$target/release", "target/release")) {
-            if (-not (Test-Path $base)) { continue }
-            Get-ChildItem $base -Filter "themis-service*" -File | Copy-Item -Destination dist
-            Get-ChildItem $base -Filter "themis-cli*" -File | Copy-Item -Destination dist
-            Get-ChildItem $base -Filter "themis-tray*" -File | Copy-Item -Destination dist
-          }
-          foreach ($bundle in @(
-            "target/$target/release/bundle",
-            "target/release/bundle",
-            "apps/themis-tray/src-tauri/target/$target/release/bundle"
-          )) {
-            if (Test-Path $bundle) {
-              Copy-Item $bundle dist/tauri-bundle -Recurse
-              break
-            }
-          }
-          if (-not (Get-ChildItem dist -Force | Select-Object -First 1)) {
-            Write-Error "dist/ is empty — no release binaries or bundles found"
-          }
-          if (Test-Path "themis-${{ matrix.name }}.zip") {
-            Remove-Item "themis-${{ matrix.name }}.zip" -Force
-          }
-          Compress-Archive -Path dist/* -DestinationPath "themis-${{ matrix.name }}.zip"
+        run: ./scripts/package-release-assets.ps1 -Target "${{ matrix.target }}" -Name "${{ matrix.name }}"
 
       - uses: actions/upload-artifact@v4
         with:
           name: themis-${{ matrix.name }}
-          path: themis-${{ matrix.name }}.zip
+          path: release-assets/${{ matrix.name }}/
+          if-no-files-found: error
 
   release:
     needs: build
@@ -127,10 +83,19 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Flatten artifacts
-        run: find artifacts -name '*.zip' -exec cp {} . \;
+      - name: Flatten release assets
+        shell: bash
+        run: |
+          mkdir -p release-upload
+          find artifacts -type f \
+            ! -name '*.zip' \
+            ! -name '*.tar.gz' \
+            ! -name '*.sig' \
+            -exec cp {} release-upload/ \;
+          echo "Uploading:"
+          ls -la release-upload/
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: "*.zip"
+          files: release-upload/*
           generate_release_notes: true

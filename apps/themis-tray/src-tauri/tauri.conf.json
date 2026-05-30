@@ -70,7 +70,8 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "dmg"],
+    "createUpdaterArtifacts": false,
     "macOS": {
       "infoPlist": "Info.plist"
     },
