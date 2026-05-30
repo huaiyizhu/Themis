@@ -45,24 +45,73 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Prepare macOS Tauri icons
+        if: runner.os == 'macOS'
+        run: bash scripts/prepare-macos-icons.sh
+
       - name: Build Tauri bundle
         working-directory: apps/themis-tray
         run: |
           npm install
+          npm run icons
           npm run tauri build -- --target ${{ matrix.target }}
         env:
           CI: "true"
 
-      - name: Package artifacts
+      - name: Package artifacts (Unix)
+        if: runner.os != 'Windows'
         shell: bash
         run: |
+          set -euo pipefail
+          target="${{ matrix.target }}"
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/themis-service* dist/ 2>/dev/null || cp target/release/themis-service* dist/ || true
-          cp target/${{ matrix.target }}/release/themis-cli* dist/ 2>/dev/null || cp target/release/themis-cli* dist/ || true
-          if [ -d "apps/themis-tray/src-tauri/target/${{ matrix.target }}/release/bundle" ]; then
-            cp -r apps/themis-tray/src-tauri/target/${{ matrix.target }}/release/bundle dist/tauri-bundle
-          fi
-          cd dist && zip -r ../themis-${{ matrix.name }}.zip .
+          for base in "target/${target}/release" "target/release"; do
+            shopt -s nullglob
+            for f in "${base}"/themis-service* "${base}"/themis-cli* "${base}"/themis-tray*; do
+              [ -e "$f" ] && cp "$f" dist/
+            done
+          done
+          for bundle in \
+            "target/${target}/release/bundle" \
+            "target/release/bundle" \
+            "apps/themis-tray/src-tauri/target/${target}/release/bundle"; do
+            if [ -d "$bundle" ]; then
+              cp -r "$bundle" dist/tauri-bundle
+              break
+            fi
+          done
+          cd dist && zip -r "../themis-${{ matrix.name }}.zip" .
+
+      - name: Package artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $target = "${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          foreach ($base in @("target/$target/release", "target/release")) {
+            if (-not (Test-Path $base)) { continue }
+            Get-ChildItem $base -Filter "themis-service*" -File | Copy-Item -Destination dist
+            Get-ChildItem $base -Filter "themis-cli*" -File | Copy-Item -Destination dist
+            Get-ChildItem $base -Filter "themis-tray*" -File | Copy-Item -Destination dist
+          }
+          foreach ($bundle in @(
+            "target/$target/release/bundle",
+            "target/release/bundle",
+            "apps/themis-tray/src-tauri/target/$target/release/bundle"
+          )) {
+            if (Test-Path $bundle) {
+              Copy-Item $bundle dist/tauri-bundle -Recurse
+              break
+            }
+          }
+          if (-not (Get-ChildItem dist -Force | Select-Object -First 1)) {
+            Write-Error "dist/ is empty — no release binaries or bundles found"
+          }
+          if (Test-Path "themis-${{ matrix.name }}.zip") {
+            Remove-Item "themis-${{ matrix.name }}.zip" -Force
+          }
+          Compress-Archive -Path dist/* -DestinationPath "themis-${{ matrix.name }}.zip"
 
       - uses: actions/upload-artifact@v4
         with:
