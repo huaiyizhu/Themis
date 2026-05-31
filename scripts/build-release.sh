@@ -29,6 +29,11 @@ esac
 
 OUT_DIR="$ROOT/release-assets/$NAME"
 
+if command -v rustup >/dev/null 2>&1; then
+  echo "Ensuring Rust target ${TARGET}..."
+  rustup target add "${TARGET}"
+fi
+
 export CARGO_TERM_COLOR=always
 export THEMIS_USE_MOCK_SPEECH=true
 export CARGO_PROFILE_RELEASE_LTO=thin
@@ -63,8 +68,10 @@ else
 fi
 
 echo "[4/4] Collect release assets..."
-bash scripts/package-release-assets.sh "$TARGET" "$NAME"
+bash scripts/package-release-assets.sh "$TARGET" "$NAME" --flat-names
 cp packaging/RELEASE-INDEX.md "$OUT_DIR/README.md"
+
+unset THEMIS_USE_MOCK_SPEECH || true
 
 echo ""
 echo "Done. Release files:"

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Collect flat release files (no nested zip/tar.gz updater bundles).
-# Usage: package-release-assets.sh <rust-target-triple> <artifact-name-prefix>
+# Usage: package-release-assets.sh <rust-target-triple> <artifact-name-prefix> [--flat-names]
 set -euo pipefail
 
 target="${1:?target triple required}"
 name="${2:?artifact name prefix required}"
+flat_names=0
+if [[ "${3:-}" == "--flat-names" ]]; then
+  flat_names=1
+fi
 out="release-assets/${name}"
 mkdir -p "$out"
 
@@ -16,7 +20,11 @@ copy_binaries() {
       for f in "${base}/${pattern}"*; do
         [[ -f "$f" ]] || continue
         case "$f" in *.d) continue ;; esac
-        cp "$f" "${out}/${name}-$(basename "$f")"
+        if ((flat_names)); then
+          cp "$f" "${out}/$(basename "$f")"
+        else
+          cp "$f" "${out}/${name}-$(basename "$f")"
+        fi
       done
     done
   done
@@ -42,7 +50,11 @@ copy_installers() {
     ! -name '*.tar.gz' \
     ! -name '*.sig' \
     -print0 | while IFS= read -r -d '' f; do
-      cp "$f" "${out}/${name}-$(basename "$f")"
+      if ((flat_names)); then
+        cp "$f" "${out}/$(basename "$f")"
+      else
+        cp "$f" "${out}/${name}-$(basename "$f")"
+      fi
     done
 }
 
@@ -53,10 +65,18 @@ copy_docs() {
     macos-*) guide="packaging/release-user-guide-macos.md" ;;
   esac
   if [[ -n "$guide" && -f "$guide" ]]; then
-    cp "$guide" "${out}/${name}-README.md"
+    if ((flat_names)); then
+      cp "$guide" "${out}/README.md"
+    else
+      cp "$guide" "${out}/${name}-README.md"
+    fi
   fi
   if [[ -f ".env.example" ]]; then
-    cp ".env.example" "${out}/${name}-env.example"
+    if ((flat_names)); then
+      cp ".env.example" "${out}/env.example"
+    else
+      cp ".env.example" "${out}/${name}-env.example"
+    fi
   fi
 }
 

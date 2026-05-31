@@ -121,9 +121,9 @@ Themis **默认只抓系统播放声**（输出）；在特定模式或检测到
 
 | 平台 | 文件名前缀 | 典型文件 |
 |------|------------|----------|
-| **Windows x64** | `themis-windows-x86_64-` | `themis-tray.exe`、`themis-service.exe`、`*-setup.exe`（NSIS 安装程序） |
-| **macOS Apple Silicon** | `themis-macos-aarch64-` | `themis-tray`、`themis-service`、`.dmg` |
-| **macOS Intel** | `themis-macos-x86_64-` | 同上 |
+| **Windows x64** | `windows-x86_64-` | `windows-x86_64-themis-tray.exe`、`themis-service.exe`、`*-setup.exe`（NSIS） |
+| **macOS Apple Silicon** | `macos-aarch64-` | `macos-aarch64-themis-tray`、`themis-service`、`.dmg` |
+| **macOS Intel** | `macos-x86_64-` | 同上 |
 
 Release 页直接提供**多个文件**（不再套一层 zip）。按需下载：
 
@@ -287,7 +287,7 @@ git push origin v0.1.0
 推送标签后：
 
 1. 打开 GitHub → **Actions** → **Release**，查看运行进度
-2. 成功后 **Releases** 页会出现 `v0.1.0`，附件为各平台**扁平文件**（如 `themis-windows-x86_64-themis-tray.exe`、`*-setup.exe`、`.dmg` 等，**不再**提供套 zip 的 monolithic 包）
+2. 成功后 **Releases** 页会出现 `v0.1.0`，附件为各平台**扁平文件**（如 `windows-x86_64-themis-tray.exe`、`*-setup.exe`、`.dmg` 等，**不再**提供套 zip 的 monolithic 包）
 3. Release 说明由 `generate_release_notes: true` 自动生成
 
 ### 3.3 Release 构建内容（各 job）
@@ -323,9 +323,9 @@ GitHub Actions 不可用（额度、网络等）或发 tag 前想在本地验包
 | **Windows** | `.\scripts\build-release.ps1` 或 `scripts\build-release.cmd` |
 | **macOS** | `chmod +x scripts/build-release.sh && ./scripts/build-release.sh` |
 
-脚本会依次：前端 `npm ci` + 构建 → `cargo build --release`（service / cli / tray）→ Tauri 安装包（Windows NSIS / macOS dmg）→ `package-release-assets` 收集并重命名，并附上 `README.md`、`*-env.example`、平台用户指南。
+脚本会依次：前端 `npm ci` + 构建 → `cargo build --release`（service / cli / tray）→ Tauri 安装包（Windows NSIS / macOS dmg）→ `package-release-assets` 收集，并附上 `README.md`、`env.example`、平台用户指南。
 
-**产出目录：** `release-assets/windows-x86_64/` 或 `release-assets/macos-aarch64/` 等（文件名带平台前缀，与 GitHub Release 附件一致）。
+**产出目录：** `release-assets/windows-x86_64/` 或 `release-assets/macos-aarch64/` 等。本地构建的文件名**不带** `windows-x86_64-` 前缀（目录已区分平台），例如 `themis-tray.exe`、`themis-service.exe`、`env.example`。GitHub Actions Release 附件仍带前缀（多平台混在同一 Release 页），例如 `windows-x86_64-themis-tray.exe`。
 
 **跳过安装包（仅 exe，更快）：**
 
@@ -337,9 +337,29 @@ GitHub Actions 不可用（额度、网络等）或发 tag 前想在本地验包
 ./scripts/build-release.sh --skip-installer
 ```
 
-**环境：** 与 [§4.1 环境要求](#41-环境要求) 相同；编译无需真实 Azure Key。
+**环境：** 与 [§4.1 环境要求](#41-环境要求) 相同；编译无需真实 Azure Key（构建脚本会设 `THEMIS_USE_MOCK_SPEECH=true` 仅用于编译，结束后会清除）。
 
-**上传到 GitHub Release：**
+**Rust：** 首次在 Windows 打 x64 Release 时，脚本会自动执行 `rustup target add x86_64-pc-windows-msvc`（需下载 `rust-std`，可能较慢）。若仍报 `E0463 can't find crate for core`，请手动执行该命令后重试。
+
+**本地验包（Windows 示例）：**
+
+```powershell
+cd release-assets\windows-x86_64
+copy env.example .env          # 编辑 AZURE_SPEECH_KEY / AZURE_SPEECH_REGION、FOUNDRY_* 等
+taskkill /IM themis-service.exe /F 2>$null
+.\themis-tray.exe
+```
+
+`themis-tray.exe`、`themis-service.exe`、`themis-cli.exe` 与 **`.env` 须在同一目录**。托盘状态栏会交叉校验「托盘读到的 .env」与「正在运行的 themis-service」是否一致。
+
+**若出现「⚠ 不一致，请 restart 服务」**（例如 STT `.env` 为 mock、服务为 `azure/eastus`）：
+
+1. **不要在执行完 `build-release.ps1` 的同一 PowerShell 窗口里直接启动 tray**——该窗口可能仍带有 `THEMIS_USE_MOCK_SPEECH=true`，托盘会按 Mock 显示；请新开终端，或等构建脚本结束后再运行。
+2. 确认 **`release-assets\windows-x86_64\.env`** 已配置（不要只依赖仓库根目录的 `.env`）；改 `.env` 后先结束旧进程再启动。
+3. **`taskkill /IM themis-service.exe /F`** 结束仍在运行的旧版/开发环境 service，再启动 `themis-tray.exe`（会自动拉起同目录的 `themis-service.exe`）。
+4. 用 **`.	hemis-cli.exe doctor`** 确认 Speech / Foundry 均为 configured。
+
+**上传到 GitHub Release：** CI 产物带平台前缀；若从本地上传扁平文件名，需自行重命名或仅作本地测试。推荐仍通过打 tag 走 Actions 发布。
 
 ```powershell
 gh release create v0.1.0 release-assets\windows-x86_64\* --title v0.1.0
@@ -442,7 +462,7 @@ npm run tauri build -- --bundles nsis
 
 | 产物 | 路径 |
 |------|------|
-| 一键 Release 输出 | `release-assets/<平台>/`（扁平文件 + README + env 示例） |
+| 一键 Release 输出 | `release-assets/<平台>/`（`themis-tray` / `themis-service` / `themis-cli` + `README.md` + `env.example`） |
 | 服务 / CLI | `target/release/themis-service.exe`（Windows） |
 | 托盘 exe | `target/release/themis-tray.exe` |
 | 安装包 | `target/release/bundle/` 或 `apps/themis-tray/src-tauri/target/release/bundle/` |

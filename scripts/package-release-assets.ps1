@@ -1,7 +1,9 @@
 # Collect flat release files (no nested zip/tar.gz updater bundles).
 param(
     [Parameter(Mandatory = $true)][string]$Target,
-    [Parameter(Mandatory = $true)][string]$Name
+    [Parameter(Mandatory = $true)][string]$Name,
+    # Local build-release: files already live under release-assets/<Name>/ — omit Name- prefix.
+    [switch]$FlatNames
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +13,8 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 function Copy-WithPrefix {
     param([string]$SourcePath)
     if (-not (Test-Path $SourcePath -PathType Leaf)) { return }
-    $destName = "$Name-$(Split-Path $SourcePath -Leaf)"
+    $leaf = Split-Path $SourcePath -Leaf
+    $destName = if ($FlatNames) { $leaf } else { "$Name-$leaf" }
     Copy-Item $SourcePath (Join-Path $out $destName) -Force
 }
 
@@ -22,10 +25,12 @@ function Copy-Docs {
         default     { $null }
     }
     if ($guide -and (Test-Path $guide)) {
-        Copy-Item $guide (Join-Path $out "$Name-README.md") -Force
+        $readmeName = if ($FlatNames) { "README.md" } else { "$Name-README.md" }
+        Copy-Item $guide (Join-Path $out $readmeName) -Force
     }
     if (Test-Path ".env.example") {
-        Copy-Item ".env.example" (Join-Path $out "$Name-env.example") -Force
+        $envName = if ($FlatNames) { "env.example" } else { "$Name-env.example" }
+        Copy-Item ".env.example" (Join-Path $out $envName) -Force
     }
 }
 
