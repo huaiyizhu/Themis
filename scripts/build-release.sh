@@ -54,18 +54,20 @@ npm run icons
 npm run build
 popd >/dev/null
 
-echo "[2/4] Rust release (themis-service, themis-cli, themis-tray)..."
-cargo build --release -p themis-service -p themis-cli -p themis-tray --target "$TARGET"
+echo "[2/4] Rust release (themis-service, themis-cli)..."
+cargo build --release -p themis-service -p themis-cli --target "$TARGET"
 
-if [[ "$SKIP_INSTALLER" -eq 0 ]]; then
-  echo "[3/4] Tauri bundle (dmg)..."
-  pushd apps/themis-tray >/dev/null
-  export CI=true
-  npm run tauri build -- --target "$TARGET" --bundles dmg --config '{"build":{"beforeBuildCommand":""}}'
-  popd >/dev/null
+echo "[3/4] Tauri app (themis-tray, embed frontend)..."
+pushd apps/themis-tray >/dev/null
+export CI=true
+tauri_cfg='{"build":{"beforeBuildCommand":""}}'
+if [[ "$SKIP_INSTALLER" -eq 1 ]]; then
+  echo "  (--skip-installer: no dmg, still building tray)"
+  npm run tauri build -- --target "$TARGET" --no-bundle --config "$tauri_cfg"
 else
-  echo "[3/4] Skipped Tauri bundle (--skip-installer)."
+  npm run tauri build -- --target "$TARGET" --bundles dmg --config "$tauri_cfg"
 fi
+popd >/dev/null
 
 echo "[4/4] Collect release assets..."
 bash scripts/package-release-assets.sh "$TARGET" "$NAME" --flat-names

@@ -327,7 +327,7 @@ GitHub Actions 不可用（额度、网络等）或发 tag 前想在本地验包
 
 **产出目录：** `release-assets/windows-x86_64/` 或 `release-assets/macos-aarch64/` 等。本地构建的文件名**不带** `windows-x86_64-` 前缀（目录已区分平台），例如 `themis-tray.exe`、`themis-service.exe`、`.env.example`。GitHub Actions Release 附件仍带前缀（多平台混在同一 Release 页），例如 `windows-x86_64-themis-tray.exe`。
 
-**跳过安装包（仅 exe，更快）：**
+**跳过安装包（仅 exe，更快）：** 仍会执行 `tauri build --no-bundle`（内嵌最新浮层 UI）。勿仅用 `cargo build -p themis-tray`——会得到旧界面（如缺少「配置」）；开发时 `themis.ps1 tray` / `tauri dev` 走 Vite 热更新，与 Release exe 不是同一条路径。
 
 ```powershell
 .\scripts\build-release.ps1 -SkipInstaller

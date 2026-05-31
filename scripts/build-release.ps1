@@ -64,23 +64,27 @@ Invoke-Checked { npm run icons } "npm run icons"
 Invoke-Checked { npm run build } "npm run build"
 Pop-Location
 
-Write-Host "[2/4] Rust release (themis-service, themis-cli, themis-tray)..." -ForegroundColor Yellow
+Write-Host "[2/4] Rust release (themis-service, themis-cli)..." -ForegroundColor Yellow
 Invoke-Checked {
-    cargo build --release -p themis-service -p themis-cli -p themis-tray --target $Target
-} "cargo build --release"
+    cargo build --release -p themis-service -p themis-cli --target $Target
+} "cargo build --release (service, cli)"
 
-if (-not $SkipInstaller) {
-    Write-Host "[3/4] Tauri bundle (NSIS installer)..." -ForegroundColor Yellow
-    Push-Location (Join-Path $Root "apps\themis-tray")
-    $env:CI = "true"
-    $tauriConfig = '{"build":{"beforeBuildCommand":""}}'
+# themis-tray MUST go through `tauri build` so dist/ UI is embedded (cargo-only = stale overlay).
+Write-Host "[3/4] Tauri app (themis-tray, embed frontend)..." -ForegroundColor Yellow
+Push-Location (Join-Path $Root "apps\themis-tray")
+$env:CI = "true"
+$tauriConfig = '{"build":{"beforeBuildCommand":""}}'
+if ($SkipInstaller) {
+    Write-Host "  (-SkipInstaller: no NSIS installer, still building tray exe)" -ForegroundColor DarkGray
+    Invoke-Checked {
+        npm run tauri build -- --target $Target --no-bundle --config $tauriConfig
+    } "npm run tauri build --no-bundle"
+} else {
     Invoke-Checked {
         npm run tauri build -- --target $Target --bundles $Bundle --config $tauriConfig
     } "npm run tauri build"
-    Pop-Location
-} else {
-    Write-Host "[3/4] Skipped Tauri bundle (-SkipInstaller)." -ForegroundColor DarkYellow
 }
+Pop-Location
 
 Write-Host "[4/4] Collect release assets..." -ForegroundColor Yellow
 & (Join-Path $Root "scripts\package-release-assets.ps1") -Target $Target -Name $Name -FlatNames

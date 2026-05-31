@@ -8,7 +8,7 @@
 
 | 文件 | 作用 | 如何运行 |
 |------|------|----------|
-| **themis-tray.exe** | 主程序：系统托盘图标 + 字幕/Insights 浮层 | 双击启动；首次会尝试拉起同目录的 `themis-service.exe` |
+| **themis-tray.exe** | 主程序：系统托盘图标 + 字幕/Insights 浮层（UI 内嵌在 exe 中） | 双击启动；须由 `build-release.ps1` 经 **`tauri build`** 生成，勿单独 `cargo build` 托盘 |
 | **themis-service.exe** | 后台服务：音频采集、Azure 听写、Insights 分析（gRPC） | 通常**无需单独运行**；若 tray 未自动拉起，可先运行 service 再开 tray |
 | **themis-cli.exe** | 命令行诊断（可选） | 在 PowerShell 中：`.\themis-cli.exe doctor` 检查 Speech / Foundry 是否已配置 |
 | **.env.example** | 配置字段说明与示例（可选参考） | 不必手动复制；见下文「配置方式」 |
