@@ -22,6 +22,4 @@ apps/themis-tray/src-tauri/gen/
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
+/release-assets/

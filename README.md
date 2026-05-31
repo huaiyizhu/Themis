@@ -314,7 +314,44 @@ push tag v*
 
 CI 环境使用 `THEMIS_USE_MOCK_SPEECH=true`，**不需要**真实 Azure Key 即可编译。
 
-### 3.4 重新发布 / 修正
+### 3.4 本地打 Release 包（一键）
+
+GitHub Actions 不可用（额度、网络等）或发 tag 前想在本地验包时，可在**对应平台**的项目根目录执行 **一条命令**，产出与 CI Release job 相同结构的扁平文件。
+
+| 平台 | 命令 |
+|------|------|
+| **Windows** | `.\scripts\build-release.ps1` 或 `scripts\build-release.cmd` |
+| **macOS** | `chmod +x scripts/build-release.sh && ./scripts/build-release.sh` |
+
+脚本会依次：前端 `npm ci` + 构建 → `cargo build --release`（service / cli / tray）→ Tauri 安装包（Windows NSIS / macOS dmg）→ `package-release-assets` 收集并重命名，并附上 `README.md`、`*-env.example`、平台用户指南。
+
+**产出目录：** `release-assets/windows-x86_64/` 或 `release-assets/macos-aarch64/` 等（文件名带平台前缀，与 GitHub Release 附件一致）。
+
+**跳过安装包（仅 exe，更快）：**
+
+```powershell
+.\scripts\build-release.ps1 -SkipInstaller
+```
+
+```bash
+./scripts/build-release.sh --skip-installer
+```
+
+**环境：** 与 [§4.1 环境要求](#41-环境要求) 相同；编译无需真实 Azure Key。
+
+**上传到 GitHub Release：**
+
+```powershell
+gh release create v0.1.0 release-assets\windows-x86_64\* --title v0.1.0
+```
+
+```bash
+gh release create v0.1.0 release-assets/macos-aarch64/*
+```
+
+`release-assets/` 已加入 `.gitignore`，不会误提交。
+
+### 3.5 重新发布 / 修正
 
 - **同一标签不能重复推送**；若失败需修复后打新标签，如 `v0.1.1`
 - 删除远程标签（慎用）：`git push origin :refs/tags/v0.1.0`
@@ -345,6 +382,7 @@ macOS 可选：[BlackHole](https://existential.audio/blackhole/)（仅 `THEMIS_A
 | `.\scripts\themis.ps1 tray` | 服务 + Tauri 托盘（`tauri dev`，前台） |
 | `.\scripts\themis.ps1 stop` / `status` / `doctor` / `probe` | 停止 / 状态 / 诊断 / 音频自检 |
 | `.\scripts\themis.ps1 build -Release` | 仅 Release 编译服务 |
+| `.\scripts\build-release.ps1` | 本地 Release 一键打包（见 §3.4） |
 
 ```powershell
 copy .env.example .env   # 首次
@@ -385,6 +423,10 @@ cd apps/themis-tray && npm install && npm run tauri dev
 
 ### 4.4 Release 二进制与安装包
 
+**推荐：** 一键本地 Release 包见 [§3.4 本地打 Release 包](#34-本地打-release-包一键)（`build-release.ps1` / `build-release.cmd` / `build-release.sh`）。
+
+若只需手动打单个组件：
+
 ```powershell
 cd apps\themis-tray
 
@@ -398,10 +440,9 @@ npm run tauri build
 npm run tauri build -- --bundles nsis
 ```
 
-产物路径：
-
 | 产物 | 路径 |
 |------|------|
+| 一键 Release 输出 | `release-assets/<平台>/`（扁平文件 + README + env 示例） |
 | 服务 / CLI | `target/release/themis-service.exe`（Windows） |
 | 托盘 exe | `target/release/themis-tray.exe` |
 | 安装包 | `target/release/bundle/` 或 `apps/themis-tray/src-tauri/target/release/bundle/` |
