@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { setupAuxWindowCloseHandler } from "./aux-window-close.js";
 import { applyConfigStatusEl } from "./config-status.js";
 
 const form = document.getElementById("settings-form");
@@ -110,4 +111,5 @@ async function onReloadDisk() {
 form?.addEventListener("submit", onSave);
 reloadBtn?.addEventListener("click", onReloadDisk);
 listen("env-settings-saved", () => loadSettings());
+setupAuxWindowCloseHandler().catch(() => {});
 loadSettings();

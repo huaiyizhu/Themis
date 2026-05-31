@@ -26,7 +26,7 @@ use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Listener, Manager, State,
+    AppHandle, Emitter, Listener, Manager, State, WebviewWindow, WindowEvent,
 };
 use themis_core::{
     AnalysisPrefs, ConfigStatusSnapshot, EnvSettings, ThemisConfig,
@@ -473,6 +473,41 @@ async fn reload_env_settings(
     })
 }
 
+/// Diagnose/settings: hide on title-bar close (do not destroy), keep `is_visible` in sync with overlay buttons.
+fn set_aux_window_visible(
+    w: &WebviewWindow,
+    app: &AppHandle,
+    visibility_event: &str,
+    visible: bool,
+) -> Result<bool, String> {
+    if visible {
+        let _ = w.unminimize();
+        w.show().map_err(|e| e.to_string())?;
+        w.set_focus().map_err(|e| e.to_string())?;
+        let _ = app.emit(visibility_event, true);
+        Ok(true)
+    } else {
+        w.hide().map_err(|e| e.to_string())?;
+        let _ = app.emit(visibility_event, false);
+        Ok(false)
+    }
+}
+
+fn toggle_aux_window(app: AppHandle, label: &str, visibility_event: &str) -> Result<bool, String> {
+    let w = app
+        .get_webview_window(label)
+        .ok_or_else(|| format!("{label} window not found"))?;
+    let visible = w.is_visible().map_err(|e| e.to_string())?;
+    set_aux_window_visible(&w, &app, visibility_event, !visible)
+}
+
+fn handle_aux_window_close_requested(app: &AppHandle, label: &str, visibility_event: &str) {
+    if let Some(w) = app.get_webview_window(label) {
+        let _ = w.hide();
+        let _ = app.emit(visibility_event, false);
+    }
+}
+
 #[tauri::command]
 fn is_settings_visible(app: AppHandle) -> Result<bool, String> {
     let w = app
@@ -483,20 +518,7 @@ fn is_settings_visible(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 fn toggle_settings_window(app: AppHandle) -> Result<bool, String> {
-    let w = app
-        .get_webview_window("settings")
-        .ok_or_else(|| "settings window not found".to_string())?;
-    let visible = w.is_visible().map_err(|e| e.to_string())?;
-    if visible {
-        w.hide().map_err(|e| e.to_string())?;
-        let _ = app.emit("settings-visibility", false);
-        Ok(false)
-    } else {
-        w.show().map_err(|e| e.to_string())?;
-        w.set_focus().map_err(|e| e.to_string())?;
-        let _ = app.emit("settings-visibility", true);
-        Ok(true)
-    }
+    toggle_aux_window(app, "settings", "settings-visibility")
 }
 
 #[tauri::command]
@@ -782,20 +804,7 @@ fn is_diagnose_visible(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 fn toggle_diagnose_window(app: AppHandle) -> Result<bool, String> {
-    let w = app
-        .get_webview_window("diagnose")
-        .ok_or_else(|| "diagnose window not found".to_string())?;
-    let visible = w.is_visible().map_err(|e| e.to_string())?;
-    if visible {
-        w.hide().map_err(|e| e.to_string())?;
-        let _ = app.emit("diagnose-visibility", false);
-        Ok(false)
-    } else {
-        w.show().map_err(|e| e.to_string())?;
-        w.set_focus().map_err(|e| e.to_string())?;
-        let _ = app.emit("diagnose-visibility", true);
-        Ok(true)
-    }
+    toggle_aux_window(app, "diagnose", "diagnose-visibility")
 }
 
 #[tauri::command]
@@ -1217,6 +1226,22 @@ pub fn run() {
     let ui_state = Arc::new(OverlayUiState::new());
 
     tauri::Builder::default()
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle().clone();
+                match window.label() {
+                    "diagnose" => {
+                        handle_aux_window_close_requested(&app, "diagnose", "diagnose-visibility");
+                        api.prevent_close();
+                    }
+                    "settings" => {
+                        handle_aux_window_close_requested(&app, "settings", "settings-visibility");
+                        api.prevent_close();
+                    }
+                    _ => {}
+                }
+            }
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([

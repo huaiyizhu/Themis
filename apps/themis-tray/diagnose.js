@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { setupAuxWindowCloseHandler } from "./aux-window-close.js";
 import { applyConfigStatusEl } from "./config-status.js";
 
 const overlayEl = document.getElementById("overlay-text");
@@ -205,6 +206,8 @@ async function refresh() {
     }
   }
 }
+
+setupAuxWindowCloseHandler().catch(() => {});
 
 refresh();
 setInterval(refresh, 1000);

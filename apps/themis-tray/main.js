@@ -1292,6 +1292,7 @@ toggleDiagnoseBtn?.addEventListener("click", async () => {
     const open = await invoke("toggle_diagnose_window");
     updateDiagnoseButton(Boolean(open));
   } catch (e) {
+    updateDiagnoseButton(false);
     setTip(statusEl, String(e));
   }
 });
@@ -1305,6 +1306,7 @@ toggleSettingsBtn?.addEventListener("click", async () => {
     const open = await invoke("toggle_settings_window");
     updateSettingsButton(Boolean(open));
   } catch (e) {
+    updateSettingsButton(false);
     setTip(statusEl, String(e));
   }
 });
@@ -1447,6 +1449,13 @@ loadOverlayUi();
 loadInsightSettings();
 syncDiagnoseButton();
 syncSettingsButton();
+
+getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+  if (focused) {
+    syncDiagnoseButton();
+    syncSettingsButton();
+  }
+});
 syncMiniMode();
 refreshStatus();
 setInterval(refreshStatus, 5000);
