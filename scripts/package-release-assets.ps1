@@ -40,14 +40,21 @@ function Copy-Docs {
     }
 }
 
-foreach ($base in @("target/$Target/release", "target/release")) {
-    if (-not (Test-Path $base)) { continue }
-    foreach ($pattern in @("themis-service*", "themis-cli*", "themis-tray*")) {
-        Get-ChildItem $base -Filter $pattern -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Extension -ne ".d" } |
-            ForEach-Object {
-            Copy-WithPrefix $_.FullName
-        }
+# Use only the requested target triple. Do NOT also copy target/release — on Windows ARM
+# dev machines that folder holds stale host (aarch64) binaries and overwrites the x64 build.
+$releaseBase = "target/$Target/release"
+if (-not (Test-Path $releaseBase)) {
+    $releaseBase = "target/release"
+}
+if (-not (Test-Path $releaseBase)) {
+    throw "No release binaries under target/$Target/release or target/release"
+}
+Write-Host "Collecting binaries from: $releaseBase"
+foreach ($pattern in @("themis-service*", "themis-cli*", "themis-tray*")) {
+    Get-ChildItem $releaseBase -Filter $pattern -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension -ne ".d" } |
+        ForEach-Object {
+        Copy-WithPrefix $_.FullName
     }
 }
 

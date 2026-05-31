@@ -175,6 +175,11 @@ Pop-Location
 
 Write-Host "[4/4] Collect release assets..." -ForegroundColor Yellow
 & (Join-Path $Root "scripts\package-release-assets.ps1") -Target $Target -Name $Name -FlatNames
+$packedTray = Join-Path $OutDir "themis-tray.exe"
+$builtTray = Join-Path $Root "target\$Target\release\themis-tray.exe"
+if ((Get-Item $packedTray).Length -ne (Get-Item $builtTray).Length) {
+    throw "release themis-tray.exe does not match target/$Target build (stale copy?)."
+}
 
 Remove-Item Env:THEMIS_USE_MOCK_SPEECH -ErrorAction SilentlyContinue
 

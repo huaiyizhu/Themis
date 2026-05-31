@@ -14,18 +14,24 @@ mkdir -p "$out"
 
 copy_binaries() {
   shopt -s nullglob
-  for base in "target/${target}/release" "target/release"; do
-    [[ -d "$base" ]] || continue
-    for pattern in themis-service themis-cli themis-tray; do
-      for f in "${base}/${pattern}"*; do
-        [[ -f "$f" ]] || continue
-        case "$f" in *.d) continue ;; esac
-        if ((flat_names)); then
-          cp "$f" "${out}/$(basename "$f")"
-        else
-          cp "$f" "${out}/${name}-$(basename "$f")"
-        fi
-      done
+  local release_base="target/${target}/release"
+  if [[ ! -d "$release_base" ]]; then
+    release_base="target/release"
+  fi
+  if [[ ! -d "$release_base" ]]; then
+    echo "No release binaries under target/${target}/release or target/release" >&2
+    return 1
+  fi
+  echo "Collecting binaries from: ${release_base}"
+  for pattern in themis-service themis-cli themis-tray; do
+    for f in "${release_base}/${pattern}"*; do
+      [[ -f "$f" ]] || continue
+      case "$f" in *.d) continue ;; esac
+      if ((flat_names)); then
+        cp "$f" "${out}/$(basename "$f")"
+      else
+        cp "$f" "${out}/${name}-$(basename "$f")"
+      fi
     done
   done
 }
