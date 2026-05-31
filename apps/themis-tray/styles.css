@@ -173,17 +173,18 @@ body:not(.is-mini-mode) .mini-floater {
   color: #1a1a22;
 }
 
-/* Resize handles live inside the panel, below the drag header in z-order */
+/* Resize handles: last in DOM, low z-index; only edges receive clicks (WebView2-safe). */
 .resize-layer {
   inset: 0;
-  pointer-events: none;
+  pointer-events: none !important;
   position: absolute;
-  z-index: 5;
+  z-index: 2;
 }
 
 .resize-edge {
   pointer-events: auto;
   position: absolute;
+  z-index: 3;
 }
 
 .resize-n {
@@ -202,9 +203,9 @@ body:not(.is-mini-mode) .mini-floater {
   cursor: ns-resize;
 }
 
-/* Side grips start below title bar so they never steal drag from the header */
+/* Side grips start below compact title bar */
 .resize-e {
-  top: 40px;
+  top: 44px;
   right: 0;
   bottom: 12px;
   width: 6px;
@@ -212,7 +213,7 @@ body:not(.is-mini-mode) .mini-floater {
 }
 
 .resize-w {
-  top: 40px;
+  top: 44px;
   left: 0;
   bottom: 12px;
   width: 6px;
@@ -384,7 +385,7 @@ body.adaptive-on .theme-badge::after {
   flex-shrink: 0;
   position: relative;
   user-select: none;
-  z-index: 30;
+  z-index: 40;
   -webkit-app-region: no-drag;
 }
 
@@ -448,14 +449,18 @@ body.adaptive-on .theme-badge::after {
   cursor: pointer;
 }
 
+.status-line,
+.config-status-line,
+.summary-panel,
+.pinned-panel,
+#glance-panel,
+.layout-body,
 .transcript-scroll,
 .transcript-toggle-h,
 .transcript-bar,
-.status-line,
 .feedback-line,
 .stack-divider,
 .middle-divider,
-.layout-body,
 .middle-row,
 .transcript-block,
 .transcript-section,
@@ -463,7 +468,7 @@ body.adaptive-on .theme-badge::after {
 .insights-panel {
   -webkit-app-region: no-drag;
   position: relative;
-  z-index: 10;
+  z-index: 15;
 }
 
 .header-left {

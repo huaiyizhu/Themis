@@ -195,22 +195,40 @@ impl LlmAnalyzer {
         }
 
         let (system, user) = match kind {
-            "term" => (
-                "你是技术听写助手，负责用简体中文给出术语的深入解释。\
+            "term" | "term_advanced" => {
+                let system = if kind == "term_advanced" {
+                    "你是技术听写助手，用简体中文给出该术语的「进阶版」解释：\
+面向已有基础的听众，覆盖原理、实现要点、与相近概念的区别、常见误区，4-6 句。\
+结合会话上下文；不要 Markdown，不要反问，只输出正文。"
+                } else {
+                    "你是技术听写助手，负责用简体中文给出术语的深入解释。\
 输出 4-8 句，覆盖：定义、原理或机制、典型用途、注意事项、1 个简短例子。\
 结合会话上下文判断领域（如 AI/软件）；缩写按当前语境解释（如 MCP = Model Context Protocol）。\
-不要 Markdown 标题，不要反问，只输出正文。",
-                format!(
-                    "Session context (if any):\n{}\n\nTerm: {subject}\nBrief explanation already shown:\n{brief}\n\nGive a fuller explanation:",
-                    session_context.trim()
-                ),
-            ),
+不要 Markdown 标题，不要反问，只输出正文。"
+                };
+                (
+                    system,
+                    format!(
+                        "Session context (if any):\n{}\n\nTerm: {subject}\nBrief explanation already shown:\n{brief}\n\nGive a fuller explanation:",
+                        session_context.trim()
+                    ),
+                )
+            }
             "question" => (
                 "你是技术听写助手，负责用简体中文深入回答一个问题。\
 输出 4-8 句，覆盖：直接回答、关键原理、实践要点或对比、必要时举简短例子。\
 结合会话上下文；不要 Markdown 标题，不要反问，只输出正文。",
                 format!(
                     "Session context (if any):\n{}\n\nQuestion: {subject}\nBrief answer already shown:\n{brief}\n\nGive a fuller answer:",
+                    session_context.trim()
+                ),
+            ),
+            "question_approach" => (
+                "你是技术会议助手。针对下面的问题，用简体中文给出「回答思路」而非完整答案：\
+分 3-5 条要点：①对方在问什么 ②建议回答结构 ③关键概念或对比 ④可追问或澄清的点 ⑤一句示范开场白。\
+结合会话上下文；不要 Markdown 标题，不要反问，条理清晰，篇幅适中。",
+                format!(
+                    "Session context (if any):\n{}\n\nQuestion: {subject}\nBrief answer already shown:\n{brief}\n\nGive answer approach (not full answer):",
                     session_context.trim()
                 ),
             ),
