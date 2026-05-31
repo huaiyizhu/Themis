@@ -20,16 +20,22 @@ function Copy-WithPrefix {
 
 function Copy-Docs {
     $guide = switch -Wildcard ($Name) {
-        "windows-*" { "packaging/release-user-guide-windows.md" }
-        "macos-*"   { "packaging/release-user-guide-macos.md" }
-        default     { $null }
+        "windows-*" {
+            if ($FlatNames) { "packaging/release-assets-readme-windows.md" }
+            else { "packaging/release-user-guide-windows.md" }
+        }
+        "macos-*" {
+            if ($FlatNames) { "packaging/release-assets-readme-macos.md" }
+            else { "packaging/release-user-guide-macos.md" }
+        }
+        default { $null }
     }
     if ($guide -and (Test-Path $guide)) {
         $readmeName = if ($FlatNames) { "README.md" } else { "$Name-README.md" }
         Copy-Item $guide (Join-Path $out $readmeName) -Force
     }
     if (Test-Path ".env.example") {
-        $envName = if ($FlatNames) { "env.example" } else { "$Name-env.example" }
+        $envName = if ($FlatNames) { ".env.example" } else { "$Name-env.example" }
         Copy-Item ".env.example" (Join-Path $out $envName) -Force
     }
 }

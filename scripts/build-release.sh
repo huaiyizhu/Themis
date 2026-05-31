@@ -69,7 +69,6 @@ fi
 
 echo "[4/4] Collect release assets..."
 bash scripts/package-release-assets.sh "$TARGET" "$NAME" --flat-names
-cp packaging/RELEASE-INDEX.md "$OUT_DIR/README.md"
 
 unset THEMIS_USE_MOCK_SPEECH || true
 

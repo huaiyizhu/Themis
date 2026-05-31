@@ -61,8 +61,20 @@ copy_installers() {
 copy_docs() {
   local guide=""
   case "$name" in
-    windows-*) guide="packaging/release-user-guide-windows.md" ;;
-    macos-*) guide="packaging/release-user-guide-macos.md" ;;
+    windows-*)
+      if ((flat_names)); then
+        guide="packaging/release-assets-readme-windows.md"
+      else
+        guide="packaging/release-user-guide-windows.md"
+      fi
+      ;;
+    macos-*)
+      if ((flat_names)); then
+        guide="packaging/release-assets-readme-macos.md"
+      else
+        guide="packaging/release-user-guide-macos.md"
+      fi
+      ;;
   esac
   if [[ -n "$guide" && -f "$guide" ]]; then
     if ((flat_names)); then
@@ -73,7 +85,7 @@ copy_docs() {
   fi
   if [[ -f ".env.example" ]]; then
     if ((flat_names)); then
-      cp ".env.example" "${out}/env.example"
+      cp ".env.example" "${out}/.env.example"
     else
       cp ".env.example" "${out}/${name}-env.example"
     fi

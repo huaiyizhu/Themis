@@ -141,6 +141,16 @@ pub fn env_file_path_or_default() -> PathBuf {
     env_file_path().unwrap_or_else(|| env_file_directory().join(".env"))
 }
 
+/// `.env.example` beside the exe / cwd (release bundle template).
+pub fn env_example_path() -> Option<PathBuf> {
+    let path = env_file_directory().join(".env.example");
+    if path.is_file() {
+        Some(path)
+    } else {
+        None
+    }
+}
+
 pub fn parse_env_file(content: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for line in content.lines() {
@@ -189,6 +199,9 @@ pub fn read_env_settings() -> Result<(PathBuf, EnvSettings), String> {
     let path = env_file_path_or_default();
     let content = if path.is_file() {
         fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?
+    } else if let Some(example) = env_example_path() {
+        fs::read_to_string(&example)
+            .map_err(|e| format!("read {}: {e}", example.display()))?
     } else {
         String::new()
     };

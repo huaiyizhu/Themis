@@ -84,7 +84,6 @@ if (-not $SkipInstaller) {
 
 Write-Host "[4/4] Collect release assets..." -ForegroundColor Yellow
 & (Join-Path $Root "scripts\package-release-assets.ps1") -Target $Target -Name $Name -FlatNames
-Copy-Item (Join-Path $Root "packaging\RELEASE-INDEX.md") (Join-Path $OutDir "README.md") -Force
 
 Remove-Item Env:THEMIS_USE_MOCK_SPEECH -ErrorAction SilentlyContinue
 
@@ -97,7 +96,7 @@ Write-Host "  $OutDir"
 Write-Host ""
 Write-Host "Run tray (use a new terminal, or after build script exits):" -ForegroundColor Cyan
 Write-Host "  cd $OutDir"
-Write-Host "  copy env.example .env   # then edit AZURE_SPEECH_* / FOUNDRY_*"
+Write-Host "  # optional: copy .env.example .env — or use tray 配置 button after start"
 Write-Host "  taskkill /IM themis-service.exe /F 2>`$null; .\themis-tray.exe"
 Write-Host ""
 Write-Host "Manual GitHub Release (CI assets use windows-x86_64- prefix): gh release create vX.Y.Z ..." -ForegroundColor DarkGray

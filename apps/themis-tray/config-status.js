@@ -41,7 +41,24 @@ function renderChip(kind, kindClass, trayConfigured, serviceConfigured, trayDeta
   return `<span class="cfg-chip ${kindClass}"><span class="cfg-kind">${kind}</span>${envSide}<span class="cfg-dot">·</span>${svcSide}</span>`;
 }
 
-function isAllOk(config) {
+/** @param {object} tray */
+export function listMissingConfigItems(tray) {
+  if (!tray) return [];
+  /** @type {string[]} */
+  const missing = [];
+  if (!tray.stt_configured) {
+    missing.push("Azure Speech（AZURE_SPEECH_KEY、AZURE_SPEECH_REGION）");
+  }
+  if (!tray.llm_configured) {
+    missing.push("Azure OpenAI Insights（FOUNDRY_ENDPOINT、FOUNDRY_API_KEY）");
+  }
+  if (tray.analysis_enabled === false) {
+    missing.push("Insights 已关闭（THEMIS_ANALYSIS_ENABLED=false）");
+  }
+  return missing;
+}
+
+export function isAllOk(config) {
   if (!config?.tray || !config.service || !config.in_sync) return false;
   const { tray, service } = config;
   return (
@@ -50,6 +67,14 @@ function isAllOk(config) {
     service.stt_configured &&
     service.llm_configured
   );
+}
+
+function renderMissingHint(tray) {
+  const missing = listMissingConfigItems(tray).filter((m) =>
+    m.startsWith("Azure") || m.startsWith("Insights 已关闭"),
+  );
+  if (!missing.length) return "";
+  return `<span class="cfg-hint">· 未配置：${escapeHtml(missing.join("；"))} · 点击标题栏「<strong>配置</strong>」填写并保存</span>`;
 }
 
 /**
@@ -82,6 +107,8 @@ export function renderConfigCrossCheck(config) {
 
   if (service && !in_sync) {
     html += `<span class="cfg-warn">· ⚠ 不一致，请 restart 服务</span>`;
+  } else {
+    html += renderMissingHint(tray);
   }
   return html;
 }
@@ -105,6 +132,11 @@ export function formatConfigCrossCheck(config) {
   let line = `${sttTray} · ${sttSvc} │ ${llmTray} · ${llmSvc}`;
   if (service && !in_sync) {
     line += " · ⚠ 不一致，请 restart 服务";
+  } else {
+    const missing = listMissingConfigItems(tray).filter((m) => m.startsWith("Azure"));
+    if (missing.length) {
+      line += ` · 未配置：${missing.join("；")} · 请用「配置」保存`;
+    }
   }
   return line;
 }
@@ -131,6 +163,11 @@ export function configCrossCheckTitle(config) {
   if (!config.tray.analysis_enabled) {
     lines.push("THEMIS_ANALYSIS_ENABLED=false (Insights disabled)");
   }
+  const missing = listMissingConfigItems(config.tray);
+  if (missing.length) {
+    lines.push(`Missing: ${missing.join("; ")}`);
+    lines.push("Tip: use overlay 配置 button — .env is created on save (no manual copy required).");
+  }
   return lines.join("\n");
 }
 
@@ -145,4 +182,8 @@ export function applyConfigStatusEl(el, config) {
   el.classList.toggle("config-mismatch", Boolean(config?.service && !config.in_sync));
   el.classList.toggle("config-offline", !config?.service);
   el.classList.toggle("config-all-ok", isAllOk(config));
+  el.classList.toggle(
+    "config-incomplete",
+    Boolean(config?.tray && listMissingConfigItems(config.tray).some((m) => m.startsWith("Azure"))),
+  );
 }
