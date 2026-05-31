@@ -14,7 +14,7 @@ Set-Location $Root
 $Target = "x86_64-pc-windows-msvc"
 $Name = "windows-x86_64"
 $Bundle = "nsis"
-$OutDir = Join-Path $Root "release-assets" $Name
+$OutDir = Join-Path (Join-Path $Root "release-assets") $Name
 
 $env:CARGO_TERM_COLOR = "always"
 $env:THEMIS_USE_MOCK_SPEECH = "true"
@@ -57,7 +57,7 @@ Copy-Item (Join-Path $Root "packaging\RELEASE-INDEX.md") (Join-Path $OutDir "REA
 
 Write-Host ""
 Write-Host "Done. Release files:" -ForegroundColor Green
-Get-ChildItem $OutDir | Format-Table Name, @{ N = "KB"; E = { [math]::Round($_.Length / 1KB, 1) } } }
+Get-ChildItem $OutDir | Format-Table Name, Length -AutoSize
 Write-Host ""
 Write-Host "Next: zip or upload everything in:" -ForegroundColor Cyan
 Write-Host "  $OutDir"
