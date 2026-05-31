@@ -1,0 +1,407 @@
+/* UI modes: meeting (default) + glance */
+
+body.ui-mode-meeting .header-row-secondary,
+body.ui-mode-meeting .header-legacy-secondary {
+  display: none !important;
+}
+
+body.ui-mode-meeting.config-ok #config-status {
+  display: none;
+}
+
+body.ui-mode-meeting .status-line {
+  padding: 2px 10px 4px;
+  font-size: calc(11px * var(--font-scale, 1));
+}
+
+body.ui-mode-meeting .summary-panel.is-collapsed .summary-body {
+  display: none;
+}
+
+body.ui-mode-meeting .summary-panel.is-collapsed .summary-toggle-bar .summary-chevron::before {
+  content: "▸";
+}
+
+body.ui-mode-meeting .summary-panel:not(.is-collapsed) .summary-toggle-bar .summary-chevron::before {
+  content: "▾";
+}
+
+.summary-toggle-bar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 8px;
+  padding: 6px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.summary-toggle-bar:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.summary-toggle-label {
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+#summary-hint {
+  flex: 1;
+  font-size: calc(11px * var(--font-scale, 1));
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pinned area — docked at bottom of overlay, expands into lower space */
+.pinned-panel {
+  -webkit-app-region: no-drag;
+  background: rgba(155, 180, 255, 0.06);
+  border: 1px solid rgba(155, 180, 255, 0.22);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  margin-top: 6px;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  z-index: 16;
+}
+
+.pinned-panel.has-pins:not(.is-collapsed) {
+  border-color: rgba(155, 180, 255, 0.38);
+  border-top: 1px solid rgba(155, 180, 255, 0.35);
+  flex: 1 1 52%;
+  min-height: 180px;
+}
+
+.pinned-panel.is-collapsed .pinned-body {
+  display: none;
+}
+
+.pinned-panel.is-collapsed .pinned-toggle-bar .pinned-chevron::before {
+  content: "▸";
+}
+
+.pinned-panel:not(.is-collapsed) .pinned-toggle-bar .pinned-chevron::before {
+  content: "▾";
+}
+
+.pinned-toggle-bar {
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 8px;
+  padding: 6px 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.pinned-toggle-bar:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pinned-toggle-label {
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+#pinned-hint {
+  flex: 1;
+  font-size: calc(11px * var(--font-scale, 1));
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinned-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+}
+
+.pinned-empty {
+  font-size: calc(11px * var(--font-scale, 1));
+  margin: 0 0 6px;
+  opacity: 0.55;
+  padding: 0 2px;
+}
+
+.pinned-empty.hidden {
+  display: none;
+}
+
+.pinned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pinned-list .pinned-card {
+  flex-shrink: 0;
+}
+
+.pinned-list .pinned-card .insight-body,
+.pinned-list .pinned-card .a {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pinned-list .pinned-card .term {
+  font-size: calc(16px * var(--font-scale, 1));
+}
+
+/* Upper live area shrinks when bottom pinned strip is expanded */
+body.has-pinned-open .layout-body {
+  flex: 1 1 32%;
+  min-height: 88px;
+}
+
+body.has-pinned-open.ui-mode-glance #glance-panel {
+  flex: 1 1 28%;
+  min-height: 64px;
+}
+
+body.has-pinned-open.ui-mode-meeting .summary-panel.is-collapsed {
+  flex-shrink: 0;
+}
+
+body:not(.has-pinned-open) .pinned-panel.is-collapsed {
+  margin-top: 4px;
+}
+
+/* Compact header */
+.header-compact-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 8px;
+  width: 100%;
+}
+
+.ui-mode-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.ui-mode-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font-size: calc(11px * var(--font-scale, 1));
+  line-height: 1.2;
+  padding: 3px 8px;
+}
+
+.ui-mode-btn.is-active {
+  background: rgba(100, 160, 255, 0.35);
+  border-color: rgba(120, 180, 255, 0.5);
+}
+
+.ui-mode-btn:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.header-compact-spacer {
+  flex: 1;
+  min-width: 4px;
+}
+
+.header-overflow-wrap {
+  position: relative;
+}
+
+.header-btn,
+.ui-mode-btn,
+.summary-toggle-bar,
+.insight-more-btn,
+.insight-level-btn {
+  pointer-events: auto;
+}
+
+.header-overflow-menu {
+  background: rgba(22, 22, 30, 0.98);
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 70vh;
+  min-width: 140px;
+  overflow-y: auto;
+  padding: 6px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+}
+
+.header-overflow-menu.hidden {
+  display: none;
+}
+
+.header-overflow-menu .header-btn,
+.header-overflow-menu .header-segment {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.theme-light-glass .header-overflow-menu,
+.theme-solid-light .header-overflow-menu,
+.theme-paper .header-overflow-menu,
+.theme-cream .header-overflow-menu,
+.theme-high-contrast-light .header-overflow-menu {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #121218;
+}
+
+/* Meeting panels */
+body.ui-mode-meeting .questions-title::after,
+body.ui-mode-meeting .insights-title::after {
+  content: none;
+}
+
+body.ui-mode-meeting .insight-card.is-secondary,
+body.ui-mode-meeting .question-card.is-secondary {
+  opacity: 0.82;
+  transform: scale(0.98);
+  transform-origin: top center;
+}
+
+body.ui-mode-meeting .insight-meta {
+  display: none;
+}
+
+body.ui-mode-meeting .insight-card .term {
+  font-size: calc(17px * var(--font-scale, 1));
+  font-weight: 650;
+}
+
+.insight-level-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.insight-level-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  color: inherit;
+  cursor: pointer;
+  font-size: calc(10px * var(--font-scale, 1));
+  padding: 2px 8px;
+}
+
+.insight-level-btn.is-active {
+  background: rgba(100, 160, 255, 0.3);
+  border-color: rgba(120, 180, 255, 0.45);
+}
+
+.insight-actions-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.insight-dismiss-btn {
+  margin-left: auto;
+}
+
+/* Glance mode */
+body.ui-mode-glance #middle-row,
+body.ui-mode-glance #summary-panel,
+body.ui-mode-glance #layout-body {
+  display: none !important;
+}
+
+body.ui-mode-glance .transcript-block {
+  display: none;
+}
+
+body.ui-mode-glance #glance-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 10px 10px;
+}
+
+#glance-panel {
+  display: none;
+  pointer-events: none;
+}
+
+#glance-panel:not([hidden]) {
+  pointer-events: auto;
+}
+
+.glance-primary-card {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.glance-primary-card .term {
+  font-size: calc(20px * var(--font-scale, 1));
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.glance-prev-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  font-size: calc(11px * var(--font-scale, 1));
+  margin-top: 8px;
+  opacity: 0.75;
+  padding-top: 8px;
+}
+
+.glance-prev-row:hover {
+  opacity: 1;
+}
+
+.glance-empty {
+  font-size: calc(12px * var(--font-scale, 1));
+  opacity: 0.6;
+  padding: 12px 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insight-card,
+  .question-card {
+    transition: none !important;
+  }
+
+  .overlay-wake-pulse,
+  .mini-floater.overlay-wake-pulse {
+    animation: none !important;
+  }
+}

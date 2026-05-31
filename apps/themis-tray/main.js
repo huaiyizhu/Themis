@@ -7,6 +7,22 @@ import {
   applyCaptureStatusPending,
 } from "./capture-status.js";
 import { initTooltips, setTip, tipWithHotkey, hotkey } from "./tooltips.js";
+import {
+  clearDismissedTerms,
+  initHeaderOverflow,
+  initPinnedCollapse,
+  initSummaryCollapse,
+  initUiModeSwitch,
+  isSummaryCollapsed,
+  isTermDismissed,
+  loadUiMode,
+  normalizeTermKey,
+  renderInsightPanels as renderInsightPanelsForMode,
+  setConfigOkClass,
+  setSummaryHint,
+  formatSummaryTime,
+  setupInsightInteractions,
+} from "./ui-modes.js";
 
 const overlayEl = document.getElementById("overlay");
 const dragHandle = document.getElementById("drag-handle");
@@ -44,7 +60,20 @@ const FONT_SCALE_STEP = 0.1;
 
 initTooltips();
 
+/** @type {object | null} */
+let insightUiCtx = null;
+
+function removeTermsByKey(term) {
+  const key = normalizeTermKey(term);
+  for (let i = termEntries.length - 1; i >= 0; i -= 1) {
+    if (normalizeTermKey(termEntries[i].term) === key) {
+      termEntries.splice(i, 1);
+    }
+  }
+}
+
 function initHeaderTips() {
+  setTip(document.getElementById("header-overflow-toggle"), "更多：诊断、配置、字号、浮标等");
   setTip(sizeToggleBtn, "窗口尺寸预设");
   setTip(clearSessionBtn, "清空字幕、总结与洞察，从零继续监听");
   setTip(hideOverlayBtn, tipWithHotkey("隐藏窗口（捕捉继续，托盘可再次打开）", "O"));
@@ -72,12 +101,6 @@ const TRANSCRIPT_VISIBLE_STORAGE_KEY = "themis-transcript-visible";
 /** Whether the live transcript column is shown. */
 let transcriptVisible = true;
 const insightsEmptyEl = document.getElementById("insights-empty");
-const insightsKeywordsSec = document.getElementById("insights-keywords");
-const insightsKeywordsList = document.getElementById("insights-keywords-list");
-const keywordsToggleBtn = document.getElementById("keywords-toggle");
-const keywordsCountEl = document.getElementById("keywords-count");
-const KEYWORDS_COLLAPSED_STORAGE_KEY = "themis-keywords-collapsed";
-const insightsTermsSec = document.getElementById("insights-terms");
 const insightsTermsList = document.getElementById("insights-terms-list");
 const questionsEmptyEl = document.getElementById("questions-empty");
 const questionsListEl = document.getElementById("questions-list");
@@ -109,7 +132,7 @@ let insightLocalizeZh = true;
 
 let termSeq = 0;
 let questionSeq = 0;
-/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, term: string, explanation: string, detailText?: string, detailExpanded?: boolean, detailLoading?: boolean, detailError?: string}>} */
+/** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, term: string, explanation: string, termLevel?: string, advancedText?: string, advancedLoading?: boolean, detailText?: string, detailExpanded?: boolean, detailLoading?: boolean, detailError?: string}>} */
 const termEntries = [];
 /** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, question: string, answer: string, detailText?: string, detailExpanded?: boolean, detailLoading?: boolean, detailError?: string}>} */
 const questionEntries = [];
@@ -129,10 +152,16 @@ const MIDDLE_DIVIDER_WIDTH = 8;
 
 /** Programmatic drag avoids Windows WM_NCHITTEST fighting resize after data-tauri-drag-region. */
 function setupWindowDrag() {
+  if (!dragHandle) return;
   dragHandle.addEventListener("mousedown", async (e) => {
     if (e.button !== 0) return;
-    if (e.target.closest("button, a, input, select, textarea")) return;
-    e.preventDefault();
+    if (
+      e.target.closest(
+        "button, a, input, select, textarea, [role='button'], .header-overflow-menu, .header-overflow-wrap",
+      )
+    ) {
+      return;
+    }
     try {
       await getCurrentWindow().startDragging();
     } catch {
@@ -497,6 +526,14 @@ async function initSizePresets() {
 
 initSizePresets();
 
+function getInitialTranscriptVisible() {
+  if (loadUiMode() === "meeting") {
+    const v = localStorage.getItem(TRANSCRIPT_VISIBLE_STORAGE_KEY);
+    if (v === null) return false;
+  }
+  return localStorage.getItem(TRANSCRIPT_VISIBLE_STORAGE_KEY) !== "0";
+}
+
 function applyTranscriptVisible(visible) {
   transcriptVisible = visible;
   layoutBodyEl?.classList.toggle("transcript-hidden", !visible);
@@ -540,7 +577,7 @@ function toggleTranscriptPanel() {
   applyTranscriptVisible(!transcriptVisible);
 }
 
-applyTranscriptVisible(localStorage.getItem(TRANSCRIPT_VISIBLE_STORAGE_KEY) !== "0");
+applyTranscriptVisible(getInitialTranscriptVisible());
 
 toggleTranscriptBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
@@ -578,12 +615,16 @@ function renderSessionSummary(summary) {
   summaryEmptyEl.classList.add("hidden");
   summaryTextEl.classList.remove("hidden");
   summaryTextEl.textContent = text;
+  if (isSummaryCollapsed()) {
+    setSummaryHint(`已更新 ${formatSummaryTime()}`);
+  }
 }
 
 function resetSessionSummary() {
   summaryEmptyEl.classList.remove("hidden");
   summaryTextEl.classList.add("hidden");
   summaryTextEl.textContent = "";
+  setSummaryHint("采集中，摘要将周期性更新…");
 }
 
 function isNearBottom() {
@@ -633,14 +674,6 @@ function renderTranscript() {
     const text = document.createElement("span");
     text.textContent = line;
     wrap.appendChild(text);
-    const ins = lineInsights.get(line);
-    if (ins?.keywords?.length) {
-      const kw = document.createElement("span");
-      kw.className = "line-kw";
-      kw.textContent = ins.keywords.slice(0, 4).join(" · ");
-      setTip(kw, "Keywords");
-      wrap.appendChild(kw);
-    }
     transcriptEl.appendChild(wrap);
   }
 
@@ -653,9 +686,9 @@ function renderTranscript() {
   }
 
   requestAnimationFrame(() => {
-    if (followLatest) {
-      scrollToLatest(false);
-    }
+    if (!followLatest) return;
+    if (loadUiMode() === "meeting" && partialText) return;
+    scrollToLatest(false);
   });
 }
 
@@ -672,8 +705,10 @@ async function refreshConfigStatus(configFromStatus) {
     const config =
       configFromStatus ?? (await invoke("get_config_crosscheck"));
     applyConfigStatusEl(configStatusEl, config);
+    setConfigOkClass(config);
   } catch {
     applyConfigStatusEl(configStatusEl, null);
+    setConfigOkClass(null);
   }
 }
 
@@ -701,6 +736,7 @@ async function refreshStatus() {
     const s = await invoke("get_status");
     applyCaptureStatusEl(statusEl, s);
     applyConfigStatusEl(configStatusEl, s.config);
+    setConfigOkClass(s.config);
     updateCaptureButton(s.state === "capturing");
 
     if (s.state === "idle") {
@@ -824,50 +860,29 @@ function supersedeHeadEntry(entries, now) {
   prev.expiresAt = now + insightDwellMs;
 }
 
-function toggleEntryPin(entries, id) {
-  const item = entries.find((e) => e.id === id);
-  if (!item) return false;
-  if (item.pinned) {
-    item.pinned = false;
-    item.userPinned = false;
-    item.expiresAt = Date.now() + insightDwellMs;
-  } else {
-    item.pinned = true;
-    item.userPinned = true;
-  }
-  return true;
+function initInsightUi() {
+  insightUiCtx = {
+    get termEntries() {
+      return termEntries;
+    },
+    get questionEntries() {
+      return questionEntries;
+    },
+    questionsListEl,
+    insightsTermsList,
+    questionsEmptyEl,
+    insightsEmptyEl,
+    rerender: () => renderInsightPanels(),
+    toggleDetail: toggleInsightDetail,
+    removeTerm: removeTermsByKey,
+    get insightDwellMs() {
+      return insightDwellMs;
+    },
+  };
+  setupInsightInteractions(document.getElementById("layout-body"), insightUiCtx);
+  setupInsightInteractions(document.getElementById("glance-panel"), insightUiCtx);
+  setupInsightInteractions(document.getElementById("pinned-panel"), insightUiCtx);
 }
-
-function setupInsightCardPin() {
-  questionsListEl.addEventListener("click", (e) => {
-    const moreBtn = e.target.closest(".insight-more-btn");
-    if (moreBtn?.dataset.id) {
-      e.stopPropagation();
-      toggleInsightDetail("question", moreBtn.dataset.id);
-      return;
-    }
-    const card = e.target.closest(".question-card");
-    if (!card?.dataset.id) return;
-    if (toggleEntryPin(questionEntries, card.dataset.id)) {
-      renderInsightPanels();
-    }
-  });
-  insightsTermsList.addEventListener("click", (e) => {
-    const moreBtn = e.target.closest(".insight-more-btn");
-    if (moreBtn?.dataset.id) {
-      e.stopPropagation();
-      toggleInsightDetail("term", moreBtn.dataset.id);
-      return;
-    }
-    const card = e.target.closest(".insight-card");
-    if (!card?.dataset.id) return;
-    if (toggleEntryPin(termEntries, card.dataset.id)) {
-      renderInsightPanels();
-    }
-  });
-}
-
-setupInsightCardPin();
 
 function pruneEntryList(entries) {
   const now = Date.now();
@@ -881,7 +896,7 @@ function pruneEntryList(entries) {
   }
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const item = entries[i];
-    if (item.pinned) continue;
+    if (item.userPinned) continue;
     if (item.expiresAt <= now) {
       entries.splice(i, 1);
       changed = true;
@@ -904,9 +919,10 @@ function appendTermEntries(terms) {
   let added = false;
   for (let i = terms.length - 1; i >= 0; i -= 1) {
     const t = terms[i];
-    const key = String(t.term || "").trim().toLowerCase();
+    const key = normalizeTermKey(t.term);
     if (!key) continue;
-    if (termEntries.some((e) => e.term.trim().toLowerCase() === key)) continue;
+    if (isTermDismissed(t.term)) continue;
+    if (termEntries.some((e) => normalizeTermKey(e.term) === key)) continue;
     supersedeHeadEntry(termEntries, now);
     termSeq += 1;
     termEntries.unshift({
@@ -950,47 +966,6 @@ function appendQuestionEntries(questions) {
   return added;
 }
 
-function sortInsightEntries(entries) {
-  return [...entries].sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    return b.seq - a.seq;
-  });
-}
-
-function appendInsightMoreSection(card, item) {
-  const actions = document.createElement("div");
-  actions.className = "insight-actions";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "insight-more-btn";
-  btn.dataset.id = item.id;
-  if (item.detailLoading) {
-    btn.textContent = "加载中…";
-    btn.disabled = true;
-  } else if (item.detailExpanded) {
-    btn.textContent = "收起";
-  } else {
-    btn.textContent = "更详细";
-  }
-  actions.appendChild(btn);
-  card.appendChild(actions);
-
-  if (item.detailExpanded) {
-    const detail = document.createElement("div");
-    detail.className = "insight-detail";
-    if (item.detailLoading) {
-      detail.classList.add("loading");
-      detail.textContent = "正在生成详细说明…";
-    } else if (item.detailError) {
-      detail.classList.add("error");
-      detail.textContent = item.detailError;
-    } else if (item.detailText) {
-      detail.textContent = item.detailText;
-    }
-    card.appendChild(detail);
-  }
-}
-
 async function toggleInsightDetail(kind, id) {
   const entries = kind === "term" ? termEntries : questionEntries;
   const item = entries.find((e) => e.id === id);
@@ -1029,61 +1004,8 @@ async function toggleInsightDetail(kind, id) {
 }
 
 function renderInsightPanels() {
-  const hasTerms = termEntries.length > 0;
-  const hasQuestions = questionEntries.length > 0;
-  const hasKeywords = insightsKeywordsList.childElementCount > 0;
-
-  questionsEmptyEl.classList.toggle("hidden", hasQuestions);
-  questionsListEl.replaceChildren();
-  for (const item of sortInsightEntries(questionEntries)) {
-    const card = document.createElement("div");
-    card.className = "question-card";
-    if (item.pinned) card.classList.add("is-pinned");
-    card.dataset.id = item.id;
-    setTip(card, item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）");
-    const meta = document.createElement("div");
-    meta.className = "insight-meta";
-    const pinLabel = item.pinned ? " · 📌" : "";
-    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}${pinLabel}`;
-    const q = document.createElement("div");
-    q.className = "q";
-    q.textContent = item.question;
-    const a = document.createElement("div");
-    a.className = "a";
-    a.textContent = item.answer;
-    card.append(meta, q, a);
-    appendInsightMoreSection(card, item);
-    questionsListEl.appendChild(card);
-  }
-
-  if (hasTerms || hasKeywords) {
-    insightsEmptyEl.classList.add("hidden");
-  } else {
-    insightsEmptyEl.classList.remove("hidden");
-  }
-
-  insightsTermsSec.classList.toggle("hidden", !hasTerms);
-  insightsTermsList.replaceChildren();
-  for (const item of sortInsightEntries(termEntries)) {
-    const card = document.createElement("div");
-    card.className = "insight-card";
-    if (item.pinned) card.classList.add("is-pinned");
-    card.dataset.id = item.id;
-    setTip(card, item.pinned ? "点击取消固定" : "点击固定（不会被自动移除）");
-    const meta = document.createElement("div");
-    meta.className = "insight-meta";
-    const pinLabel = item.pinned ? " · 📌" : "";
-    meta.textContent = `#${item.seq} · ${formatInsightTime(item.addedAt)}${pinLabel}`;
-    const term = document.createElement("div");
-    term.className = "term";
-    term.textContent = item.term;
-    const body = document.createElement("div");
-    body.textContent = item.explanation;
-    card.append(meta, term, body);
-    appendInsightMoreSection(card, item);
-    insightsTermsList.appendChild(card);
-  }
-
+  if (!insightUiCtx) return;
+  renderInsightPanelsForMode(insightUiCtx);
 }
 
 function resetInsightDwellState() {
@@ -1097,60 +1019,11 @@ function resetInsightDwellState() {
   }
 }
 
-function loadKeywordsCollapsed() {
-  try {
-    return localStorage.getItem(KEYWORDS_COLLAPSED_STORAGE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function setKeywordsCollapsed(collapsed) {
-  if (!insightsKeywordsSec || !keywordsToggleBtn) return;
-  insightsKeywordsSec.classList.toggle("is-collapsed", collapsed);
-  keywordsToggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-  try {
-    localStorage.setItem(KEYWORDS_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
-  } catch {
-    /* ignore */
-  }
-}
-
-function updateKeywordsCount(count) {
-  if (!keywordsCountEl) return;
-  if (count > 0) {
-    keywordsCountEl.textContent = String(count);
-    keywordsCountEl.classList.remove("hidden");
-  } else {
-    keywordsCountEl.textContent = "";
-    keywordsCountEl.classList.add("hidden");
-  }
-}
-
-keywordsToggleBtn?.addEventListener("click", () => {
-  setKeywordsCollapsed(!insightsKeywordsSec?.classList.contains("is-collapsed"));
-});
-
-setKeywordsCollapsed(loadKeywordsCollapsed());
-
 function renderInsights(insights) {
-  if (!insights || (!insights.keywords?.length && !insights.terms?.length && !insights.questions?.length)) {
+  if (!insights || (!insights.terms?.length && !insights.questions?.length)) {
     return;
   }
   let changed = false;
-
-  if (insights.keywords?.length) {
-    insightsKeywordsSec.classList.remove("hidden");
-    insightsKeywordsList.replaceChildren();
-    for (const kw of insights.keywords) {
-      const tag = document.createElement("span");
-      tag.className = "tag";
-      tag.textContent = kw;
-      insightsKeywordsList.appendChild(tag);
-    }
-    updateKeywordsCount(insights.keywords.length);
-    changed = true;
-  }
 
   if (appendTermEntries(insights.terms)) changed = true;
   if (appendQuestionEntries(insights.questions)) changed = true;
@@ -1219,15 +1092,13 @@ function clearOverlaySession(placeholderText = "已清空，继续监听中…")
   followLatest = true;
   scrollLatestBtn.classList.add("hidden");
   resetInsightDwellState();
+  clearDismissedTerms();
   resetSessionSummary();
   questionsEmptyEl.classList.remove("hidden");
   insightsEmptyEl.classList.remove("hidden");
-  insightsKeywordsSec.classList.add("hidden");
-  insightsTermsSec.classList.add("hidden");
-  insightsKeywordsList.replaceChildren();
-  updateKeywordsCount(0);
   insightsTermsList.replaceChildren();
   questionsListEl.replaceChildren();
+  renderInsightPanels();
   setPlaceholder(placeholderText);
 }
 
@@ -1445,6 +1316,16 @@ toggleLocalizeBtn?.addEventListener("click", async () => {
   }
 });
 
+initUiModeSwitch((mode) => {
+  if (mode === "glance") {
+    applyTranscriptVisible(false);
+  }
+  renderInsightPanels();
+});
+initHeaderOverflow();
+initSummaryCollapse();
+initPinnedCollapse();
+initInsightUi();
 loadOverlayUi();
 loadInsightSettings();
 syncDiagnoseButton();
