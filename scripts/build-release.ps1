@@ -19,9 +19,16 @@ if (Test-Path $CargoBin) {
 
 function Invoke-Checked {
     param([scriptblock]$Command, [string]$Step)
-    & $Command
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Step failed (exit $LASTEXITCODE)."
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Command
+        $exit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    if ($exit -ne 0) {
+        throw "$Step failed (exit $exit)."
     }
 }
 
@@ -35,6 +42,69 @@ function Ensure-RustTarget {
     if ($installed -contains $Triple) { return }
     Write-Host "Installing Rust target $Triple (required for release build)..." -ForegroundColor Yellow
     Invoke-Checked { rustup target add $Triple } "rustup target add $Triple"
+}
+
+function Stop-ThemisProcesses {
+    foreach ($procName in @("themis-tray", "themis-service")) {
+        Get-Process -Name $procName -ErrorAction SilentlyContinue |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Milliseconds 800
+}
+
+function Remove-TauriCliNativeModules {
+    param([string]$TrayDir)
+    $patterns = @(
+        "node_modules\@tauri-apps\cli-win32-x64-msvc",
+        "node_modules\@tauri-apps\cli-win32-arm64-msvc",
+        "node_modules\@tauri-apps\cli-win32-ia32-msvc"
+    )
+    foreach ($rel in $patterns) {
+        $path = Join-Path $TrayDir $rel
+        if (Test-Path $path) {
+            Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Windows EPERM on npm ci: Tauri CLI .node is locked while tray/tauri dev is running.
+function Invoke-NpmCiTray {
+    param([string]$TrayDir)
+    Push-Location $TrayDir
+    Stop-ThemisProcesses
+
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $maxAttempts = 3
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            $output = & npm ci 2>&1 | Out-String
+            $exit = $LASTEXITCODE
+            if ($exit -eq 0) { return }
+
+            Write-Host $output
+            $eperm = $output -match "EPERM|EBUSY|operation not permitted|-4048"
+            if (-not $eperm) {
+                throw "npm ci failed (exit $exit)."
+            }
+            if ($attempt -eq $maxAttempts) {
+                Write-Host "npm ci still EPERM; falling back to npm install..." -ForegroundColor Yellow
+                $output = & npm install 2>&1 | Out-String
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host $output
+                    throw "npm install failed (exit $LASTEXITCODE). Close themis-tray / tauri dev and retry."
+                }
+                return
+            }
+            Write-Host "npm ci locked files (attempt $attempt/$maxAttempts); retrying after cleanup..." -ForegroundColor Yellow
+            Stop-ThemisProcesses
+            Remove-TauriCliNativeModules -TrayDir $TrayDir
+            Start-Sleep -Seconds 2
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
+        Pop-Location
+    }
 }
 
 $Target = "x86_64-pc-windows-msvc"
@@ -57,9 +127,11 @@ Write-Host "=== Themis local Release build ($Name) ===" -ForegroundColor Cyan
 Write-Host "Output: $OutDir"
 Write-Host ""
 
+$TrayDir = Join-Path $Root "apps\themis-tray"
 Write-Host "[1/4] Frontend (npm ci, icons, vite build)..." -ForegroundColor Yellow
-Push-Location (Join-Path $Root "apps\themis-tray")
-Invoke-Checked { npm ci } "npm ci"
+Write-Host "  (stopping themis-tray/service if running — avoids npm EPERM on Tauri CLI)" -ForegroundColor DarkGray
+Invoke-NpmCiTray -TrayDir $TrayDir
+Push-Location $TrayDir
 Invoke-Checked { npm run icons } "npm run icons"
 Invoke-Checked { npm run build } "npm run build"
 Pop-Location
@@ -71,7 +143,8 @@ Invoke-Checked {
 
 # themis-tray MUST go through `tauri build` so dist/ UI is embedded (cargo-only = stale overlay).
 Write-Host "[3/4] Tauri app (themis-tray, embed frontend)..." -ForegroundColor Yellow
-Push-Location (Join-Path $Root "apps\themis-tray")
+Stop-ThemisProcesses
+Push-Location $TrayDir
 $env:CI = "true"
 # PowerShell strips JSON quotes when passed inline; use a config file (see release.yml bash note).
 $TauriConfigFile = (Resolve-Path (Join-Path $Root "scripts\tauri-release-build.json")).Path
@@ -82,8 +155,15 @@ function Invoke-TauriBuild {
         "--target", $Target,
         "--config", $TauriConfigFile
     ) + $ExtraArgs
-    & npm @npmArgs
-    if ($LASTEXITCODE -ne 0) { throw "$Label failed (exit $LASTEXITCODE)." }
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & npm @npmArgs
+        $exit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+    if ($exit -ne 0) { throw "$Label failed (exit $exit)." }
 }
 if ($SkipInstaller) {
     Write-Host "  (-SkipInstaller: no NSIS installer, still building tray exe)" -ForegroundColor DarkGray
