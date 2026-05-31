@@ -284,10 +284,18 @@ async fn cmd_doctor(config: &ThemisConfig) -> anyhow::Result<()> {
         println!("  foundry:  configured (deployment: {deployment})");
         println!("            restart themis-service after editing FOUNDRY_* in .env");
     } else {
-        let hint = find_dotenv_directory()
-            .and_then(|dir| std::fs::read_to_string(dir.join(".env")).ok())
+        let env_body = find_dotenv_directory()
+            .and_then(|dir| std::fs::read_to_string(dir.join(".env")).ok());
+        let has_foundry_line = env_body
+            .as_ref()
             .is_some_and(|body| body.contains("FOUNDRY_ENDPOINT"));
-        if hint {
+        let has_placeholder = env_body.as_ref().is_some_and(|body| {
+            body.contains("your-resource.openai.azure.com")
+                || body.contains("your_openai_key")
+        });
+        if has_placeholder {
+            println!("  foundry:  not configured (.env still has template placeholders — replace FOUNDRY_*)");
+        } else if has_foundry_line {
             println!("  foundry:  in .env but not loaded — quote values that contain spaces");
             println!("            (e.g. AZURE_SPEECH_CORRECTIONS=\"Reg:RAG,L L M:LLM\"), then restart");
         } else {

@@ -21,7 +21,10 @@ pub use analysis_diag::{
     AnalysisInsightRecord,
 };
 pub use capture_diag::{CaptureDiagnostics, CaptureDiagnosticsSnapshot};
-pub use config::{find_dotenv_directory, reload_dotenv_override, ConfigStatusSnapshot, ThemisConfig};
+pub use config::{
+    find_dotenv_directory, is_env_placeholder, reload_dotenv_override, ConfigStatusSnapshot,
+    ThemisConfig,
+};
 pub use env_file::{
     env_file_directory, env_file_path, env_file_path_or_default, read_env_settings, write_env_settings,
     EnvSettings, MANAGED_ENV_KEYS,

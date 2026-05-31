@@ -97,7 +97,38 @@ fn parse_insight_dwell_secs(raw: Option<String>) -> u32 {
 }
 
 fn non_empty_env(key: &str) -> Option<String> {
-    std::env::var(key).ok().filter(|s| !s.trim().is_empty())
+    std::env::var(key)
+        .ok()
+        .filter(|s| !s.trim().is_empty() && !is_env_placeholder(s))
+}
+
+/// True when a value is empty or still the `.env.example` template (not a real credential).
+pub fn is_env_placeholder(value: &str) -> bool {
+    let s = value.trim();
+    if s.is_empty() {
+        return true;
+    }
+    let lower = s.to_ascii_lowercase();
+    const MARKERS: &[&str] = &[
+        "your_speech_key",
+        "your_speech_key_here",
+        "your_openai_key",
+        "your-openai-key",
+        "your_api_key",
+        "your_key_here",
+        "changeme",
+        "replace_me",
+        "xxx.openai.azure.com",
+        "your-resource.openai.azure.com",
+        "your_resource.openai.azure.com",
+    ];
+    if MARKERS.iter().any(|m| lower.contains(m)) {
+        return true;
+    }
+    if lower.starts_with("your_") || lower.starts_with("your-") {
+        return true;
+    }
+    false
 }
 
 /// Directory containing `.env`, searched from cwd then the running executable path.
@@ -163,10 +194,10 @@ impl ThemisConfig {
     fn from_process_env() -> Self {
         let key = std::env::var("AZURE_SPEECH_KEY")
             .ok()
-            .filter(|s| !s.is_empty());
+            .filter(|s| !is_env_placeholder(s));
         let region = std::env::var("AZURE_SPEECH_REGION")
             .ok()
-            .filter(|s| !s.is_empty());
+            .filter(|s| !s.trim().is_empty());
 
         let use_mock = std::env::var("THEMIS_USE_MOCK_SPEECH")
             .ok()
@@ -215,15 +246,15 @@ impl ThemisConfig {
         }
     }
 
-    /// True when Azure OpenAI (`FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY`) is available for Insights LLM.
+    /// True when Azure OpenAI (`FOUNDRY_ENDPOINT` + `FOUNDRY_API_KEY`) are real values, not `.env.example` templates.
     pub fn llm_configured(&self) -> bool {
         self.foundry_endpoint
             .as_ref()
-            .is_some_and(|s| !s.trim().is_empty())
+            .is_some_and(|s| !is_env_placeholder(s))
             && self
                 .foundry_api_key
                 .as_ref()
-                .is_some_and(|s| !s.trim().is_empty())
+                .is_some_and(|s| !is_env_placeholder(s))
     }
 
     /// Non-secret snapshot for UI / gRPC (STT + LLM config cross-check).
@@ -308,6 +339,23 @@ mod tests {
         assert_eq!(parse_insight_dwell_secs(Some("3".into())), 20);
         assert_eq!(parse_insight_dwell_secs(Some("999".into())), 300);
         assert_eq!(parse_insight_dwell_secs(Some("bad".into())), 20);
+    }
+
+    #[test]
+    fn llm_not_configured_for_env_example_placeholders() {
+        assert!(is_env_placeholder("your_openai_key"));
+        assert!(is_env_placeholder("https://your-resource.openai.azure.com"));
+        assert!(!is_env_placeholder("eastus"));
+        let cfg = ThemisConfig {
+            foundry_endpoint: Some("https://your-resource.openai.azure.com".into()),
+            foundry_api_key: Some("your_openai_key".into()),
+            foundry_deployment: Some("gpt-4o-mini".into()),
+            ..ThemisConfig::default()
+        };
+        assert!(!cfg.llm_configured());
+        let snap = cfg.config_snapshot();
+        assert!(!snap.llm_configured);
+        assert!(snap.foundry_deployment.is_empty());
     }
 
     #[test]

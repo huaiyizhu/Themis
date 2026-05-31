@@ -19,7 +19,7 @@ function sttDetail(side) {
 function llmDetail(side) {
   if (!side.llm_configured) return "未配置";
   const dep = side.foundry_deployment?.trim();
-  return dep || "configured";
+  return dep || "已配置";
 }
 
 function statusMark(ok) {
