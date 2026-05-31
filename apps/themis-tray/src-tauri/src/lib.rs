@@ -1049,6 +1049,12 @@ fn spawn_service_if_needed(config: &ThemisConfig) {
         if let Some(path) = find_service_binary() {
             info!(path = %path.display(), "spawning themis-service");
             let mut cmd = std::process::Command::new(path);
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+                cmd.creation_flags(CREATE_NO_WINDOW);
+            }
             if let Some(dir) = themis_core::find_dotenv_directory() {
                 cmd.current_dir(dir);
             }

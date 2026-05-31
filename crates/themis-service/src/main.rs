@@ -1,3 +1,6 @@
+//! Headless daemon — no console window in release builds (tray spawns this in the background).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod engine;
 
 use engine::CaptureEngine;
