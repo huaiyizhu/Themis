@@ -62,7 +62,7 @@ async function loadSettings() {
     const data = await invoke("get_env_settings");
     envPathEl.textContent = data.exists
       ? `.env 路径：${data.path}`
-      : `将创建：${data.path}`;
+      : `尚无 .env，保存后将写入：${data.path}`;
     fillForm(data.settings);
     setStatus("", true);
     const cross = await invoke("get_config_crosscheck");

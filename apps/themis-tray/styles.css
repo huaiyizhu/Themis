@@ -868,6 +868,18 @@ body.adaptive-on .theme-badge::after {
   color: #9aa0a6;
 }
 
+.config-status-line.config-incomplete {
+  color: #e8b86d;
+}
+
+.config-status-line .cfg-hint {
+  color: #e8b86d;
+}
+
+.config-status-line .cfg-hint strong {
+  font-weight: 600;
+}
+
 .summary-panel {
   -webkit-app-region: no-drag;
   background: rgba(125, 206, 160, 0.06);

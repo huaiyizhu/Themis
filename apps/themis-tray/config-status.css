@@ -77,6 +77,21 @@
   margin-left: 4px;
 }
 
+.config-status-line .cfg-hint,
+.config-crosscheck .cfg-hint {
+  color: var(--cfg-warn);
+  margin-left: 4px;
+}
+
+.config-status-line .cfg-hint strong,
+.config-crosscheck .cfg-hint strong {
+  font-weight: 600;
+}
+
+.config-status-line.config-incomplete {
+  color: var(--cfg-warn);
+}
+
 .config-status-line.config-all-ok,
 .config-crosscheck.config-all-ok {
   opacity: 1;

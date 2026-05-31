@@ -323,9 +323,9 @@ GitHub Actions 不可用（额度、网络等）或发 tag 前想在本地验包
 | **Windows** | `.\scripts\build-release.ps1` 或 `scripts\build-release.cmd` |
 | **macOS** | `chmod +x scripts/build-release.sh && ./scripts/build-release.sh` |
 
-脚本会依次：前端 `npm ci` + 构建 → `cargo build --release`（service / cli / tray）→ Tauri 安装包（Windows NSIS / macOS dmg）→ `package-release-assets` 收集，并附上 `README.md`、`env.example`、平台用户指南。
+脚本会依次：前端 `npm ci` + 构建 → `cargo build --release`（service / cli / tray）→ Tauri 安装包（Windows NSIS / macOS dmg）→ `package-release-assets` 收集，并附上 `README.md`、`.env.example`、平台用户指南。
 
-**产出目录：** `release-assets/windows-x86_64/` 或 `release-assets/macos-aarch64/` 等。本地构建的文件名**不带** `windows-x86_64-` 前缀（目录已区分平台），例如 `themis-tray.exe`、`themis-service.exe`、`env.example`。GitHub Actions Release 附件仍带前缀（多平台混在同一 Release 页），例如 `windows-x86_64-themis-tray.exe`。
+**产出目录：** `release-assets/windows-x86_64/` 或 `release-assets/macos-aarch64/` 等。本地构建的文件名**不带** `windows-x86_64-` 前缀（目录已区分平台），例如 `themis-tray.exe`、`themis-service.exe`、`.env.example`。GitHub Actions Release 附件仍带前缀（多平台混在同一 Release 页），例如 `windows-x86_64-themis-tray.exe`。
 
 **跳过安装包（仅 exe，更快）：**
 
@@ -345,7 +345,7 @@ GitHub Actions 不可用（额度、网络等）或发 tag 前想在本地验包
 
 ```powershell
 cd release-assets\windows-x86_64
-copy env.example .env          # 编辑 AZURE_SPEECH_KEY / AZURE_SPEECH_REGION、FOUNDRY_* 等
+copy .env.example .env          # 编辑 AZURE_SPEECH_KEY / AZURE_SPEECH_REGION、FOUNDRY_* 等
 taskkill /IM themis-service.exe /F 2>$null
 .\themis-tray.exe
 ```
@@ -462,7 +462,7 @@ npm run tauri build -- --bundles nsis
 
 | 产物 | 路径 |
 |------|------|
-| 一键 Release 输出 | `release-assets/<平台>/`（`themis-tray` / `themis-service` / `themis-cli` + `README.md` + `env.example`） |
+| 一键 Release 输出 | `release-assets/<平台>/`（`themis-tray` / `themis-service` / `themis-cli` + `README.md` + `.env.example`） |
 | 服务 / CLI | `target/release/themis-service.exe`（Windows） |
 | 托盘 exe | `target/release/themis-tray.exe` |
 | 安装包 | `target/release/bundle/` 或 `apps/themis-tray/src-tauri/target/release/bundle/` |

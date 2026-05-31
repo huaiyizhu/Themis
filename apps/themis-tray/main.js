@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { applyConfigStatusEl } from "./config-status.js";
+import { applyConfigStatusEl, listMissingConfigItems } from "./config-status.js";
 import {
   applyCaptureStatusEl,
   applyCaptureStatusPending,
@@ -704,9 +704,17 @@ async function refreshStatus() {
     updateCaptureButton(s.state === "capturing");
 
     if (s.state === "idle") {
-      setPlaceholder(
-        "Service online — press Cmd+Shift+T (macOS) or Ctrl+Shift+T (Windows) to start capture.",
-      );
+      const missing = listMissingConfigItems(s.config?.tray);
+      const azureMissing = missing.filter((m) => m.startsWith("Azure"));
+      if (azureMissing.length) {
+        setPlaceholder(
+          `未配置：${azureMissing.join("；")}。请点击标题栏「配置」填写并保存（无需先复制 .env）。准备好后按 Ctrl+Shift+T / Cmd+Shift+T 开始采集。`,
+        );
+      } else {
+        setPlaceholder(
+          "Service online — press Cmd+Shift+T (macOS) or Ctrl+Shift+T (Windows) to start capture.",
+        );
+      }
     } else if (s.state === "capturing" && committedLines.length === 0 && !partialText) {
       let hint = "Listening… new lines appear below; view scrolls to latest.";
       if (s.message?.includes("no loopback signal") || s.message?.includes("signal=silent")) {
@@ -779,7 +787,10 @@ async function syncDiagnoseButton() {
 function updateSettingsButton(open) {
   if (!toggleSettingsBtn) return;
   toggleSettingsBtn.classList.toggle("is-open", open);
-  setTip(toggleSettingsBtn, open ? "关闭配置窗口" : "编辑 .env 配置");
+  setTip(
+    toggleSettingsBtn,
+    open ? "关闭配置窗口" : "配置 Azure Speech / Foundry（保存后自动写入 .env）",
+  );
   toggleSettingsBtn.setAttribute("aria-pressed", open ? "true" : "false");
 }
 
