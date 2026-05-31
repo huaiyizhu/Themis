@@ -73,16 +73,23 @@ Invoke-Checked {
 Write-Host "[3/4] Tauri app (themis-tray, embed frontend)..." -ForegroundColor Yellow
 Push-Location (Join-Path $Root "apps\themis-tray")
 $env:CI = "true"
-$tauriConfig = '{"build":{"beforeBuildCommand":""}}'
+# PowerShell strips JSON quotes when passed inline; use a config file (see release.yml bash note).
+$TauriConfigFile = (Resolve-Path (Join-Path $Root "scripts\tauri-release-build.json")).Path
+function Invoke-TauriBuild {
+    param([string[]]$ExtraArgs, [string]$Label)
+    $npmArgs = @(
+        "run", "tauri", "build", "--",
+        "--target", $Target,
+        "--config", $TauriConfigFile
+    ) + $ExtraArgs
+    & npm @npmArgs
+    if ($LASTEXITCODE -ne 0) { throw "$Label failed (exit $LASTEXITCODE)." }
+}
 if ($SkipInstaller) {
     Write-Host "  (-SkipInstaller: no NSIS installer, still building tray exe)" -ForegroundColor DarkGray
-    Invoke-Checked {
-        npm run tauri build -- --target $Target --no-bundle --config $tauriConfig
-    } "npm run tauri build --no-bundle"
+    Invoke-TauriBuild -ExtraArgs @("--no-bundle") -Label "npm run tauri build --no-bundle"
 } else {
-    Invoke-Checked {
-        npm run tauri build -- --target $Target --bundles $Bundle --config $tauriConfig
-    } "npm run tauri build"
+    Invoke-TauriBuild -ExtraArgs @("--bundles", $Bundle) -Label "npm run tauri build"
 }
 Pop-Location
 
