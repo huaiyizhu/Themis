@@ -93,8 +93,6 @@ function initHeaderTips() {
   setTip(document.getElementById("stack-divider"), "拖动调整字幕区高度");
 }
 
-initHeaderTips();
-
 const WINDOW_PRESET_STORAGE_KEY = "themis-window-preset";
 const TRANSCRIPT_VISIBLE_STORAGE_KEY = "themis-transcript-visible";
 
@@ -114,6 +112,18 @@ const transcriptSectionEl = document.getElementById("transcript-section");
 const insightsPanelEl = document.getElementById("insights-panel");
 const summaryEmptyEl = document.getElementById("summary-empty");
 const summaryTextEl = document.getElementById("summary-text");
+const summaryCopyBtn = document.getElementById("summary-copy");
+const summaryActionsEl = document.getElementById("summary-actions");
+
+initHeaderTips();
+
+summaryCopyBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const text = summaryTextEl?.textContent?.trim();
+  if (!text) return;
+  navigator.clipboard?.writeText(text).catch(() => {});
+});
+setTip(summaryCopyBtn, "复制当前会话摘要");
 
 /** @type {string[]} Final lines (one per Azure REST phrase). */
 let committedLines = [];
@@ -617,6 +627,10 @@ function renderSessionSummary(summary) {
   summaryEmptyEl.classList.add("hidden");
   summaryTextEl.classList.remove("hidden");
   summaryTextEl.textContent = text;
+  if (summaryCopyBtn) {
+    summaryCopyBtn.disabled = false;
+  }
+  summaryActionsEl?.classList.remove("hidden");
   if (isSummaryCollapsed()) {
     setSummaryHint(`已更新 ${formatSummaryTime()}`);
   }
@@ -626,6 +640,10 @@ function resetSessionSummary() {
   summaryEmptyEl.classList.remove("hidden");
   summaryTextEl.classList.add("hidden");
   summaryTextEl.textContent = "";
+  if (summaryCopyBtn) {
+    summaryCopyBtn.disabled = true;
+  }
+  summaryActionsEl?.classList.add("hidden");
   setSummaryHint("采集中，摘要将周期性更新…");
 }
 
@@ -893,7 +911,6 @@ function pruneEntryList(entries) {
     const head = entries[0];
     if (!head.pinned && now - head.addedAt >= insightDwellMs) {
       head.pinned = true;
-      changed = true;
     }
   }
   for (let i = entries.length - 1; i >= 0; i -= 1) {

@@ -229,6 +229,23 @@ function copyText(text) {
   navigator.clipboard?.writeText(t).catch(() => {});
 }
 
+/** @param {object} item @param {"term"|"question"} kind */
+function buildInsightCopyText(item, kind) {
+  const detail = String(item.detailText ?? "").trim();
+  if (kind === "term") {
+    const body =
+      item.termLevel === "advanced" && item.advancedText
+        ? item.advancedText
+        : item.explanation;
+    const parts = [`${item.term}\n${body}`];
+    if (detail) parts.push(`\n更详细\n${detail}`);
+    return parts.join("\n");
+  }
+  const parts = [`Q: ${item.question}\nA: ${item.answer}`];
+  if (detail) parts.push(`\n回答思路\n${detail}`);
+  return parts.join("\n");
+}
+
 /**
  * @param {HTMLElement} card
  * @param {object} item
@@ -320,15 +337,7 @@ function appendActionButtons(actions, item, kind, ctx, opts = {}) {
   copyBtn.textContent = "复制";
   copyBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (kind === "term") {
-      const body =
-        item.termLevel === "advanced" && item.advancedText
-          ? item.advancedText
-          : item.explanation;
-      copyText(`${item.term}\n${body}`);
-    } else {
-      copyText(`Q: ${item.question}\nA: ${item.answer}`);
-    }
+    copyText(buildInsightCopyText(item, kind));
   });
   actions.appendChild(copyBtn);
 

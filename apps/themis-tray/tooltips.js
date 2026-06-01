@@ -84,7 +84,12 @@ function positionTip(el, bubble) {
   const bw = bubble.offsetWidth;
   const bh = bubble.offsetHeight;
 
-  bubble.classList.remove("is-below", "is-menu-side-left", "is-menu-side-right");
+  bubble.classList.remove(
+    "is-below",
+    "is-menu-side-left",
+    "is-menu-side-right",
+    "is-actions-below",
+  );
 
   const overflowMenu = el.closest?.("#header-overflow-menu");
   if (overflowMenu) {
@@ -107,6 +112,41 @@ function positionTip(el, bubble) {
     return;
   }
 
+  const actionsRow = el.closest?.(".insight-actions-row");
+  if (actionsRow) {
+    const rowRect = actionsRow.getBoundingClientRect();
+    bubble.classList.add("is-below", "is-actions-below");
+
+    let top = rowRect.bottom + margin;
+    let left = rect.left + rect.width / 2;
+
+    if (top + bh > window.innerHeight - margin) {
+      const card = actionsRow.closest(
+        ".insight-card, .question-card, .glance-primary-card, .pinned-card",
+      );
+      const cardRect = card?.getBoundingClientRect() ?? rowRect;
+      const leftAnchor = cardRect.left - margin;
+      if (leftAnchor - bw >= margin) {
+        bubble.classList.remove("is-below", "is-actions-below");
+        bubble.classList.add("is-menu-side-left");
+        top = rect.top + rect.height / 2;
+        const halfH = bh / 2;
+        top = Math.max(margin + halfH, Math.min(top, window.innerHeight - margin - halfH));
+        bubble.style.left = `${leftAnchor}px`;
+        bubble.style.top = `${top}px`;
+        return;
+      }
+      top = rect.top - margin - bh;
+      bubble.classList.remove("is-actions-below");
+    }
+
+    const half = bw / 2;
+    left = Math.max(margin + half, Math.min(left, window.innerWidth - margin - half));
+    bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+    return;
+  }
+
   let top = rect.top - margin - bh;
   let left = rect.left + rect.width / 2;
 
@@ -123,11 +163,12 @@ function positionTip(el, bubble) {
 }
 
 function scheduleShow(el) {
+  const delay = el.closest?.(".insight-actions-row") ? 480 : 220;
   clearTimeout(showTimer);
   showTimer = setTimeout(() => {
     showTimer = null;
     showTip(el);
-  }, 220);
+  }, delay);
 }
 
 export function migrateTitleToDataTip(root = document) {
@@ -182,4 +223,14 @@ export function initTooltips() {
   );
   window.addEventListener("blur", hideTip);
   window.addEventListener("resize", hideTip);
+
+  document.addEventListener(
+    "mousedown",
+    (e) => {
+      if (!tipTarget) return;
+      if (e.target.closest?.("[data-tip]") === tipTarget) return;
+      hideTip();
+    },
+    true,
+  );
 }

@@ -59,6 +59,21 @@ body.ui-mode-meeting .summary-panel:not(.is-collapsed) .summary-toggle-bar .summ
   white-space: nowrap;
 }
 
+.summary-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.summary-actions.hidden {
+  display: none;
+}
+
+.summary-copy-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 /* Pinned area — docked at bottom of overlay, expands into lower space */
 .pinned-panel {
   -webkit-app-region: no-drag;
