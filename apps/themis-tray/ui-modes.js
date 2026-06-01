@@ -2,7 +2,7 @@
  * Meeting / glance UI modes — focused insight rendering.
  */
 import { invoke } from "@tauri-apps/api/core";
-import { setTip } from "./tooltips.js";
+import { dismissTooltip, setTip } from "./tooltips.js";
 
 export const UI_MODE_STORAGE_KEY = "themis-ui-mode";
 export const SUMMARY_COLLAPSED_KEY = "themis-summary-collapsed";
@@ -72,6 +72,7 @@ export function initHeaderOverflow() {
   const close = () => {
     menu.classList.add("hidden");
     toggle.setAttribute("aria-expanded", "false");
+    dismissTooltip();
   };
 
   toggle.addEventListener("click", (e) => {
