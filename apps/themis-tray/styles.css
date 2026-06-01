@@ -162,6 +162,14 @@ body:not(.is-mini-mode) .mini-floater {
   transform: translateX(-50%);
 }
 
+.themis-tip.is-menu-side-left {
+  transform: translate(-100%, -50%);
+}
+
+.themis-tip.is-menu-side-right {
+  transform: translate(0, -50%);
+}
+
 .theme-light-glass .themis-tip,
 .theme-solid-light .themis-tip,
 .theme-paper .themis-tip,

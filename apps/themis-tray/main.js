@@ -73,7 +73,7 @@ function removeTermsByKey(term) {
 }
 
 function initHeaderTips() {
-  setTip(document.getElementById("header-overflow-toggle"), "更多：诊断、配置、字号、浮标等");
+  setTip(document.getElementById("header-overflow-toggle"), "更多：诊断、配置、字号、尺寸等");
   setTip(sizeToggleBtn, "窗口尺寸预设");
   setTip(clearSessionBtn, "清空字幕、总结与洞察，从零继续监听");
   setTip(hideOverlayBtn, tipWithHotkey("隐藏窗口（捕捉继续，托盘可再次打开）", "O"));
@@ -442,6 +442,7 @@ initMiddleDivider();
 function closeSizeMenu() {
   sizeMenuEl?.classList.add("hidden");
   sizeToggleBtn?.setAttribute("aria-expanded", "false");
+  sizeToggleBtn?.classList.remove("is-active");
 }
 
 function markActiveSizePreset(presetId) {
@@ -503,6 +504,7 @@ async function initSizePresets() {
     e.stopPropagation();
     const open = sizeMenuEl.classList.toggle("hidden");
     sizeToggleBtn.setAttribute("aria-expanded", open ? "false" : "true");
+    sizeToggleBtn.classList.toggle("is-active", !open);
   });
 
   document.addEventListener("click", (e) => {

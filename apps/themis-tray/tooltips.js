@@ -49,6 +49,10 @@ export function setTip(el, text) {
   }
 }
 
+export function dismissTooltip() {
+  hideTip();
+}
+
 function hideTip() {
   clearTimeout(showTimer);
   showTimer = null;
@@ -79,6 +83,29 @@ function positionTip(el, bubble) {
   bubble.hidden = false;
   const bw = bubble.offsetWidth;
   const bh = bubble.offsetHeight;
+
+  bubble.classList.remove("is-below", "is-menu-side-left", "is-menu-side-right");
+
+  const overflowMenu = el.closest?.("#header-overflow-menu");
+  if (overflowMenu) {
+    const menuRect = overflowMenu.getBoundingClientRect();
+    const halfH = bh / 2;
+    let top = rect.top + rect.height / 2;
+    top = Math.max(margin + halfH, Math.min(top, window.innerHeight - margin - halfH));
+
+    const leftAnchor = menuRect.left - margin;
+    if (leftAnchor - bw >= margin) {
+      bubble.classList.add("is-menu-side-left");
+      bubble.style.left = `${leftAnchor}px`;
+      bubble.style.top = `${top}px`;
+      return;
+    }
+
+    bubble.classList.add("is-menu-side-right");
+    bubble.style.left = `${menuRect.right + margin}px`;
+    bubble.style.top = `${top}px`;
+    return;
+  }
 
   let top = rect.top - margin - bh;
   let left = rect.left + rect.width / 2;
