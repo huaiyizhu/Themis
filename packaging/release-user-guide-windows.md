@@ -141,7 +141,7 @@
 | `FOUNDRY_API_KEY` | 建议 | Azure OpenAI Key（**不是** Speech Key） |
 | `FOUNDRY_DEPLOYMENT` | 建议 | 部署名，如 `gpt-4o-mini` |
 | `THEMIS_ANALYSIS_ENABLED` | 否 | 默认 `true`；`false` 关闭全部 Insights |
-| `THEMIS_INSIGHT_DWELL_SECS` | 否 | 已弃用（术语/问题卡片不再自动消失，保留配置项兼容旧 `.env`） |
+| `THEMIS_INSIGHT_DWELL_SECS` | 否 | 术语/问题卡片停留秒数，超时后自动消失；默认 600（10 分钟），范围 5–3600 |
 | `THEMIS_SESSION_SUMMARY_INTERVAL_SECS` | 否 | 全文总结刷新间隔，默认 20 秒 |
 
 | 能力 | 无 `FOUNDRY_*` | 有 `FOUNDRY_*` |

@@ -279,12 +279,13 @@ function promoteEntryToTop(entries, id) {
  * @param {string} id
  * @param {string} kind
  */
-export function toggleUserPin(entries, id, kind, _dwellMs = 20_000) {
+export function toggleUserPin(entries, id, kind, dwellMs = 600_000) {
   const item = entries.find((e) => e.id === id);
   if (!item) return false;
   if (item.userPinned) {
     item.userPinned = false;
     item.pinned = false;
+    item.expiresAt = Date.now() + dwellMs;
   } else {
     item.userPinned = true;
     item.pinned = true;

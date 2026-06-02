@@ -147,8 +147,9 @@ let partialText = "";
 /** User scrolled up — pause auto-follow until they click Latest or scroll to bottom. */
 let followLatest = true;
 
-/** Legacy config from .env; insight cards no longer auto-expire. */
-let insightDwellMs = 20_000;
+/** How long term/question cards stay before expiring (ms); from THEMIS_INSIGHT_DWELL_SECS via tray. */
+const DEFAULT_INSIGHT_DWELL_MS = 600_000;
+let insightDwellMs = DEFAULT_INSIGHT_DWELL_MS;
 /** Whether term/Q&A explanations are localized to Chinese on the service side. */
 let insightLocalizeZh = true;
 
@@ -158,6 +159,9 @@ let questionSeq = 0;
 const termEntries = [];
 /** @type {Array<{id: string, seq: number, addedAt: number, expiresAt: number, pinned: boolean, userPinned: boolean, question: string, answer: string, detailText?: string, detailExpanded?: boolean, detailLoading?: boolean, detailError?: string}>} */
 const questionEntries = [];
+/** @type {ReturnType<typeof setInterval> | null} */
+let insightPruneTimer = null;
+
 const SCROLL_BOTTOM_THRESHOLD = 48;
 
 const TRANSCRIPT_HEIGHT_STORAGE_KEY = "themis-transcript-panel-height";
@@ -877,6 +881,47 @@ function formatInsightTime(ms) {
   });
 }
 
+function ensureInsightPruneTimer() {
+  if (insightPruneTimer !== null) return;
+  insightPruneTimer = setInterval(pruneExpiredInsights, 500);
+}
+
+function supersedeHeadEntry(entries, now) {
+  const prev = entries[0];
+  if (!prev || prev.userPinned) return;
+  prev.pinned = false;
+  prev.expiresAt = now + insightDwellMs;
+}
+
+function pruneEntryList(entries) {
+  const now = Date.now();
+  let changed = false;
+  if (entries.length > 0) {
+    const head = entries[0];
+    if (!head.pinned && !head.userPinned && now - head.addedAt >= insightDwellMs) {
+      head.pinned = true;
+      head.expiresAt = now + insightDwellMs;
+    }
+  }
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const item = entries[i];
+    if (item.userPinned) continue;
+    if (item.expiresAt <= now) {
+      entries.splice(i, 1);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function pruneExpiredInsights() {
+  const termsChanged = pruneEntryList(termEntries);
+  const questionsChanged = pruneEntryList(questionEntries);
+  if (termsChanged || questionsChanged) {
+    renderInsightPanels();
+  }
+}
+
 function initInsightUi() {
   insightUiCtx = {
     get termEntries() {
@@ -912,12 +957,13 @@ function appendTermEntries(terms) {
     if (!key) continue;
     if (isTermDismissed(t.term)) continue;
     if (termEntries.some((e) => normalizeTermKey(e.term) === key)) continue;
+    supersedeHeadEntry(termEntries, now);
     termSeq += 1;
     termEntries.unshift({
       id: `${now}-t${termSeq}`,
       seq: termSeq,
       addedAt: now,
-      expiresAt: Number.MAX_SAFE_INTEGER,
+      expiresAt: now + insightDwellMs,
       pinned: false,
       userPinned: false,
       term: t.term,
@@ -938,12 +984,13 @@ function appendQuestionEntries(questions) {
     if (!key) continue;
     if (isQuestionDismissed(q.question)) continue;
     if (questionEntries.some((e) => e.question.trim() === key)) continue;
+    supersedeHeadEntry(questionEntries, now);
     questionSeq += 1;
     questionEntries.unshift({
       id: `${now}-q${questionSeq}`,
       seq: questionSeq,
       addedAt: now,
-      expiresAt: Number.MAX_SAFE_INTEGER,
+      expiresAt: now + insightDwellMs,
       pinned: false,
       userPinned: false,
       question: q.question,
@@ -1001,6 +1048,10 @@ function resetInsightDwellState() {
   questionSeq = 0;
   termEntries.length = 0;
   questionEntries.length = 0;
+  if (insightPruneTimer !== null) {
+    clearInterval(insightPruneTimer);
+    insightPruneTimer = null;
+  }
 }
 
 function renderInsights(insights) {
@@ -1013,6 +1064,7 @@ function renderInsights(insights) {
   if (appendQuestionEntries(insights.questions)) changed = true;
 
   if (changed) {
+    ensureInsightPruneTimer();
     renderInsightPanels();
   }
 }

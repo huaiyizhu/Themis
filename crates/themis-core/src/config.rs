@@ -64,7 +64,7 @@ impl Default for ThemisConfig {
             audio_gain_max: 16.0,
             audio_capture_mode: "auto".into(),
             analysis_enabled: true,
-            insight_dwell_secs: 20,
+            insight_dwell_secs: 600,
             session_summary_interval_secs: 20,
         }
     }
@@ -84,9 +84,9 @@ fn parse_session_summary_interval_secs(raw: Option<String>) -> u32 {
 }
 
 fn parse_insight_dwell_secs(raw: Option<String>) -> u32 {
-    const DEFAULT: u32 = 20;
+    const DEFAULT: u32 = 600;
     const MIN: u32 = 5;
-    const MAX: u32 = 300;
+    const MAX: u32 = 3600;
     let Some(s) = raw.filter(|v| !v.is_empty()) else {
         return DEFAULT;
     };
@@ -320,7 +320,7 @@ mod tests {
         let cfg = ThemisConfig::default();
         assert_eq!(cfg.sample_rate, 16_000);
         assert_eq!(cfg.grpc_port, 50051);
-        assert_eq!(cfg.insight_dwell_secs, 20);
+        assert_eq!(cfg.insight_dwell_secs, 600);
         assert_eq!(cfg.session_summary_interval_secs, 20);
     }
 
@@ -334,11 +334,12 @@ mod tests {
 
     #[test]
     fn parse_insight_dwell_secs_clamps_and_defaults() {
-        assert_eq!(parse_insight_dwell_secs(None), 20);
+        assert_eq!(parse_insight_dwell_secs(None), 600);
         assert_eq!(parse_insight_dwell_secs(Some("30".into())), 30);
-        assert_eq!(parse_insight_dwell_secs(Some("3".into())), 20);
-        assert_eq!(parse_insight_dwell_secs(Some("999".into())), 300);
-        assert_eq!(parse_insight_dwell_secs(Some("bad".into())), 20);
+        assert_eq!(parse_insight_dwell_secs(Some("3".into())), 600);
+        assert_eq!(parse_insight_dwell_secs(Some("999".into())), 999);
+        assert_eq!(parse_insight_dwell_secs(Some("5000".into())), 3600);
+        assert_eq!(parse_insight_dwell_secs(Some("bad".into())), 600);
     }
 
     #[test]

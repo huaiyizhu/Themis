@@ -33,7 +33,7 @@ FOUNDRY_DEPLOYMENT=gpt-4o-mini
 # false 可关闭全部 Insights 分析
 THEMIS_ANALYSIS_ENABLED=true
 # Terms/Questions 卡片最短停留秒数，默认 20，范围 5–300
-# THEMIS_INSIGHT_DWELL_SECS=20
+# THEMIS_INSIGHT_DWELL_SECS=600
 # 全文总结刷新间隔（秒），默认 20，范围 10–120
 # THEMIS_SESSION_SUMMARY_INTERVAL_SECS=20
 
@@ -200,7 +200,7 @@ WINDOWS_GUIDE = r"""# Themis 使用说明（Windows）
 | `FOUNDRY_API_KEY` | 建议 | Azure OpenAI Key（**不是** Speech Key） |
 | `FOUNDRY_DEPLOYMENT` | 建议 | 部署名，如 `gpt-4o-mini` |
 | `THEMIS_ANALYSIS_ENABLED` | 否 | 默认 `true`；`false` 关闭全部 Insights |
-| `THEMIS_INSIGHT_DWELL_SECS` | 否 | 术语/问题卡片最短停留秒数，默认 20 |
+| `THEMIS_INSIGHT_DWELL_SECS` | 否 | 术语/问题卡片停留秒数，超时消失；默认 600（10 分钟） |
 | `THEMIS_SESSION_SUMMARY_INTERVAL_SECS` | 否 | 全文总结刷新间隔，默认 20 秒 |
 
 | 能力 | 无 `FOUNDRY_*` | 有 `FOUNDRY_*` |
