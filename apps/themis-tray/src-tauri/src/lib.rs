@@ -1193,6 +1193,11 @@ pub fn run() {
     } else {
         "Ctrl+Shift+KeyM"
     };
+    let hotkey_topmost = if cfg!(target_os = "macos") {
+        "Command+Shift+KeyP"
+    } else {
+        "Ctrl+Shift+KeyP"
+    };
 
     let sc_toggle: tauri_plugin_global_shortcut::Shortcut = hotkey_toggle
         .parse()
@@ -1233,6 +1238,9 @@ pub fn run() {
     let sc_mini: tauri_plugin_global_shortcut::Shortcut = hotkey_mini
         .parse()
         .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_mini}: {e}"));
+    let sc_topmost: tauri_plugin_global_shortcut::Shortcut = hotkey_topmost
+        .parse()
+        .unwrap_or_else(|e| panic!("invalid hotkey {hotkey_topmost}: {e}"));
 
     let ui_state = Arc::new(OverlayUiState::new());
 
@@ -1269,6 +1277,7 @@ pub fn run() {
                     hotkey_overlay_visibility,
                     hotkey_wake,
                     hotkey_mini,
+                    hotkey_topmost,
                 ])
                 .unwrap_or_else(|e| panic!("invalid hotkeys: {e}"))
                 .with_handler({
@@ -1315,6 +1324,9 @@ pub fn run() {
                         } else if shortcut == &sc_mini {
                             let state = app.state::<AppState>();
                             let _ = toggle_mini_mode(app, &state.mini_mode);
+                        } else if shortcut == &sc_topmost {
+                            let s = ui_state.toggle_always_on_top();
+                            let _ = apply_overlay_ui(app, &s);
                         }
                     }
                 })

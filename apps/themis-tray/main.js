@@ -1293,8 +1293,8 @@ function updateTopmostButton(alwaysOnTop) {
   setTip(
     toggleTopmostBtn,
     on
-      ? "窗口置顶：始终在最前（点击改为常规层叠）"
-      : "常规层叠：可被其他窗口挡住（点击改为始终置顶）",
+      ? tipWithHotkey("窗口置顶：始终在最前（点击改为常规层叠）", "P")
+      : tipWithHotkey("常规层叠：可被其他窗口挡住（点击改为始终置顶）", "P"),
   );
   toggleTopmostBtn.setAttribute("aria-pressed", on ? "true" : "false");
 }
