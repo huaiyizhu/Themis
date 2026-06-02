@@ -4,12 +4,15 @@ use crate::macos_window::apply_overlay_topmost;
 use crate::mini_mode::mini_mode_active;
 use tauri::WebviewWindow;
 
-pub fn wake_overlay_window(window: &WebviewWindow) -> Result<(), String> {
+pub fn wake_overlay_window(
+    window: &WebviewWindow,
+    always_on_top: bool,
+) -> Result<(), String> {
     if window.is_minimized().map_err(|e| e.to_string())? {
         window.unminimize().map_err(|e| e.to_string())?;
     }
     window.show().map_err(|e| e.to_string())?;
-    apply_overlay_topmost(window, mini_mode_active())?;
+    apply_overlay_topmost(window, mini_mode_active(), always_on_top)?;
     window.set_focus().map_err(|e| e.to_string())?;
     Ok(())
 }

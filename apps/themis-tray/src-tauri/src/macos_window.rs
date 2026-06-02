@@ -140,20 +140,32 @@ pub fn set_macos_mini_floater_elevated(
 }
 
 #[cfg(target_os = "macos")]
-pub fn apply_overlay_topmost(window: &WebviewWindow, mini_mode: bool) -> Result<(), String> {
+pub fn apply_overlay_topmost(
+    window: &WebviewWindow,
+    mini_mode: bool,
+    always_on_top: bool,
+) -> Result<(), String> {
     if mini_mode {
         Ok(())
     } else {
-        window.set_always_on_top(true).map_err(|e| e.to_string())
+        window
+            .set_always_on_top(always_on_top)
+            .map_err(|e| e.to_string())
     }
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn apply_overlay_topmost(window: &WebviewWindow, mini_mode: bool) -> Result<(), String> {
+pub fn apply_overlay_topmost(
+    window: &WebviewWindow,
+    mini_mode: bool,
+    always_on_top: bool,
+) -> Result<(), String> {
     if mini_mode {
         Ok(())
     } else {
-        window.set_always_on_top(true).map_err(|e| e.to_string())
+        window
+            .set_always_on_top(always_on_top)
+            .map_err(|e| e.to_string())
     }
 }
 

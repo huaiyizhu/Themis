@@ -314,6 +314,16 @@ fn toggle_overlay_adaptive(
 }
 
 #[tauri::command]
+fn toggle_overlay_always_on_top(
+    app: AppHandle,
+    ui: State<'_, Arc<OverlayUiState>>,
+) -> Result<OverlayUiSettings, String> {
+    let settings = ui.toggle_always_on_top();
+    apply_overlay_ui(&app, &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
 fn quit_app(app: AppHandle) {
     app.exit(0);
 }
@@ -703,7 +713,8 @@ fn wake_overlay(app: &AppHandle, expand_to_current_screen: bool) -> Result<(), S
     let w = app
         .get_webview_window("overlay")
         .ok_or_else(|| "overlay window missing".to_string())?;
-    window_wake::wake_overlay_window(&w)?;
+    let always_on_top = app.state::<Arc<OverlayUiState>>().get().always_on_top;
+    window_wake::wake_overlay_window(&w, always_on_top)?;
     let _ = app.emit("overlay-visibility", true);
     if expand_to_current_screen {
         let _ = app.emit("window-preset-applied", WAKE_LAYOUT_PRESET_ID);
@@ -1349,7 +1360,6 @@ pub fn run() {
             let menu = Menu::with_items(app, &[&show_i, &hide_i, &toggle_i, &diag_i, &quit_i])?;
 
             if let Some(w) = app.get_webview_window("overlay") {
-                let _ = w.set_always_on_top(true);
                 apply_overlay_transparency(&w);
             }
             #[cfg(target_os = "macos")]
@@ -1445,6 +1455,7 @@ pub fn run() {
             reset_overlay_font_scale,
             cycle_overlay_theme,
             toggle_overlay_adaptive,
+            toggle_overlay_always_on_top,
             clear_listening_session,
             list_window_presets,
             apply_window_preset,

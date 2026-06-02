@@ -83,6 +83,10 @@ fn default_font_scale() -> f64 {
     1.0
 }
 
+fn default_always_on_top() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverlayUiSettings {
     pub opacity: f64,
@@ -92,6 +96,9 @@ pub struct OverlayUiSettings {
     /// Multiplier for overlay content text (1.0 = default).
     #[serde(default = "default_font_scale")]
     pub font_scale: f64,
+    /// When true, overlay stays above other windows; when false, normal stacking.
+    #[serde(default = "default_always_on_top")]
+    pub always_on_top: bool,
 }
 
 impl Default for OverlayUiSettings {
@@ -101,6 +108,7 @@ impl Default for OverlayUiSettings {
             theme: THEMES[0].to_string(),
             adaptive: false,
             font_scale: 1.0,
+            always_on_top: true,
         }
     }
 }
@@ -190,6 +198,12 @@ impl OverlayUiState {
         s.adaptive = !s.adaptive;
         self.set(s)
     }
+
+    pub fn toggle_always_on_top(&self) -> OverlayUiSettings {
+        let mut s = self.get();
+        s.always_on_top = !s.always_on_top;
+        self.set(s)
+    }
 }
 
 pub fn overlay_window(app: &AppHandle) -> Option<WebviewWindow> {
@@ -198,7 +212,7 @@ pub fn overlay_window(app: &AppHandle) -> Option<WebviewWindow> {
 
 pub fn apply_overlay_ui(app: &AppHandle, settings: &OverlayUiSettings) -> Result<(), String> {
     let window = overlay_window(app).ok_or_else(|| "overlay window missing".to_string())?;
-    apply_overlay_topmost(&window, mini_mode_active())?;
+    apply_overlay_topmost(&window, mini_mode_active(), settings.always_on_top)?;
 
     let effective_theme = if settings.adaptive {
         adaptive_theme_for_window(&window)
@@ -214,6 +228,7 @@ pub fn apply_overlay_ui(app: &AppHandle, settings: &OverlayUiSettings) -> Result
         effective_theme,
         adaptive: settings.adaptive,
         font_scale: settings.font_scale,
+        always_on_top: settings.always_on_top,
     };
     app.emit("overlay-ui", payload)
         .map_err(|e| e.to_string())?;
@@ -227,6 +242,7 @@ pub struct OverlayUiPayload {
     pub effective_theme: String,
     pub adaptive: bool,
     pub font_scale: f64,
+    pub always_on_top: bool,
 }
 
 pub fn adaptive_theme_for_window(window: &WebviewWindow) -> Option<f32> {
@@ -334,6 +350,7 @@ pub fn spawn_adaptive_poll(app: AppHandle, ui: std::sync::Arc<OverlayUiState>) {
                             effective_theme: theme,
                             adaptive: true,
                             font_scale: settings.font_scale,
+                            always_on_top: settings.always_on_top,
                         };
                         let _ = app.emit("overlay-ui", payload);
                     }

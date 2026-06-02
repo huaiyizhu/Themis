@@ -1,4 +1,5 @@
-use crate::macos_window::apply_overlay_transparency;
+use crate::macos_window::{apply_overlay_topmost, apply_overlay_transparency};
+use crate::overlay_ui::OverlayUiState;
 #[cfg(target_os = "macos")]
 use crate::macos_mini_panel::{hide_mini_panel, refresh_mini_panel, show_mini_panel};
 use std::sync::{
@@ -216,10 +217,14 @@ fn enter_mini(
 }
 
 #[cfg(target_os = "macos")]
-fn exit_mini(overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
+fn exit_mini(
+    app: &AppHandle,
+    overlay: &WebviewWindow,
+    saved: &SavedGeometry,
+) -> Result<(), String> {
     MINI_MODE_ACTIVE.store(false, Ordering::Relaxed);
     hide_mini_panel()?;
-    restore_overlay(overlay, saved)
+    restore_overlay(app, overlay, saved)
 }
 
 #[cfg(windows)]
@@ -230,7 +235,7 @@ fn exit_mini(_app: &AppHandle, overlay: &WebviewWindow, saved: &SavedGeometry) -
     disable_overlay_mini_ui(overlay)?;
     set_macos_mini_floater_elevated(overlay, false)?;
     set_mini_circular_clip(overlay, false);
-    restore_overlay(overlay, saved)
+    restore_overlay(app, overlay, saved)
 }
 
 #[cfg(all(not(target_os = "macos"), not(windows)))]
@@ -241,10 +246,14 @@ fn exit_mini(app: &AppHandle, overlay: &WebviewWindow, saved: &SavedGeometry) ->
     set_macos_mini_floater_elevated(&mini, false)?;
     set_mini_circular_clip(&mini, false);
     mini.hide().map_err(|e| e.to_string())?;
-    restore_overlay(overlay, saved)
+    restore_overlay(app, overlay, saved)
 }
 
-fn restore_overlay(overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
+fn restore_overlay(
+    app: &AppHandle,
+    overlay: &WebviewWindow,
+    saved: &SavedGeometry,
+) -> Result<(), String> {
     apply_overlay_transparency(overlay);
     overlay.set_resizable(true).map_err(|e| e.to_string())?;
     overlay
@@ -264,7 +273,8 @@ fn restore_overlay(overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(),
             .map_err(|e| e.to_string())?;
     }
     overlay.show().map_err(|e| e.to_string())?;
-    let _ = overlay.set_always_on_top(true);
+    let always_on_top = app.state::<Arc<OverlayUiState>>().get().always_on_top;
+    apply_overlay_topmost(overlay, false, always_on_top)?;
     let _ = overlay.set_focus();
     Ok(())
 }
@@ -282,7 +292,7 @@ pub fn toggle_mini_mode(app: &AppHandle, state: &Arc<Mutex<MiniModeState>>) -> R
             .ok_or_else(|| "missing saved window geometry".to_string())?;
         stop_elevate_task(&mut guard);
         #[cfg(target_os = "macos")]
-        exit_mini(&overlay, &saved)?;
+        exit_mini(app, &overlay, &saved)?;
         #[cfg(not(target_os = "macos"))]
         exit_mini(app, &overlay, &saved)?;
         guard.active = false;

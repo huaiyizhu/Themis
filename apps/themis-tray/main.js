@@ -38,6 +38,7 @@ const toggleDiagnoseBtn = document.getElementById("toggle-diagnose");
 const toggleSettingsBtn = document.getElementById("toggle-settings");
 const toggleLocalizeBtn = document.getElementById("toggle-localize");
 const toggleMiniBtn = document.getElementById("toggle-mini");
+const toggleTopmostBtn = document.getElementById("toggle-topmost");
 const hideOverlayBtn = document.getElementById("hide-overlay");
 const quitAppBtn = document.getElementById("quit-app");
 const miniFloaterEl = document.getElementById("mini-floater");
@@ -1269,6 +1270,7 @@ function applyOverlayUi(payload) {
     );
   }
   document.body.classList.toggle("adaptive-on", Boolean(payload.adaptive));
+  updateTopmostButton(payload.always_on_top !== false);
   const saved = payload.theme && payload.theme !== theme ? ` · saved ${payload.theme}` : "";
   themeBadgeEl.textContent = themeShortLabel(theme);
   setTip(
@@ -1283,6 +1285,29 @@ listen("overlay-ui", (event) => {
   applyOverlayUi(event.payload);
 });
 
+function updateTopmostButton(alwaysOnTop) {
+  if (!toggleTopmostBtn) return;
+  const on = Boolean(alwaysOnTop);
+  toggleTopmostBtn.classList.toggle("is-topmost", on);
+  toggleTopmostBtn.setAttribute("aria-label", on ? "窗口置顶（已开启）" : "窗口置顶（已关闭，常规层叠）");
+  setTip(
+    toggleTopmostBtn,
+    on
+      ? "窗口置顶：始终在最前（点击改为常规层叠）"
+      : "常规层叠：可被其他窗口挡住（点击改为始终置顶）",
+  );
+  toggleTopmostBtn.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
+toggleTopmostBtn?.addEventListener("click", async () => {
+  try {
+    const s = await invoke("toggle_overlay_always_on_top");
+    updateTopmostButton(s.always_on_top);
+  } catch (e) {
+    setTip(statusEl, String(e));
+  }
+});
+
 async function loadOverlayUi() {
   try {
     const s = await invoke("get_overlay_ui");
@@ -1292,6 +1317,7 @@ async function loadOverlayUi() {
       adaptive: s.adaptive,
       opacity: s.opacity,
       font_scale: s.font_scale,
+      always_on_top: s.always_on_top,
     });
   } catch {
     /* not in tauri shell */

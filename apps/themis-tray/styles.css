@@ -678,6 +678,52 @@ body.adaptive-on .theme-badge::after {
   border-color: rgba(255, 255, 255, 0.22);
 }
 
+.header-btn.topmost-btn.header-btn-icon {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 26px;
+  padding: 2px 5px;
+}
+
+.topmost-pin-icon {
+  display: block;
+  flex-shrink: 0;
+  height: 14px;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  width: 14px;
+}
+
+.header-btn.topmost-btn.is-topmost {
+  background: rgba(100, 200, 255, 0.16);
+  border-color: rgba(100, 200, 255, 0.35);
+}
+
+.header-btn.topmost-btn.is-topmost .topmost-pin-icon {
+  opacity: 1;
+  transform: none;
+}
+
+.header-btn.topmost-btn:not(.is-topmost) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.header-btn.topmost-btn:not(.is-topmost) .topmost-pin-icon {
+  opacity: 0.5;
+  transform: rotate(-32deg);
+  transform-origin: 50% 85%;
+}
+
+.theme-light-glass .header-btn.topmost-btn.is-topmost,
+.theme-solid-light .header-btn.topmost-btn.is-topmost,
+.theme-paper .header-btn.topmost-btn.is-topmost,
+.theme-cream .header-btn.topmost-btn.is-topmost,
+.theme-high-contrast-light .header-btn.topmost-btn.is-topmost {
+  background: rgba(0, 100, 180, 0.1);
+  border-color: rgba(0, 100, 180, 0.28);
+}
+
 .theme-light-glass .header-btn.localize-btn.is-localized,
 .theme-solid-light .header-btn.localize-btn.is-localized,
 .theme-paper .header-btn.localize-btn.is-localized,
