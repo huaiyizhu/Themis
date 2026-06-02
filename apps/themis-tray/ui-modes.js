@@ -208,6 +208,59 @@ function liveQuestions(questionEntries) {
   );
 }
 
+function pinnedQuestions(questionEntries) {
+  return questionEntries.filter(
+    (e) => e.userPinned && !isQuestionDismissed(e.question),
+  );
+}
+
+function countLiveTerms(termEntries) {
+  return liveTerms(termEntries).length;
+}
+
+function countPinnedTerms(termEntries) {
+  return termEntries.filter((e) => e.userPinned && !isTermDismissed(e.term)).length;
+}
+
+/** @param {object} ctx */
+function updateInsightPanelCounts(ctx) {
+  const qLive = liveQuestions(ctx.questionEntries).length;
+  const qPinned = pinnedQuestions(ctx.questionEntries).length;
+  const tLive = countLiveTerms(ctx.termEntries);
+  const tPinned = countPinnedTerms(ctx.termEntries);
+
+  const questionsCountEl = document.getElementById("questions-count");
+  const termsCountEl = document.getElementById("terms-count");
+  const pinnedCountsEl = document.getElementById("pinned-counts");
+
+  if (questionsCountEl) {
+    questionsCountEl.textContent = String(qLive);
+    questionsCountEl.setAttribute(
+      "aria-label",
+      qPinned > 0 ? `当前问题 ${qLive} 条，另有 ${qPinned} 条已固定` : `当前问题 ${qLive} 条`,
+    );
+  }
+  if (termsCountEl) {
+    termsCountEl.textContent = String(tLive);
+    termsCountEl.setAttribute(
+      "aria-label",
+      tPinned > 0 ? `术语 ${tLive} 条，另有 ${tPinned} 条已固定` : `术语 ${tLive} 条`,
+    );
+  }
+  if (pinnedCountsEl) {
+    if (qPinned === 0 && tPinned === 0) {
+      pinnedCountsEl.textContent = "";
+      pinnedCountsEl.setAttribute("aria-label", "暂无已固定");
+    } else {
+      pinnedCountsEl.textContent = ` · 问题 ${qPinned} · 术语 ${tPinned}`;
+      pinnedCountsEl.setAttribute(
+        "aria-label",
+        `已固定：问题 ${qPinned} 条，术语 ${tPinned} 条`,
+      );
+    }
+  }
+}
+
 function primaryEntries(entries, limit) {
   const sorted = [...entries].sort((a, b) => b.seq - a.seq);
   return sorted.slice(0, limit);
@@ -432,6 +485,8 @@ export function renderMeetingPanels(ctx) {
   const qPrimary = primaryEntries(liveQuestions(questionEntries), Number.POSITIVE_INFINITY);
   const tShow = primaryEntries(terms, Number.POSITIVE_INFINITY);
 
+  updateInsightPanelCounts(ctx);
+
   questionsEmptyEl?.classList.toggle("hidden", qPrimary.length > 0);
   insightsEmptyEl?.classList.toggle("hidden", tShow.length > 0);
 
@@ -629,6 +684,8 @@ export function renderPinnedPanel(ctx) {
     (e) => e.userPinned && !isQuestionDismissed(e.question),
   );
   const total = pinnedTerms.length + pinnedQuestions.length;
+
+  updateInsightPanelCounts(ctx);
   const expanded = panel && !panel.classList.contains("is-collapsed");
 
   if (hint) {

@@ -122,7 +122,9 @@
       <div class="layout-body" id="layout-body">
         <div class="middle-row" id="middle-row">
           <aside id="questions-panel" class="questions-panel" aria-label="当前问题">
-            <h2 class="questions-title">当前问题</h2>
+            <h2 class="questions-title">
+              当前问题<span id="questions-count" class="panel-count" aria-label="当前问题条数">0</span>
+            </h2>
             <p id="questions-empty" class="questions-empty">
               检测到技术问句时，会给出简答；可 📌 固定到底部栏回看，或点「忽略」移出列表。
             </p>
@@ -136,7 +138,9 @@
             aria-label="调整问题与术语栏宽度"
           ></div>
           <aside id="insights-panel" class="insights-panel" aria-label="术语">
-            <h2 class="insights-title">术语</h2>
+            <h2 class="insights-title">
+              术语<span id="terms-count" class="panel-count" aria-label="术语条数">0</span>
+            </h2>
             <p id="insights-empty" class="insights-empty">识别到术语后会显示扫盲说明；可 📌 固定、进阶或标记已懂。</p>
             <div id="insights-terms-list" class="insight-cards"></div>
           </aside>
@@ -171,7 +175,9 @@
 
       <section id="pinned-panel" class="pinned-panel is-collapsed" aria-label="已固定">
         <button type="button" id="pinned-toggle" class="pinned-toggle-bar" aria-expanded="false">
-          <span class="pinned-toggle-label">📌 已固定</span>
+          <span class="pinned-toggle-label"
+            >📌 已固定<span id="pinned-counts" class="panel-count panel-count-inline" aria-label="已固定条数"></span
+          ></span>
           <span id="pinned-hint">固定术语或问题，便于当场查看与会后回看</span>
           <span class="pinned-chevron" aria-hidden="true"></span>
         </button>

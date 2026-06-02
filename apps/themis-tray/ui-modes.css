@@ -321,6 +321,65 @@ body.ui-mode-meeting .insights-title::after {
   content: none;
 }
 
+.panel-count {
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  margin-left: 5px;
+  min-width: 1.25em;
+  padding: 2px 6px;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+.questions-title .panel-count {
+  background: rgba(255, 200, 102, 0.2);
+  border: 1px solid rgba(255, 200, 102, 0.35);
+  color: #ffc866;
+}
+
+.insights-title .panel-count {
+  background: rgba(120, 180, 255, 0.18);
+  border: 1px solid rgba(120, 180, 255, 0.32);
+  color: #9ec5ff;
+}
+
+.panel-count-inline {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 2px;
+  min-width: 0;
+  opacity: 0.88;
+  padding: 0;
+}
+
+.theme-light-glass .questions-title .panel-count,
+.theme-solid-light .questions-title .panel-count,
+.theme-paper .questions-title .panel-count,
+.theme-cream .questions-title .panel-count,
+.theme-high-contrast-light .questions-title .panel-count {
+  background: rgba(180, 83, 9, 0.12);
+  border-color: rgba(180, 83, 9, 0.28);
+  color: #b45309;
+}
+
+.theme-light-glass .insights-title .panel-count,
+.theme-solid-light .insights-title .panel-count,
+.theme-paper .insights-title .panel-count,
+.theme-cream .insights-title .panel-count,
+.theme-high-contrast-light .insights-title .panel-count {
+  background: rgba(30, 90, 180, 0.1);
+  border-color: rgba(30, 90, 180, 0.25);
+  color: #1d4ed8;
+}
+
 body.ui-mode-meeting .insight-card.is-secondary,
 body.ui-mode-meeting .question-card.is-secondary {
   opacity: 0.82;
