@@ -228,7 +228,7 @@ fn exit_mini(
 }
 
 #[cfg(windows)]
-fn exit_mini(_app: &AppHandle, overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
+fn exit_mini(app: &AppHandle, overlay: &WebviewWindow, saved: &SavedGeometry) -> Result<(), String> {
     use crate::macos_window::{set_macos_mini_floater_elevated, set_mini_circular_clip};
 
     MINI_MODE_ACTIVE.store(false, Ordering::Relaxed);
