@@ -11,14 +11,22 @@ export const PINNED_COLLAPSED_KEY = "themis-pinned-collapsed";
 /** @type {Set<string>} */
 const dismissedTermKeys = new Set();
 
+/** @type {Set<string>} */
+const dismissedQuestionKeys = new Set();
+
 export function normalizeTermKey(term) {
   return String(term || "")
     .trim()
     .toLowerCase();
 }
 
+export function normalizeQuestionKey(question) {
+  return String(question || "").trim();
+}
+
 export function clearDismissedTerms() {
   dismissedTermKeys.clear();
+  dismissedQuestionKeys.clear();
 }
 
 export function isTermDismissed(term) {
@@ -27,6 +35,14 @@ export function isTermDismissed(term) {
 
 export function dismissTermKey(term) {
   dismissedTermKeys.add(normalizeTermKey(term));
+}
+
+export function isQuestionDismissed(question) {
+  return dismissedQuestionKeys.has(normalizeQuestionKey(question));
+}
+
+export function dismissQuestionKey(question) {
+  dismissedQuestionKeys.add(normalizeQuestionKey(question));
 }
 
 export function loadUiMode() {
@@ -187,7 +203,9 @@ function liveTerms(termEntries) {
 }
 
 function liveQuestions(questionEntries) {
-  return questionEntries.filter((e) => !e.userPinned);
+  return questionEntries.filter(
+    (e) => !e.userPinned && !isQuestionDismissed(e.question),
+  );
 }
 
 function primaryEntries(entries, limit) {
@@ -208,13 +226,12 @@ function promoteEntryToTop(entries, id) {
  * @param {string} id
  * @param {string} kind
  */
-export function toggleUserPin(entries, id, kind, dwellMs = 20_000) {
+export function toggleUserPin(entries, id, kind, _dwellMs = 20_000) {
   const item = entries.find((e) => e.id === id);
   if (!item) return false;
   if (item.userPinned) {
     item.userPinned = false;
     item.pinned = false;
-    item.expiresAt = Date.now() + dwellMs;
   } else {
     item.userPinned = true;
     item.pinned = true;
@@ -381,6 +398,19 @@ function appendActionButtons(actions, item, kind, ctx, opts = {}) {
       rerender();
     });
     actions.appendChild(dismissBtn);
+  } else if (kind === "question") {
+    const dismissBtn = document.createElement("button");
+    dismissBtn.type = "button";
+    dismissBtn.className = "insight-more-btn insight-dismiss-btn";
+    dismissBtn.textContent = "忽略";
+    setTip(dismissBtn, "从「当前问题」列表移除；本场同问句不再显示");
+    dismissBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dismissQuestionKey(item.question);
+      ctx.removeQuestion?.(item.question);
+      rerender();
+    });
+    actions.appendChild(dismissBtn);
   }
 }
 
@@ -399,8 +429,8 @@ export function renderMeetingPanels(ctx) {
   } = ctx;
 
   const terms = liveTerms(termEntries);
-  const qPrimary = primaryEntries(liveQuestions(questionEntries), 1);
-  const tShow = primaryEntries(terms, 2);
+  const qPrimary = primaryEntries(liveQuestions(questionEntries), Number.POSITIVE_INFINITY);
+  const tShow = primaryEntries(terms, Number.POSITIVE_INFINITY);
 
   questionsEmptyEl?.classList.toggle("hidden", qPrimary.length > 0);
   insightsEmptyEl?.classList.toggle("hidden", tShow.length > 0);
@@ -595,7 +625,9 @@ export function renderPinnedPanel(ctx) {
   const pinnedTerms = ctx.termEntries.filter(
     (e) => e.userPinned && !isTermDismissed(e.term),
   );
-  const pinnedQuestions = ctx.questionEntries.filter((e) => e.userPinned);
+  const pinnedQuestions = ctx.questionEntries.filter(
+    (e) => e.userPinned && !isQuestionDismissed(e.question),
+  );
   const total = pinnedTerms.length + pinnedQuestions.length;
   const expanded = panel && !panel.classList.contains("is-collapsed");
 
