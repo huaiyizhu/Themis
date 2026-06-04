@@ -11,7 +11,8 @@ mod pipeline;
 mod state;
 
 pub use analysis::{
-    finalize_question_answers, is_placeholder_answer, questions_match, AnalysisContext,
+    finalize_question_answers, is_placeholder_answer, question_in_transcript,
+    questions_match, retain_questions_in_transcript, AnalysisContext,
     AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis, QuestionInsight,
     TermInsight,
 };

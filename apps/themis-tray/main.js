@@ -1141,6 +1141,34 @@ function resetInsightDwellState() {
   }
 }
 
+function normalizeTranscriptMatch(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[\s，,。.、；;：:！!？?]/g, "");
+}
+
+function questionInTranscriptLine(question, line) {
+  const q = normalizeTranscriptMatch(question);
+  const t = normalizeTranscriptMatch(line);
+  return q.length >= 4 && t.includes(q);
+}
+
+function questionInCommittedTranscript(question) {
+  if (questionInTranscriptLine(question, partialText)) return true;
+  return committedLines.some((line) => questionInTranscriptLine(question, line));
+}
+
+function filterInsightsToSourceLine(insights, sourceLine) {
+  if (!insights?.questions?.length) return insights;
+  const questions = insights.questions.filter(
+    (q) =>
+      questionInTranscriptLine(q.question, sourceLine) ||
+      questionInCommittedTranscript(q.question),
+  );
+  if (questions.length === insights.questions.length) return insights;
+  return { ...insights, questions };
+}
+
 function renderInsights(insights) {
   if (!insights || (!insights.terms?.length && !insights.questions?.length)) {
     return;
@@ -1181,8 +1209,9 @@ listen("transcript", (event) => {
 
   if (is_final) {
     if (insights) {
-      lineInsights.set(trimmed, insights);
-      renderInsights(insights);
+      const verified = filterInsightsToSourceLine(insights, trimmed);
+      lineInsights.set(trimmed, verified);
+      renderInsights(verified);
       if (committedLines.includes(trimmed)) {
         renderTranscript();
       }

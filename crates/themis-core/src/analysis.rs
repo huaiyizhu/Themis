@@ -123,11 +123,12 @@ fn attach_llm_question_answers(
     transcript_questions: &mut [QuestionInsight],
     llm_questions: &[QuestionInsight],
 ) {
-    for q in transcript_questions {
-        if let Some(llm_q) = llm_questions
+    for (idx, q) in transcript_questions.iter_mut().enumerate() {
+        let llm_q = llm_questions
             .iter()
             .find(|x| questions_match(&x.question, &q.question))
-        {
+            .or_else(|| llm_questions.get(idx));
+        if let Some(llm_q) = llm_q {
             if should_prefer_explanation(&q.answer, &llm_q.answer) {
                 q.answer = llm_q.answer.clone();
             }
@@ -154,6 +155,34 @@ pub fn questions_match(a: &str, b: &str) -> bool {
         return true;
     }
     na.contains(&nb) || nb.contains(&na)
+}
+
+/// Collapse whitespace/punctuation for substring checks against live transcript lines.
+pub fn normalize_transcript_match(s: &str) -> String {
+    s.chars()
+        .filter(|c| {
+            !c.is_whitespace()
+                && !['，', ',', '。', '.', '、', '；', ';', '：', ':', '！', '!', '？', '?']
+                    .contains(c)
+        })
+        .flat_map(|c| c.to_lowercase())
+        .collect()
+}
+
+/// True when `question` appears verbatim (modulo spacing/punctuation) inside `transcript`.
+pub fn question_in_transcript(question: &str, transcript: &str) -> bool {
+    let q = normalize_transcript_match(question);
+    let t = normalize_transcript_match(transcript);
+    if q.chars().count() < 4 || t.is_empty() {
+        return false;
+    }
+    t.contains(&q)
+}
+
+pub fn retain_questions_in_transcript(result: &mut AnalysisResult, transcript: &str) {
+    result
+        .questions
+        .retain(|q| question_in_transcript(&q.question, transcript));
 }
 
 pub fn is_placeholder_answer(answer: &str) -> bool {
@@ -286,6 +315,15 @@ mod merge_tests {
         assert_eq!(base.questions.len(), 1);
         assert_eq!(base.questions[0].question, "What is RAG?");
         assert!(base.questions[0].answer.contains("retrieves"));
+    }
+
+    #[test]
+    fn question_in_transcript_normalizes_spacing() {
+        assert!(question_in_transcript("RAG 是什么？", "那么 RAG 是什么？"));
+        assert!(!question_in_transcript(
+            "什么是 Transformer？",
+            "今天讲 embedding"
+        ));
     }
 }
 

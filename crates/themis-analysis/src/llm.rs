@@ -36,6 +36,7 @@ impl LlmAnalyzer {
         &self,
         transcript: &str,
         ctx: &AnalysisContext,
+        detected_questions: &[QuestionInsight],
     ) -> anyhow::Result<Option<AnalysisResult>> {
         let text = transcript.trim();
         if text.len() < 6 {
@@ -47,9 +48,9 @@ impl LlmAnalyzer {
             self.endpoint, self.deployment
         );
 
-        let system = build_analysis_system_prompt(ctx.localize_zh);
+        let system = build_analysis_system_prompt(ctx.localize_zh, !detected_questions.is_empty());
 
-        let user_content = build_analysis_user_content(text, ctx);
+        let user_content = build_analysis_user_content(text, ctx, detected_questions);
 
         let body = ChatRequest {
             messages: vec![
@@ -290,7 +291,7 @@ impl LlmAnalyzer {
     }
 }
 
-fn build_analysis_system_prompt(localize_zh: bool) -> String {
+fn build_analysis_system_prompt(localize_zh: bool, has_detected_questions: bool) -> String {
     let lang = if localize_zh {
         "Each explanation and answer MUST be in Chinese (简体中文), 1-3 short sentences, covering when possible: \
 主要用途、核心作用、常见用法/场景、一个简短例子. Keep the original term/question wording from the transcript when possible, \
@@ -302,9 +303,18 @@ Write explanations and answers in the same language as the source phrase (Englis
 2-4 concise sentences, factual."
     };
 
+    let questions_rule = if has_detected_questions {
+        "The user message lists verbatim questions already detected in the latest phrase. \
+Copy each question string EXACTLY into the JSON (character-for-character). Do NOT add, remove, rephrase, or invent questions. \
+Only supply answers."
+    } else {
+        "The latest phrase contains no detected question. Return an empty questions array. \
+Do NOT invent or infer questions from session summary or prior transcript."
+    };
+
     format!(
-        "You extract TECH-focused keywords, specialized terminology, and substantively \
-challenging questions from live speech transcripts. \
+        "You extract TECH-focused keywords, specialized terminology, and answers for \
+pre-detected questions from live speech transcripts. \
 Respond ONLY with valid JSON: \
 {{\"keywords\":[\"...\"],\"terms\":[{{\"term\":\"...\",\"explanation\":\"...\"}}],\
 \"questions\":[{{\"question\":\"...\",\"answer\":\"...\"}}]}}. \
@@ -322,16 +332,17 @@ TERMS (max 6): Only jargon that a general audience would NOT already understand 
 KV cache, embedding space, retrieval reranking. {lang} \
 EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
 \
-QUESTIONS (max 3): ONLY questions that appear VERBATIM (or nearly verbatim) in the latest phrase — \
-copy the exact speaker wording; do NOT paraphrase, rephrase, expand, or invent questions. \
-Each entry's \"question\" field must be a direct quote from the transcript. \
-Provide a technical answer for each quoted question. \
+QUESTIONS (max 3): {questions_rule} \
 EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk. \
-If the latest phrase contains no real question, return an empty questions array."
+If nothing meets this bar, return an empty questions array."
     )
 }
 
-fn build_analysis_user_content(phrase: &str, ctx: &AnalysisContext) -> String {
+fn build_analysis_user_content(
+    phrase: &str,
+    ctx: &AnalysisContext,
+    detected_questions: &[QuestionInsight],
+) -> String {
     let mut parts = Vec::new();
     if let Some(summary) = ctx
         .session_summary
@@ -350,6 +361,13 @@ fn build_analysis_user_content(phrase: &str, ctx: &AnalysisContext) -> String {
         parts.push(format!("Recent prior transcript:\n{recent}"));
     }
     parts.push(format!("Latest phrase (extract insights primarily from this):\n{phrase}"));
+    if !detected_questions.is_empty() {
+        let mut q_lines = String::from("Verbatim questions detected in latest phrase (answer ONLY these; copy text exactly):\n");
+        for (i, q) in detected_questions.iter().enumerate().take(3) {
+            q_lines.push_str(&format!("{}. {}\n", i + 1, q.question.trim()));
+        }
+        parts.push(q_lines.trim_end().to_string());
+    }
     parts.join("\n\n")
 }
 

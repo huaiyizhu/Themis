@@ -39,7 +39,7 @@ impl AnalysisProvider for CompositeAnalyzer {
 
         if let Some(llm) = &self.llm {
             let l0 = Instant::now();
-            match timeout(self.llm_timeout, llm.analyze(transcript, ctx)).await {
+            match timeout(self.llm_timeout, llm.analyze(transcript, ctx, &heuristic.questions)).await {
                 Ok(Ok(Some(llm_result))) => {
                     llm_ms = Some(l0.elapsed().as_millis() as u32);
                     llm_status = if llm_result.is_empty() {
@@ -74,6 +74,8 @@ impl AnalysisProvider for CompositeAnalyzer {
             &llm_status,
             ctx.localize_zh,
         );
+
+        themis_core::retain_questions_in_transcript(&mut merged, transcript);
 
         if merged.is_empty() {
             return Ok(None);

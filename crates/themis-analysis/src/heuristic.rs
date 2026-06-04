@@ -244,11 +244,15 @@ fn is_substantive_question(q: &str) -> bool {
         || q_lower.contains("how to")
         || q_lower.contains("why ")
         || trimmed.contains("为什么")
+        || trimmed.contains("为何")
         || trimmed.contains("如何")
         || trimmed.contains("怎么")
-        || trimmed.contains("什么")
-        || trimmed.contains("为何")
-        || trimmed.contains("怎样");
+        || trimmed.contains("怎样")
+        || trimmed.contains("是什么")
+        || trimmed.contains("是啥")
+        || trimmed.contains("什么是")
+        || trimmed.contains("啥是")
+        || trimmed.contains("什么意思");
 
     if !has_question_marker {
         return false;
@@ -339,10 +343,57 @@ fn extract_questions(text: &str) -> Vec<String> {
     }
     let trimmed = text.trim();
     if (trimmed.ends_with('?') || trimmed.ends_with('？')) && trimmed.len() >= 4 {
-        push_unique(&mut out, trimmed);
+        let whole = trim_question_leading_filler(trimmed);
+        if whole.chars().count() <= 96 {
+            push_unique(&mut out, &whole);
+        } else if let Some(core) = core_question_span(trimmed) {
+            push_unique(&mut out, &core);
+        }
     }
+
+    out.iter_mut()
+        .for_each(|q| *q = trim_question_leading_filler(q));
+    out.retain(|q| themis_core::question_in_transcript(q, text));
     out.truncate(4);
     out
+}
+
+fn trim_question_leading_filler(s: &str) -> String {
+    let mut t = s.trim().to_string();
+    const FILLERS: &[&str] = &[
+        "那么", "那", "所以", "然后", "接下来", "请问", "我想问", "我想问一下", "问题是", "好，",
+        "好的，", "嗯，", "呃，", "就是说", "也就是说",
+    ];
+    loop {
+        let mut trimmed = false;
+        for f in FILLERS {
+            if t.starts_with(f) {
+                t = t[f.len()..].trim_start().to_string();
+                trimmed = true;
+            }
+        }
+        if !trimmed {
+            break;
+        }
+    }
+    t
+}
+
+fn core_question_span(s: &str) -> Option<String> {
+    const MARKERS: &[&str] = &[
+        "什么是", "啥是", "何谓", "为什么", "为何", "如何", "怎么", "怎样", "是什么", "是啥",
+        "什么意思", "what is", "what's", "how does", "how do", "how to", "why ",
+    ];
+    let lower = s.to_lowercase();
+    let mut best: Option<(usize, &str)> = None;
+    for marker in MARKERS {
+        if let Some(i) = lower.find(&marker.to_lowercase()) {
+            if best.map(|(idx, _)| i > idx).unwrap_or(true) {
+                best = Some((i, marker));
+            }
+        }
+    }
+    best.map(|(i, _)| trim_question_leading_filler(s[i..].trim()))
 }
 
 fn push_unique(out: &mut Vec<String>, s: &str) {
@@ -477,5 +528,33 @@ mod tests {
             "expected substantive question, got {:?}",
             r.questions
         );
+    }
+
+    #[test]
+    fn trims_leading_filler_from_question() {
+        let r = analyze_heuristic("那么，我想问一下，RAG 是什么？", true);
+        assert!(
+            r.questions.iter().any(|q| q.question.contains("RAG 是什么")),
+            "questions: {:?}",
+            r.questions
+        );
+        assert!(
+            !r.questions.iter().any(|q| q.question.starts_with("那么")),
+            "questions: {:?}",
+            r.questions
+        );
+    }
+
+    #[test]
+    fn rejects_question_not_in_source_line() {
+        let mut r = AnalysisResult {
+            questions: vec![QuestionInsight {
+                question: "什么是 Transformer 架构？".into(),
+                answer: "placeholder".into(),
+            }],
+            ..Default::default()
+        };
+        themis_core::retain_questions_in_transcript(&mut r, "今天我们讲 RAG。");
+        assert!(r.questions.is_empty());
     }
 }
