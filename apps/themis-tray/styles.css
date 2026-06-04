@@ -1066,9 +1066,9 @@ body.adaptive-on .theme-badge::after {
 
 .transcript-body {
   font-size: calc(15px * var(--font-scale));
-  line-height: 1.5;
+  line-height: 1.55;
   min-height: 1.5em;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
 }
 
@@ -1079,17 +1079,44 @@ body.adaptive-on .theme-badge::after {
 .transcript-body.is-placeholder {
   font-size: calc(13px * var(--font-scale));
   opacity: 0.55;
+  white-space: pre-wrap;
 }
 
-.transcript-body .line-final {
-  display: block;
-  margin-bottom: 0.35em;
+.transcript-line {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.45em;
 }
 
-.transcript-body .line-partial {
-  display: block;
+.transcript-line-time {
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  font-size: calc(12px * var(--font-scale));
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.42);
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  user-select: none;
+}
+
+.transcript-line-time.is-partial-time {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.transcript-line-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.transcript-body .line-partial-row .line-partial {
+  display: inline;
   font-style: italic;
-  opacity: 0.85;
+  opacity: 0.82;
 }
 
 .feedback-line {
@@ -1261,6 +1288,33 @@ body.middle-dragging {
 .theme-high-contrast-light .question-card {
   background: rgba(200, 120, 0, 0.08);
   border-color: rgba(180, 100, 0, 0.2);
+}
+
+.insight-head-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 4px;
+}
+
+.insight-time {
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  font-size: calc(11px * var(--font-scale));
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.42);
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  user-select: none;
+}
+
+.insight-head-row .q,
+.insight-head-row .term {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .question-card .insight-meta {

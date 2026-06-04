@@ -99,6 +99,12 @@ message GetSessionExportResponse {
   /// Rolling LLM session summary when available.
   string session_summary = 2;
   uint32 line_count = 3;
+  repeated TranscriptLineEntry lines = 4;
+}
+
+message TranscriptLineEntry {
+  string text = 1;
+  int64 timestamp_unix_ms = 2;
 }
 
 message GetDiagnosticsResponse {

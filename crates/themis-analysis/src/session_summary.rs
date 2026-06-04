@@ -10,8 +10,14 @@ const LLM_MIN_CHARS: usize = 48;
 /// How many prior transcript lines to pass as LLM analysis context.
 pub const ANALYSIS_CONTEXT_LINES: usize = 10;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranscriptLine {
+    pub text: String,
+    pub at_ms: i64,
+}
+
 pub struct SessionSummarizer {
-    lines: Mutex<Vec<String>>,
+    lines: Mutex<Vec<TranscriptLine>>,
     summary: Mutex<Option<String>>,
     last_llm_at: Mutex<Option<Instant>>,
     llm: Option<LlmAnalyzer>,
@@ -35,16 +41,19 @@ impl SessionSummarizer {
         *self.last_llm_at.lock().unwrap() = None;
     }
 
-    pub fn append_line(&self, line: &str) {
+    pub fn append_line(&self, line: &str, at_ms: i64) {
         let t = line.trim();
         if t.is_empty() {
             return;
         }
         let mut lines = self.lines.lock().unwrap();
-        if lines.last().map(String::as_str) == Some(t) {
+        if lines.last().map(|l| l.text.as_str()) == Some(t) {
             return;
         }
-        lines.push(t.to_string());
+        lines.push(TranscriptLine {
+            text: t.to_string(),
+            at_ms,
+        });
     }
 
     pub fn current_summary(&self) -> Option<String> {
@@ -52,7 +61,17 @@ impl SessionSummarizer {
     }
 
     pub fn full_text(&self) -> String {
-        self.lines.lock().unwrap().join("\n")
+        self.lines
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub fn export_lines(&self) -> Vec<TranscriptLine> {
+        self.lines.lock().unwrap().clone()
     }
 
     /// Prior finalized lines (excludes the latest) for per-phrase LLM context.
@@ -63,7 +82,11 @@ impl SessionSummarizer {
         }
         let end = lines.len() - 1;
         let start = end.saturating_sub(max_lines);
-        lines[start..end].join("\n")
+        lines[start..end]
+            .iter()
+            .map(|l| l.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     fn should_call_llm(&self, text_len: usize) -> bool {
@@ -115,10 +138,13 @@ mod tests {
     #[test]
     fn prior_context_excludes_latest_line() {
         let s = SessionSummarizer::from_config(&ThemisConfig::default());
-        s.append_line("line one");
-        s.append_line("line two");
-        s.append_line("line three");
+        s.append_line("line one", 1_000);
+        s.append_line("line two", 2_000);
+        s.append_line("line three", 3_000);
         assert_eq!(s.prior_context(10), "line one\nline two");
         assert_eq!(s.prior_context(1), "line two");
+        let exported = s.export_lines();
+        assert_eq!(exported.len(), 3);
+        assert_eq!(exported[0].at_ms, 1_000);
     }
 }

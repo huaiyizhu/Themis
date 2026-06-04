@@ -27,12 +27,15 @@ import {
 } from "./ui-modes.js";
 import {
   buildInsightsExportText,
-  buildTranscriptExportText,
-  copyExportText,
   defaultExportFileName,
-  resolveTranscriptForExport,
   saveExportText,
+  copyExportText,
 } from "./export-session.js";
+import {
+  buildTimestampedTranscriptExportText,
+  formatRelativeTranscriptTime,
+  mergeExportLines,
+} from "./transcript-time.js";
 
 const overlayEl = document.getElementById("overlay");
 const dragHandle = document.getElementById("drag-handle");
@@ -164,16 +167,27 @@ function flashExportStatus(message) {
 }
 
 async function exportTranscriptSession() {
-  const { transcript, summary, partial } = await resolveTranscriptForExport({
-    committedLines,
-    partialText,
-    summaryText: summaryTextEl?.textContent?.trim() || "",
-  });
-  if (!transcript && !partial) {
+  const summary = summaryTextEl?.textContent?.trim() || "";
+  let lines = committedLines.map((l) => ({ text: l.text, atMs: l.atMs }));
+  try {
+    const remote = await invoke("get_session_export");
+    const remoteLines = (remote?.lines || []).map((l) => ({
+      text: l.text,
+      atMs: Number(l.timestamp_unix_ms) || 0,
+    }));
+    lines = mergeExportLines(lines, remoteLines);
+  } catch {
+    /* use local lines */
+  }
+  if (lines.length === 0 && !partialText) {
     flashExportStatus("暂无字幕可导出");
     return;
   }
-  const content = buildTranscriptExportText({ transcript, summary, partial });
+  const content = buildTimestampedTranscriptExportText(lines, {
+    partialText,
+    partialAtMs,
+    summary,
+  });
   const result = await saveExportText(content, defaultExportFileName("themis-transcript"));
   if (result.ok) {
     flashExportStatus(`字幕已导出：${result.path}`);
@@ -224,12 +238,16 @@ exportInsightsBtn?.addEventListener("click", (e) => {
   exportInsightsSession().catch((err) => flashExportStatus(String(err)));
 });
 
-/** @type {string[]} Final lines (one per Azure REST phrase). */
+/** @type {Array<{text: string, atMs: number}>} */
 let committedLines = [];
+/** Session anchor for relative timestamps (+MM:SS). */
+let sessionStartMs = null;
 /** @type {Map<string, object|null>} line text → latest insights */
 const lineInsights = new Map();
 /** Latest partial hypothesis while speaking. */
 let partialText = "";
+/** Timestamp when partial line last updated. */
+let partialAtMs = null;
 
 /** User scrolled up — pause auto-follow until they click Latest or scroll to bottom. */
 let followLatest = true;
@@ -780,6 +798,19 @@ scrollEl.addEventListener(
 
 scrollLatestBtn.addEventListener("click", () => scrollToLatest(true));
 
+function hasCommittedText(text) {
+  return committedLines.some((line) => line.text === text);
+}
+
+function commitTranscriptLine(text, atMs) {
+  const trimmed = text.trim();
+  if (!trimmed || hasCommittedText(trimmed)) return;
+  if (sessionStartMs === null) sessionStartMs = atMs;
+  committedLines.push({ text: trimmed, atMs });
+  partialText = "";
+  partialAtMs = null;
+}
+
 function renderTranscript() {
   transcriptEl.classList.remove("is-placeholder", "is-partial");
   transcriptEl.replaceChildren();
@@ -789,19 +820,40 @@ function renderTranscript() {
   }
 
   for (const line of committedLines) {
-    const wrap = document.createElement("span");
-    wrap.className = "line-final line-with-tags";
-    const text = document.createElement("span");
-    text.textContent = line;
-    wrap.appendChild(text);
-    transcriptEl.appendChild(wrap);
+    const row = document.createElement("div");
+    row.className = "transcript-line line-final";
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "transcript-line-time";
+    timeEl.textContent = formatRelativeTranscriptTime(line.atMs, sessionStartMs);
+    timeEl.setAttribute("aria-label", "会话相对时间");
+
+    const textEl = document.createElement("span");
+    textEl.className = "transcript-line-text";
+    textEl.textContent = line.text;
+
+    row.appendChild(timeEl);
+    row.appendChild(textEl);
+    transcriptEl.appendChild(row);
   }
 
   if (partialText) {
-    const el = document.createElement("span");
-    el.className = "line-partial";
-    el.textContent = partialText;
-    transcriptEl.appendChild(el);
+    const row = document.createElement("div");
+    row.className = "transcript-line line-partial-row";
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "transcript-line-time is-partial-time";
+    timeEl.textContent = partialAtMs
+      ? formatRelativeTranscriptTime(partialAtMs, sessionStartMs)
+      : "--:--";
+
+    const textEl = document.createElement("span");
+    textEl.className = "transcript-line-text line-partial";
+    textEl.textContent = partialText;
+
+    row.appendChild(timeEl);
+    row.appendChild(textEl);
+    transcriptEl.appendChild(row);
     transcriptEl.classList.add("is-partial");
   }
 
@@ -960,12 +1012,9 @@ async function syncSettingsButton() {
 }
 
 function formatInsightTime(ms) {
-  return new Date(ms).toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
+  if (!ms) return "";
+  const anchor = sessionStartMs ?? ms;
+  return formatRelativeTranscriptTime(ms, anchor);
 }
 
 function ensureInsightPruneTimer() {
@@ -1028,6 +1077,7 @@ function initInsightUi() {
     get insightDwellMs() {
       return insightDwellMs;
     },
+    formatInsightTime,
   };
   setupInsightInteractions(document.getElementById("layout-body"), insightUiCtx);
   setupInsightInteractions(document.getElementById("glance-panel"), insightUiCtx);
@@ -1037,6 +1087,7 @@ function initInsightUi() {
 function appendTermEntries(terms) {
   if (!terms?.length) return false;
   const now = Date.now();
+  if (sessionStartMs === null) sessionStartMs = now;
   let added = false;
   for (let i = terms.length - 1; i >= 0; i -= 1) {
     const t = terms[i];
@@ -1064,6 +1115,7 @@ function appendTermEntries(terms) {
 function appendQuestionEntries(questions) {
   if (!questions?.length) return false;
   const now = Date.now();
+  if (sessionStartMs === null) sessionStartMs = now;
   let added = false;
   for (let i = questions.length - 1; i >= 0; i -= 1) {
     const q = questions[i];
@@ -1155,7 +1207,7 @@ function questionInTranscriptLine(question, line) {
 
 function questionInCommittedTranscript(question) {
   if (questionInTranscriptLine(question, partialText)) return true;
-  return committedLines.some((line) => questionInTranscriptLine(question, line));
+  return committedLines.some((line) => questionInTranscriptLine(question, line.text));
 }
 
 function filterInsightsToSourceLine(insights, sourceLine) {
@@ -1194,7 +1246,8 @@ function isSystemMessage(text) {
 }
 
 listen("transcript", (event) => {
-  const { text, is_final, insights, session_summary } = event.payload;
+  const { text, is_final, insights, session_summary, timestamp_unix_ms } = event.payload;
+  const atMs = Number(timestamp_unix_ms) || Date.now();
   if (session_summary !== undefined && session_summary !== null) {
     renderSessionSummary(session_summary);
   }
@@ -1212,17 +1265,18 @@ listen("transcript", (event) => {
       const verified = filterInsightsToSourceLine(insights, trimmed);
       lineInsights.set(trimmed, verified);
       renderInsights(verified);
-      if (committedLines.includes(trimmed)) {
+      if (hasCommittedText(trimmed)) {
         renderTranscript();
       }
       return;
     }
-    if (trimmed && !committedLines.includes(trimmed)) {
-      committedLines.push(trimmed);
-      partialText = "";
+    if (trimmed) {
+      commitTranscriptLine(trimmed, atMs);
     }
   } else {
     partialText = trimmed;
+    partialAtMs = atMs;
+    if (sessionStartMs === null && trimmed) sessionStartMs = atMs;
   }
 
   renderTranscript();
@@ -1232,13 +1286,16 @@ listen("capture-stopped", () => {
   endCapturePending();
   updateCaptureButton(false);
   partialText = "";
+  partialAtMs = null;
   renderTranscript();
   refreshStatus();
 });
 
 function clearOverlaySession(placeholderText = "已清空，继续监听中…") {
   committedLines = [];
+  sessionStartMs = null;
   partialText = "";
+  partialAtMs = null;
   lineInsights.clear();
   followLatest = true;
   scrollLatestBtn.classList.add("hidden");

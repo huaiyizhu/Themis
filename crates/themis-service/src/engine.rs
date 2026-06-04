@@ -157,7 +157,7 @@ impl CaptureEngine {
                     let tx = transcript_tx.clone();
                     let analysis = Arc::clone(&analysis);
                     let session_summary = Arc::clone(&session_summary_events);
-                    session_summary.append_line(&text);
+                    session_summary.append_line(&text, emitted_unix_ms);
                     // Show transcript immediately; insights attach later. Summary updates on its own interval.
                     let _ = tx.send(TranscriptEvent {
                         text: text.clone(),
@@ -293,14 +293,25 @@ impl CaptureEngine {
             .unwrap_or_default()
     }
 
-    pub async fn get_session_export(&self) -> anyhow::Result<(String, Option<String>)> {
+    pub async fn get_session_export(
+        &self,
+    ) -> anyhow::Result<(String, Option<String>, Vec<(String, i64)>)> {
         let guard = self.inner.lock().await;
         Ok(match guard.as_ref() {
-            Some(running) => (
-                running.session_summary.full_text(),
-                running.session_summary.current_summary(),
-            ),
-            None => (String::new(), None),
+            Some(running) => {
+                let lines = running
+                    .session_summary
+                    .export_lines()
+                    .into_iter()
+                    .map(|l| (l.text, l.at_ms))
+                    .collect();
+                (
+                    running.session_summary.full_text(),
+                    running.session_summary.current_summary(),
+                    lines,
+                )
+            }
+            None => (String::new(), None, Vec::new()),
         })
     }
 

@@ -873,10 +873,17 @@ async fn expand_insight(
 }
 
 #[derive(Clone, Serialize)]
+struct TranscriptLineDto {
+    text: String,
+    timestamp_unix_ms: i64,
+}
+
+#[derive(Clone, Serialize)]
 struct SessionExportDto {
     transcript: String,
     session_summary: String,
     line_count: u32,
+    lines: Vec<TranscriptLineDto>,
 }
 
 #[tauri::command]
@@ -893,6 +900,14 @@ async fn get_session_export(state: State<'_, AppState>) -> Result<SessionExportD
         transcript: resp.transcript,
         session_summary: resp.session_summary,
         line_count: resp.line_count,
+        lines: resp
+            .lines
+            .into_iter()
+            .map(|l| TranscriptLineDto {
+                text: l.text,
+                timestamp_unix_ms: l.timestamp_unix_ms,
+            })
+            .collect(),
     })
 }
 

@@ -56,7 +56,7 @@ pub trait CaptureEngineHandle: Send + Sync {
     async fn stop(&self) -> anyhow::Result<()>;
     async fn reset_session(&self) -> anyhow::Result<()>;
     async fn expand_insight(&self, kind: &str, subject: &str, brief: &str) -> anyhow::Result<String>;
-    async fn get_session_export(&self) -> anyhow::Result<(String, Option<String>)>;
+    async fn get_session_export(&self) -> anyhow::Result<(String, Option<String>, Vec<(String, i64)>)>;
 }
 
 pub struct ThemisGrpcServer {
@@ -270,16 +270,27 @@ impl ThemisService for ThemisGrpcServer {
         _request: Request<GetSessionExportRequest>,
     ) -> Result<Response<GetSessionExportResponse>, Status> {
         match self.service.engine.get_session_export().await {
-            Ok((transcript, session_summary)) => {
-                let line_count = if transcript.is_empty() {
-                    0
+            Ok((transcript, session_summary, lines)) => {
+                let line_count = if lines.is_empty() {
+                    if transcript.is_empty() {
+                        0
+                    } else {
+                        transcript.lines().count() as u32
+                    }
                 } else {
-                    transcript.lines().count() as u32
+                    lines.len() as u32
                 };
                 Ok(Response::new(GetSessionExportResponse {
                     transcript,
                     session_summary: session_summary.unwrap_or_default(),
                     line_count,
+                    lines: lines
+                        .into_iter()
+                        .map(|(text, timestamp_unix_ms)| crate::proto::TranscriptLineEntry {
+                            text,
+                            timestamp_unix_ms,
+                        })
+                        .collect(),
                 }))
             }
             Err(e) => Err(Status::internal(e.to_string())),

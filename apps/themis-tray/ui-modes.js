@@ -3,6 +3,7 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { dismissTooltip, setTip } from "./tooltips.js";
+import { formatAbsoluteTranscriptTime } from "./transcript-time.js";
 
 export const UI_MODE_STORAGE_KEY = "themis-ui-mode";
 export const SUMMARY_COLLAPSED_KEY = "themis-summary-collapsed";
@@ -307,19 +308,44 @@ export function buildInsightExportText(item, kind) {
 
 /** @param {object} item @param {"term"|"question"} kind */
 function buildInsightCopyText(item, kind) {
+  const stamp = item.addedAt ? `[${formatAbsoluteTranscriptTime(item.addedAt)}] ` : "";
   const detail = String(item.detailText ?? "").trim();
   if (kind === "term") {
     const body =
       item.termLevel === "advanced" && item.advancedText
         ? item.advancedText
         : item.explanation;
-    const parts = [`${item.term}\n${body}`];
+    const parts = [`${stamp}${item.term}\n${body}`];
     if (detail) parts.push(`\n更详细\n${detail}`);
     return parts.join("\n");
   }
-  const parts = [`Q: ${item.question}\nA: ${item.answer}`];
+  const parts = [`${stamp}Q: ${item.question}\nA: ${item.answer}`];
   if (detail) parts.push(`\n回答思路\n${detail}`);
   return parts.join("\n");
+}
+
+/**
+ * @param {HTMLElement} card
+ * @param {object} item
+ * @param {object} ctx
+ * @param {{ title: string, titleClass: string }} opts
+ */
+function appendInsightHeader(card, item, ctx, { title, titleClass }) {
+  const row = document.createElement("div");
+  row.className = "insight-head-row";
+
+  const timeEl = document.createElement("span");
+  timeEl.className = "insight-time";
+  const label = ctx.formatInsightTime?.(item.addedAt) || "";
+  timeEl.textContent = label;
+  timeEl.setAttribute("aria-label", "捕获时间");
+
+  const titleEl = document.createElement("div");
+  titleEl.className = titleClass;
+  titleEl.textContent = title;
+
+  row.append(timeEl, titleEl);
+  card.appendChild(row);
 }
 
 /**
@@ -484,7 +510,6 @@ export function renderMeetingPanels(ctx) {
     insightsTermsList,
     questionsEmptyEl,
     insightsEmptyEl,
-    formatInsightTime,
   } = ctx;
 
   const terms = liveTerms(termEntries);
@@ -504,9 +529,10 @@ export function renderMeetingPanels(ctx) {
       if (item.userPinned) card.classList.add("is-pinned");
       card.dataset.id = item.id;
 
-      const q = document.createElement("div");
-      q.className = "q";
-      q.textContent = item.question;
+      appendInsightHeader(card, item, ctx, {
+        title: item.question,
+        titleClass: "q",
+      });
       const a = document.createElement("div");
       a.className = "a";
       a.textContent = item.answer;
@@ -515,7 +541,7 @@ export function renderMeetingPanels(ctx) {
       actions.className = "insight-actions-row";
       appendActionButtons(actions, item, "question", ctx);
 
-      card.append(q, a, actions);
+      card.append(a, actions);
       appendDetailBlock(card, item, "question");
       questionsListEl.appendChild(card);
     }
@@ -530,9 +556,10 @@ export function renderMeetingPanels(ctx) {
       if (index === 1) card.classList.add("is-secondary");
       card.dataset.id = item.id;
 
-      const term = document.createElement("div");
-      term.className = "term";
-      term.textContent = item.term;
+      appendInsightHeader(card, item, ctx, {
+        title: item.term,
+        titleClass: "term",
+      });
       const body = document.createElement("div");
       body.className = "insight-body";
       body.textContent = termBodyText(item);
@@ -544,7 +571,7 @@ export function renderMeetingPanels(ctx) {
       actions.className = "insight-actions-row";
       appendActionButtons(actions, item, "term", ctx);
 
-      card.append(term, body, actions);
+      card.append(body, actions);
       appendDetailBlock(card, item, "term");
       insightsTermsList.appendChild(card);
     });
@@ -590,9 +617,10 @@ export function renderGlancePanel(ctx) {
   const prev = sorted[1];
 
   primary.replaceChildren();
-  const term = document.createElement("div");
-  term.className = "term";
-  term.textContent = main.term;
+  appendInsightHeader(primary, main, ctx, {
+    title: main.term,
+    titleClass: "term",
+  });
   const body = document.createElement("div");
   body.className = "insight-body";
   body.textContent = termBodyText(main);
@@ -602,7 +630,7 @@ export function renderGlancePanel(ctx) {
   const actions = document.createElement("div");
   actions.className = "insight-actions-row";
   appendActionButtons(actions, main, "term", ctx);
-  primary.append(term, body, actions);
+  primary.append(body, actions);
   appendDetailBlock(primary, main, "term");
 
   if (prev && prevRow) {
@@ -628,9 +656,10 @@ function buildPinnedTermCard(item, ctx) {
   card.dataset.id = item.id;
   card.dataset.kind = "term";
 
-  const term = document.createElement("div");
-  term.className = "term";
-  term.textContent = item.term;
+  appendInsightHeader(card, item, ctx, {
+    title: item.term,
+    titleClass: "term",
+  });
   const body = document.createElement("div");
   body.className = "insight-body";
   body.textContent = termBodyText(item);
@@ -642,7 +671,7 @@ function buildPinnedTermCard(item, ctx) {
   actions.className = "insight-actions-row";
   appendActionButtons(actions, item, "term", ctx, { inPinnedPanel: true });
 
-  card.append(term, body, actions);
+  card.append(body, actions);
   appendDetailBlock(card, item, "term");
   return card;
 }
@@ -657,9 +686,10 @@ function buildPinnedQuestionCard(item, ctx) {
   card.dataset.id = item.id;
   card.dataset.kind = "question";
 
-  const q = document.createElement("div");
-  q.className = "q";
-  q.textContent = item.question;
+  appendInsightHeader(card, item, ctx, {
+    title: item.question,
+    titleClass: "q",
+  });
   const a = document.createElement("div");
   a.className = "a";
   a.textContent = item.answer;
@@ -668,7 +698,7 @@ function buildPinnedQuestionCard(item, ctx) {
   actions.className = "insight-actions-row";
   appendActionButtons(actions, item, "question", ctx, { inPinnedPanel: true });
 
-  card.append(q, a, actions);
+  card.append(a, actions);
   appendDetailBlock(card, item, "question");
   return card;
 }

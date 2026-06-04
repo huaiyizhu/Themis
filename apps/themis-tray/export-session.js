@@ -38,39 +38,15 @@ function dedupeEntriesByKey(entries, keyFn) {
 }
 
 /**
- * @param {{ transcript?: string, summary?: string, partial?: string }} opts
- */
-export function buildTranscriptExportText({ transcript = "", summary = "", partial = "" } = {}) {
-  const parts = ["# Themis 会话字幕", `导出时间: ${formatExportTimestamp()}`, ""];
-  const body = String(transcript || "").trim();
-  const partialText = String(partial || "").trim();
-
-  if (!body && !partialText) {
-    parts.push("（暂无字幕）");
-  } else {
-    if (body) parts.push(body);
-    if (partialText) {
-      if (body) parts.push("");
-      parts.push(`[进行中] ${partialText}`);
-    }
-  }
-
-  const summaryText = String(summary || "").trim();
-  if (summaryText) {
-    parts.push("", "---", "", "## 会话摘要", "", summaryText);
-  }
-
-  return parts.join("\n");
-}
-
-/**
- * @param {{ termEntries?: object[], questionEntries?: object[] }} opts
+ * @param {Array<{termEntries?: object[], questionEntries?: object[]}>} opts
  */
 export function buildInsightsExportText({ termEntries = [], questionEntries = [] } = {}) {
-  const terms = dedupeEntriesByKey(termEntries, (item) => normalizeTermKey(item.term));
+  const terms = dedupeEntriesByKey(termEntries, (item) => normalizeTermKey(item.term)).sort(
+    (a, b) => (a.addedAt || 0) - (b.addedAt || 0),
+  );
   const questions = dedupeEntriesByKey(questionEntries, (item) =>
     normalizeQuestionKey(item.question),
-  );
+  ).sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
 
   const parts = ["# Themis 问题与术语", `导出时间: ${formatExportTimestamp()}`, ""];
 
@@ -127,30 +103,4 @@ export async function copyExportText(content) {
   } catch {
     return false;
   }
-}
-
-/**
- * Prefer backend transcript when longer; fall back to local committed lines.
- * @param {{ committedLines?: string[], partialText?: string, summaryText?: string }} local
- */
-export async function resolveTranscriptForExport(local) {
-  let transcript = (local.committedLines || []).join("\n").trim();
-  let summary = String(local.summaryText || "").trim();
-  let partial = String(local.partialText || "").trim();
-
-  try {
-    const remote = await invoke("get_session_export");
-    const remoteTranscript = String(remote?.transcript || "").trim();
-    const remoteSummary = String(remote?.session_summary || "").trim();
-    if (remoteTranscript.length > transcript.length) {
-      transcript = remoteTranscript;
-    }
-    if (remoteSummary) {
-      summary = remoteSummary;
-    }
-  } catch {
-    /* service offline — use local state */
-  }
-
-  return { transcript, summary, partial };
 }

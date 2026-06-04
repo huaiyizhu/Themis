@@ -6,4 +6,4 @@ mod session_summary;
 
 pub use factory::create_analyzer;
 pub use llm::LlmAnalyzer;
-pub use session_summary::{SessionSummarizer, ANALYSIS_CONTEXT_LINES};
+pub use session_summary::{SessionSummarizer, TranscriptLine, ANALYSIS_CONTEXT_LINES};
