@@ -1,7 +1,8 @@
 use crate::proto::{
     themis_service_server::ThemisService, ConfigStatus as ProtoConfigStatus,
     ExpandInsightRequest, ExpandInsightResponse, GetDiagnosticsRequest, GetDiagnosticsResponse,
-    GetStatusRequest, GetStatusResponse, LatencyBreakdown as ProtoLatencyBreakdown,
+    GetSessionExportRequest, GetSessionExportResponse, GetStatusRequest, GetStatusResponse,
+    LatencyBreakdown as ProtoLatencyBreakdown,
     LatencyRecord as ProtoLatencyRecord, LatencySummary as ProtoLatencySummary,
     ResetSessionRequest, ResetSessionResponse, StartCaptureRequest, StartCaptureResponse,
     StopCaptureRequest, StopCaptureResponse, SubscribeTranscriptsRequest, TranscriptMessage,
@@ -55,6 +56,7 @@ pub trait CaptureEngineHandle: Send + Sync {
     async fn stop(&self) -> anyhow::Result<()>;
     async fn reset_session(&self) -> anyhow::Result<()>;
     async fn expand_insight(&self, kind: &str, subject: &str, brief: &str) -> anyhow::Result<String>;
+    async fn get_session_export(&self) -> anyhow::Result<(String, Option<String>)>;
 }
 
 pub struct ThemisGrpcServer {
@@ -260,6 +262,27 @@ impl ThemisService for ThemisGrpcServer {
                 detail: String::new(),
                 message: e.to_string(),
             })),
+        }
+    }
+
+    async fn get_session_export(
+        &self,
+        _request: Request<GetSessionExportRequest>,
+    ) -> Result<Response<GetSessionExportResponse>, Status> {
+        match self.service.engine.get_session_export().await {
+            Ok((transcript, session_summary)) => {
+                let line_count = if transcript.is_empty() {
+                    0
+                } else {
+                    transcript.lines().count() as u32
+                };
+                Ok(Response::new(GetSessionExportResponse {
+                    transcript,
+                    session_summary: session_summary.unwrap_or_default(),
+                    line_count,
+                }))
+            }
+            Err(e) => Err(Status::internal(e.to_string())),
         }
     }
 

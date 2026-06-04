@@ -293,6 +293,17 @@ impl CaptureEngine {
             .unwrap_or_default()
     }
 
+    pub async fn get_session_export(&self) -> anyhow::Result<(String, Option<String>)> {
+        let guard = self.inner.lock().await;
+        Ok(match guard.as_ref() {
+            Some(running) => (
+                running.session_summary.full_text(),
+                running.session_summary.current_summary(),
+            ),
+            None => (String::new(), None),
+        })
+    }
+
     pub async fn expand_insight(
         &self,
         kind: &str,

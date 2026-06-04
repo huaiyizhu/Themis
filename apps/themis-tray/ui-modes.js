@@ -301,6 +301,11 @@ function copyText(text) {
 }
 
 /** @param {object} item @param {"term"|"question"} kind */
+export function buildInsightExportText(item, kind) {
+  return buildInsightCopyText(item, kind);
+}
+
+/** @param {object} item @param {"term"|"question"} kind */
 function buildInsightCopyText(item, kind) {
   const detail = String(item.detailText ?? "").trim();
   if (kind === "term") {

@@ -25,6 +25,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-global-shortcut = "2"
+rfd = "0.15"
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

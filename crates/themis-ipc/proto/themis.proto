@@ -9,6 +9,7 @@ service ThemisService {
   rpc GetDiagnostics(GetDiagnosticsRequest) returns (GetDiagnosticsResponse);
   rpc ResetSession(ResetSessionRequest) returns (ResetSessionResponse);
   rpc ExpandInsight(ExpandInsightRequest) returns (ExpandInsightResponse);
+  rpc GetSessionExport(GetSessionExportRequest) returns (GetSessionExportResponse);
   rpc SubscribeTranscripts(SubscribeTranscriptsRequest)
       returns (stream TranscriptMessage);
 }
@@ -88,6 +89,16 @@ message ExpandInsightResponse {
   bool ok = 1;
   string detail = 2;
   string message = 3;
+}
+
+message GetSessionExportRequest {}
+
+message GetSessionExportResponse {
+  /// Full session transcript (one line per finalized phrase).
+  string transcript = 1;
+  /// Rolling LLM session summary when available.
+  string session_summary = 2;
+  uint32 line_count = 3;
 }
 
 message GetDiagnosticsResponse {

@@ -30,6 +30,9 @@ impl CaptureEngineHandle for EngineHandle {
     async fn expand_insight(&self, kind: &str, subject: &str, brief: &str) -> anyhow::Result<String> {
         self.0.expand_insight(kind, subject, brief).await
     }
+    async fn get_session_export(&self) -> anyhow::Result<(String, Option<String>)> {
+        self.0.get_session_export().await
+    }
 }
 
 #[tokio::main]

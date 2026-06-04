@@ -25,6 +25,14 @@ import {
   formatSummaryTime,
   setupInsightInteractions,
 } from "./ui-modes.js";
+import {
+  buildInsightsExportText,
+  buildTranscriptExportText,
+  copyExportText,
+  defaultExportFileName,
+  resolveTranscriptForExport,
+  saveExportText,
+} from "./export-session.js";
 
 const overlayEl = document.getElementById("overlay");
 const dragHandle = document.getElementById("drag-handle");
@@ -35,6 +43,8 @@ const scrollEl = document.getElementById("transcript-scroll");
 const transcriptEl = document.getElementById("transcript");
 const scrollLatestBtn = document.getElementById("scroll-latest");
 const clearSessionBtn = document.getElementById("clear-session");
+const exportTranscriptBtn = document.getElementById("export-transcript");
+const exportInsightsBtn = document.getElementById("export-insights");
 const toggleCaptureBtn = document.getElementById("toggle-capture");
 const toggleDiagnoseBtn = document.getElementById("toggle-diagnose");
 const toggleSettingsBtn = document.getElementById("toggle-settings");
@@ -88,6 +98,8 @@ function initHeaderTips() {
   setTip(document.getElementById("header-overflow-toggle"), "更多：诊断、配置、字号、尺寸等");
   setTip(sizeToggleBtn, "窗口尺寸预设");
   setTip(clearSessionBtn, "清空字幕、总结与洞察，从零继续监听");
+  setTip(exportTranscriptBtn, "导出当前会话的原始字幕到文本文件");
+  setTip(exportInsightsBtn, "导出本会话已抓取的全部术语与问题到文本文件");
   setTip(hideOverlayBtn, tipWithHotkey("隐藏窗口（捕捉继续，托盘可再次打开）", "O"));
   setTip(quitAppBtn, tipWithHotkey("退出 Themis（停止托盘与捕捉）", "Q"));
   setTip(scrollLatestBtn, "跳转到最新字幕");
@@ -136,6 +148,81 @@ summaryCopyBtn?.addEventListener("click", (e) => {
   navigator.clipboard?.writeText(text).catch(() => {});
 });
 setTip(summaryCopyBtn, "复制当前会话摘要");
+
+function flashExportStatus(message) {
+  if (!message) return;
+  setSummaryHint(message);
+  if (statusEl) {
+    const prev = statusEl.textContent;
+    statusEl.textContent = message;
+    window.setTimeout(() => {
+      if (statusEl.textContent === message) {
+        statusEl.textContent = prev;
+      }
+    }, 3200);
+  }
+}
+
+async function exportTranscriptSession() {
+  const { transcript, summary, partial } = await resolveTranscriptForExport({
+    committedLines,
+    partialText,
+    summaryText: summaryTextEl?.textContent?.trim() || "",
+  });
+  if (!transcript && !partial) {
+    flashExportStatus("暂无字幕可导出");
+    return;
+  }
+  const content = buildTranscriptExportText({ transcript, summary, partial });
+  const result = await saveExportText(content, defaultExportFileName("themis-transcript"));
+  if (result.ok) {
+    flashExportStatus(`字幕已导出：${result.path}`);
+    return;
+  }
+  if (result.reason === "cancelled") return;
+  if (result.reason === "empty") {
+    flashExportStatus("暂无字幕可导出");
+    return;
+  }
+  if (await copyExportText(content)) {
+    flashExportStatus("保存失败，已复制字幕到剪贴板");
+  } else {
+    flashExportStatus(`导出失败：${result.reason}`);
+  }
+}
+
+async function exportInsightsSession() {
+  if (termEntries.length === 0 && questionEntries.length === 0) {
+    flashExportStatus("暂无问题或术语可导出");
+    return;
+  }
+  const content = buildInsightsExportText({ termEntries, questionEntries });
+  const result = await saveExportText(content, defaultExportFileName("themis-insights"));
+  if (result.ok) {
+    flashExportStatus(`问题与术语已导出：${result.path}`);
+    return;
+  }
+  if (result.reason === "cancelled") return;
+  if (result.reason === "empty") {
+    flashExportStatus("暂无问题或术语可导出");
+    return;
+  }
+  if (await copyExportText(content)) {
+    flashExportStatus("保存失败，已复制问题与术语到剪贴板");
+  } else {
+    flashExportStatus(`导出失败：${result.reason}`);
+  }
+}
+
+exportTranscriptBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  exportTranscriptSession().catch((err) => flashExportStatus(String(err)));
+});
+
+exportInsightsBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  exportInsightsSession().catch((err) => flashExportStatus(String(err)));
+});
 
 /** @type {string[]} Final lines (one per Azure REST phrase). */
 let committedLines = [];

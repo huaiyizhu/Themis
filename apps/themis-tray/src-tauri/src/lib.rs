@@ -34,8 +34,8 @@ use themis_core::{
 };
 use themis_ipc::client::connect;
 use themis_ipc::{
-    ExpandInsightRequest, GetDiagnosticsRequest, GetStatusRequest, ResetSessionRequest,
-    StartCaptureRequest, StopCaptureRequest, SubscribeTranscriptsRequest,
+    ExpandInsightRequest, GetDiagnosticsRequest, GetSessionExportRequest, GetStatusRequest,
+    ResetSessionRequest, StartCaptureRequest, StopCaptureRequest, SubscribeTranscriptsRequest,
 };
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
@@ -872,6 +872,52 @@ async fn expand_insight(
     }
 }
 
+#[derive(Clone, Serialize)]
+struct SessionExportDto {
+    transcript: String,
+    session_summary: String,
+    line_count: u32,
+}
+
+#[tauri::command]
+async fn get_session_export(state: State<'_, AppState>) -> Result<SessionExportDto, String> {
+    let mut client = connect(state.grpc_port())
+        .await
+        .map_err(|e| e.to_string())?;
+    let resp = client
+        .get_session_export(GetSessionExportRequest {})
+        .await
+        .map_err(|e| e.to_string())?
+        .into_inner();
+    Ok(SessionExportDto {
+        transcript: resp.transcript,
+        session_summary: resp.session_summary,
+        line_count: resp.line_count,
+    })
+}
+
+#[tauri::command]
+async fn save_text_file(content: String, default_name: String) -> Result<Option<String>, String> {
+    let name = default_name.trim().to_string();
+    if name.is_empty() {
+        return Err("default file name is empty".into());
+    }
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        rfd::FileDialog::new()
+            .set_file_name(&name)
+            .add_filter("Text", &["txt"])
+            .add_filter("Markdown", &["md"])
+            .save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    std::fs::write(&path, content.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(Some(path.display().to_string()))
+}
+
 #[tauri::command]
 async fn clear_listening_session(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let mut client = connect(state.grpc_port())
@@ -1474,6 +1520,8 @@ pub fn run() {
             toggle_overlay_mini_mode,
             is_overlay_mini_mode,
             expand_insight,
+            get_session_export,
+            save_text_file,
             toggle_overlay_visibility,
             is_overlay_visible,
             wake_overlay_window,
