@@ -322,11 +322,12 @@ TERMS (max 6): Only jargon that a general audience would NOT already understand 
 KV cache, embedding space, retrieval reranking. {lang} \
 EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
 \
-QUESTIONS (max 3): Only REAL technical or conceptual questions that need expertise — mechanisms, \
-tradeoffs, comparisons, failure modes, architecture, edge cases. \
-EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk, casual health/lifestyle questions, \
-and trivial one-liner definitions. \
-If nothing meets this bar, return empty arrays."
+QUESTIONS (max 3): ONLY questions that appear VERBATIM (or nearly verbatim) in the latest phrase — \
+copy the exact speaker wording; do NOT paraphrase, rephrase, expand, or invent questions. \
+Each entry's \"question\" field must be a direct quote from the transcript. \
+Provide a technical answer for each quoted question. \
+EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk. \
+If the latest phrase contains no real question, return an empty questions array."
     )
 }
 

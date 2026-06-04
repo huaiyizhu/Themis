@@ -48,7 +48,7 @@ impl AnalysisProvider for CompositeAnalyzer {
                         "ok".into()
                     };
                     llm_out = Some(llm_result.clone());
-                    merged.merge(llm_result);
+                    merged.merge_llm_supplement(&llm_result);
                 }
                 Ok(Ok(None)) => {
                     llm_ms = Some(l0.elapsed().as_millis() as u32);

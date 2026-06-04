@@ -42,26 +42,42 @@ impl AnalysisResult {
     }
 
     pub fn merge(&mut self, other: AnalysisResult) {
-        for kw in other.keywords {
-            if !self.keywords.iter().any(|k| k.eq_ignore_ascii_case(&kw)) {
-                self.keywords.push(kw);
+        self.merge_keywords_and_terms(&other);
+        for q in other.questions {
+            merge_question(self, q);
+        }
+    }
+
+    /// Merge LLM keywords/terms and attach LLM answers to existing transcript questions.
+    /// Question text always stays verbatim from the transcript (heuristic extraction); LLM
+    /// must not add or rephrase questions.
+    pub fn merge_llm_supplement(&mut self, other: &AnalysisResult) {
+        self.merge_keywords_and_terms(other);
+        attach_llm_question_answers(&mut self.questions, &other.questions);
+    }
+
+    fn merge_keywords_and_terms(&mut self, other: &AnalysisResult) {
+        for kw in &other.keywords {
+            if !self
+                .keywords
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(kw))
+            {
+                self.keywords.push(kw.clone());
             }
         }
-        for t in other.terms {
+        for t in &other.terms {
             if let Some(existing) = self
                 .terms
                 .iter_mut()
                 .find(|x| x.term.eq_ignore_ascii_case(&t.term))
             {
                 if should_prefer_explanation(&existing.explanation, &t.explanation) {
-                    existing.explanation = t.explanation;
+                    existing.explanation = t.explanation.clone();
                 }
             } else {
-                self.terms.push(t);
+                self.terms.push(t.clone());
             }
-        }
-        for q in other.questions {
-            merge_question(self, q);
         }
     }
 
@@ -98,12 +114,25 @@ fn merge_question(result: &mut AnalysisResult, incoming: QuestionInsight) {
         if should_prefer_explanation(&existing.answer, &incoming.answer) {
             existing.answer = incoming.answer;
         }
-        if existing.question.len() < incoming.question.len() {
-            existing.question = incoming.question;
-        }
         return;
     }
     result.questions.push(incoming);
+}
+
+fn attach_llm_question_answers(
+    transcript_questions: &mut [QuestionInsight],
+    llm_questions: &[QuestionInsight],
+) {
+    for q in transcript_questions {
+        if let Some(llm_q) = llm_questions
+            .iter()
+            .find(|x| questions_match(&x.question, &q.question))
+        {
+            if should_prefer_explanation(&q.answer, &llm_q.answer) {
+                q.answer = llm_q.answer.clone();
+            }
+        }
+    }
 }
 
 fn normalize_question_key(q: &str) -> String {
@@ -138,6 +167,11 @@ pub fn is_placeholder_answer(answer: &str) -> bool {
         || a.contains("这是方法/步骤类问题")
         || a.contains("Identified as a question")
         || a.contains("Configure Azure OpenAI")
+        || a.contains("Definition-style question")
+        || a.contains("waiting for LLM")
+        || a.contains("Why/cause-style question")
+        || a.contains("How-to/process question")
+        || a.contains("Preliminary question detected")
 }
 
 fn should_prefer_explanation(existing: &str, incoming: &str) -> bool {
@@ -223,6 +257,34 @@ mod merge_tests {
         };
         base.merge(llm);
         assert_eq!(base.questions.len(), 1);
+        assert!(base.questions[0].answer.contains("retrieves"));
+    }
+
+    #[test]
+    fn merge_llm_supplement_keeps_transcript_question_text() {
+        let mut base = AnalysisResult {
+            questions: vec![QuestionInsight {
+                question: "What is RAG?".into(),
+                answer: "Definition-style question; waiting for LLM to expand.".into(),
+            }],
+            ..Default::default()
+        };
+        let llm = AnalysisResult {
+            questions: vec![
+                QuestionInsight {
+                    question: "What is RAG in AI systems?".into(),
+                    answer: "RAG retrieves documents before generation.".into(),
+                },
+                QuestionInsight {
+                    question: "How does transformer attention work?".into(),
+                    answer: "Self-attention compares all tokens in the sequence.".into(),
+                },
+            ],
+            ..Default::default()
+        };
+        base.merge_llm_supplement(&llm);
+        assert_eq!(base.questions.len(), 1);
+        assert_eq!(base.questions[0].question, "What is RAG?");
         assert!(base.questions[0].answer.contains("retrieves"));
     }
 }
