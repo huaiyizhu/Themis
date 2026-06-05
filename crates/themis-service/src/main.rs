@@ -40,7 +40,7 @@ async fn main() -> anyhow::Result<()> {
     let config = ThemisConfig::from_env();
     init_logging(&config)?;
 
-    let speech_mode = std::env::var("AZURE_SPEECH_MODE").unwrap_or_else(|_| "streaming".into());
+    let speech_mode = std::env::var("AZURE_SPEECH_MODE").unwrap_or_else(|_| "rest".into());
     info!(
         speech_language = %config.speech_language,
         speech_mode = %speech_mode,

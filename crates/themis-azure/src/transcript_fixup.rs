@@ -11,6 +11,11 @@ static DEFAULT_CORRECTIONS: &[(&str, &str)] = &[
     // LLM / GPT style slips
     ("L L M", "LLM"),
     ("G P T", "GPT"),
+    // Common Chinese homophones for tech terms (STT mishears)
+    ("拉格", "RAG"),
+    ("瑞格", "RAG"),
+    ("雷格", "RAG"),
+    ("艾格", "RAG"),
 ];
 
 static ENV_CORRECTIONS: LazyLock<Vec<(String, String)>> = LazyLock::new(load_env_corrections);
@@ -41,15 +46,25 @@ fn load_env_corrections() -> Vec<(String, String)> {
 pub fn apply_transcript_fixup(text: &str) -> String {
     let mut out = text.to_string();
     for (from, to) in DEFAULT_CORRECTIONS {
-        out = replace_word(&out, from, to);
+        out = replace_token(&out, from, to);
     }
     for (from, to) in ENV_CORRECTIONS.iter() {
-        out = replace_word(&out, from, to);
+        out = replace_token(&out, from, to);
     }
     out
 }
 
-fn replace_word(text: &str, from: &str, to: &str) -> String {
+fn replace_token(text: &str, from: &str, to: &str) -> String {
+    if from.is_empty() || from == to {
+        return text.to_string();
+    }
+    if from.is_ascii() {
+        return replace_ascii_word(text, from, to);
+    }
+    text.replace(from, to)
+}
+
+fn replace_ascii_word(text: &str, from: &str, to: &str) -> String {
     if from.is_empty() || from == to {
         return text.to_string();
     }
@@ -108,5 +123,10 @@ mod tests {
     #[test]
     fn reg_to_rag_word_boundary() {
         assert_eq!(apply_transcript_fixup("we use Reg here"), "we use RAG here");
+    }
+
+    #[test]
+    fn zh_homophone_to_rag() {
+        assert_eq!(apply_transcript_fixup("我们讲一下拉格的原理"), "我们讲一下RAG的原理");
     }
 }

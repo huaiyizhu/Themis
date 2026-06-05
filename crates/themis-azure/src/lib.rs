@@ -1,4 +1,5 @@
 mod chunk;
+mod language_pick;
 mod mock;
 mod multilang;
 mod recognition;
@@ -16,13 +17,13 @@ pub use streaming::AzureStreamingRecognizer;
 use themis_core::ThemisConfig;
 
 /// Resolve Azure languages from `AZURE_SPEECH_LANGUAGE`.
-/// - `auto` → en-US + zh-CN
-/// - `en-US,zh-CN` → explicit list
-/// - `en-US` → single language
+/// - `auto` → zh-CN + en-US (Chinese first for better defaults in mixed auto mode)
+/// - `en-US,zh-CN` → explicit list (order preserved)
+/// - `zh-CN` → single language
 pub fn resolve_speech_languages(config: &ThemisConfig) -> Vec<String> {
     let raw = config.speech_language.trim();
     if raw.eq_ignore_ascii_case("auto") {
-        return vec!["en-US".into(), "zh-CN".into()];
+        return vec!["zh-CN".into(), "en-US".into()];
     }
     if raw.contains(',') {
         return raw
@@ -49,7 +50,13 @@ pub fn create_recognizer(config: &ThemisConfig) -> Box<dyn SpeechRecognizer + Se
 
     if mode == "streaming" {
         let langs = resolve_speech_languages(config);
-        let language = langs.first().cloned().unwrap_or_else(|| "en-US".into());
+        // Prefer Chinese when auto/multilang — streaming only supports one language.
+        let language = langs
+            .iter()
+            .find(|l| l.to_ascii_lowercase().starts_with("zh"))
+            .cloned()
+            .or_else(|| langs.first().cloned())
+            .unwrap_or_else(|| "zh-CN".into());
         return Box::new(AzureStreamingRecognizer::new(
             key.clone(),
             region.clone(),

@@ -66,11 +66,7 @@ impl AzureMultiLangRestRecognizer {
             }
         }
 
-        let Some((best, azure_ms)) = scored.into_iter().max_by(|a, b| {
-            a.0.confidence
-                .partial_cmp(&b.0.confidence)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        }) else {
+        let Some((best, azure_ms)) = crate::language_pick::pick_best_recognition(scored) else {
             return Ok(None);
         };
 
