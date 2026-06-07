@@ -58,9 +58,13 @@ echo "[2/4] Rust release (themis-service, themis-cli)..."
 cargo build --release -p themis-service -p themis-cli --target "$TARGET"
 
 echo "[3/4] Tauri app (themis-tray, embed frontend)..."
+pkill -x themis-tray 2>/dev/null || true
+pkill -x themis-service 2>/dev/null || true
+sleep 0.5
 pushd apps/themis-tray >/dev/null
 export CI=true
-tauri_cfg='{"build":{"beforeBuildCommand":""}}'
+cargo clean -p themis-tray --target "$TARGET"
+tauri_cfg="$(cat "$ROOT/scripts/tauri-release-build.json")"
 if [[ "$SKIP_INSTALLER" -eq 1 ]]; then
   echo "  (--skip-installer: no dmg, still building tray)"
   npm run tauri build -- --target "$TARGET" --no-bundle --config "$tauri_cfg"
@@ -75,9 +79,11 @@ bash scripts/package-release-assets.sh "$TARGET" "$NAME" --flat-names
 unset THEMIS_USE_MOCK_SPEECH || true
 
 echo ""
-echo "Done. Release files:"
+echo "Done. Portable files: $OUT_DIR"
+echo "Release zip (upload this): release-assets/Themis-${NAME}.zip"
 ls -la "$OUT_DIR"
+ls -la "release-assets/Themis-${NAME}.zip"
 echo ""
-echo "Next: upload everything in $OUT_DIR to GitHub Release"
-echo "  gh release create vX.Y.Z $OUT_DIR/*"
+echo "Next: tag and push to trigger CI, or:"
+echo "  gh release create vX.Y.Z release-assets/Themis-${NAME}.zip packaging/RELEASE-INDEX.md"
 echo ""

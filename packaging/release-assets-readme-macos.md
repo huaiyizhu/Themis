@@ -4,6 +4,30 @@
 
 ---
 
+## ⚠️ 从 GitHub / Safari 下载后提示「Themis.app 已损坏」？
+
+这是 **macOS Gatekeeper** 对未 Apple 公证应用的常见提示，**不是文件损坏**。
+
+**任选一种方式：**
+
+```bash
+# 方法一：解除隔离（推荐）
+xattr -cr /Applications/Themis.app
+open /Applications/Themis.app
+
+# 方法二：便携版（同一 Release 页下载 themis-tray + themis-service 到同一文件夹）
+cd <下载文件夹>
+chmod +x themis-tray themis-service
+xattr -cr .
+./themis-tray
+```
+
+或在 Finder 中 **右键 Themis.app → 打开 → 再次点打开**。
+
+仓库内也可运行：`./scripts/fix-macos-app-quarantine.sh /Applications/Themis.app`
+
+---
+
 ## 文件说明与运行方式
 
 | 文件 | 作用 | 如何运行 |
@@ -19,6 +43,8 @@
 
 ```bash
 cd <本目录>
+# 若正在跑 ./scripts/themis.sh tray（开发版），先退出并停止后台 service：
+pkill -x themis-tray 2>/dev/null; pkill -x themis-service 2>/dev/null
 chmod +x themis-tray themis-service themis-cli
 ./themis-tray
 ```

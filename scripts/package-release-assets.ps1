@@ -75,10 +75,35 @@ if ($bundle) {
 
 Copy-Docs
 
+function Get-PlatformFolderName {
+    switch -Wildcard ($Name) {
+        "windows-*" { return "Themis-Windows" }
+        "macos-aarch64" { return "Themis-macOS-Apple-Silicon" }
+        "macos-x86_64" { return "Themis-macOS-Intel" }
+        default { return "Themis-$Name" }
+    }
+}
+
+function New-PlatformZip {
+    $folder = Get-PlatformFolderName
+    $zipPath = Join-Path "release-assets" "Themis-$Name.zip"
+    $staging = Join-Path ([System.IO.Path]::GetTempPath()) ("themis-zip-$Name-" + [guid]::NewGuid().ToString())
+    $bundleDir = Join-Path $staging $folder
+    New-Item -ItemType Directory -Force -Path $bundleDir | Out-Null
+    Copy-Item (Join-Path $out "*") $bundleDir -Recurse -Force
+    if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+    Compress-Archive -Path $bundleDir -DestinationPath $zipPath -Force
+    Remove-Item $staging -Recurse -Force
+    Write-Host "Platform zip: $zipPath  ->  $folder/"
+}
+
 $files = Get-ChildItem $out -File
 if ($files.Count -eq 0) {
     throw "No release assets collected under $out"
 }
 
-Write-Host "Release assets ($($files.Count) files):"
+New-PlatformZip
+
+Write-Host "Release assets ($($files.Count) files in $out):"
 Get-ChildItem $out | Format-Table Name, Length
+Get-ChildItem (Join-Path "release-assets" "Themis-$Name.zip") | Format-Table Name, Length

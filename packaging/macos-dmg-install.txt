@@ -1,0 +1,34 @@
+Themis — macOS 安装说明
+========================
+
+从 GitHub Releases 下载后，若双击 Themis.app 提示「已损坏，无法打开」，
+这是 macOS 对未公证应用的常见提示，不是文件真的坏了。
+
+方法一（推荐）— 终端解除隔离
+----------------------------
+打开「终端」，执行（路径按实际修改）：
+
+  xattr -cr /Applications/Themis.app
+  open /Applications/Themis.app
+
+若 App 还在「下载」或 dmg 挂载目录：
+
+  xattr -cr ~/Downloads/Themis.app
+
+方法二 — 右键首次打开
+--------------------
+ Finder 中右键 Themis.app →「打开」→ 在对话框中再次点「打开」。
+
+方法三 — 不用 .app，用便携版
+----------------------------
+下载 `Themis-macos-aarch64.zip`（Apple Silicon）或 `Themis-macos-x86_64.zip`（Intel），
+解压后进入 `Themis-macOS-Apple-Silicon/`（或 `Themis-macOS-Intel/`）文件夹：
+
+  cd <解压后的文件夹>
+  chmod +x themis-tray themis-service
+  xattr -cr .
+  ./themis-tray
+
+配置 Azure：复制 .env.example 为 .env，或在 tray 里点「配置」。
+
+首次运行需授予「系统音频录制」权限。

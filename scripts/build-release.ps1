@@ -146,7 +146,7 @@ Write-Host "[3/4] Tauri app (themis-tray, embed frontend)..." -ForegroundColor Y
 Stop-ThemisProcesses
 Push-Location $TrayDir
 $env:CI = "true"
-# PowerShell strips JSON quotes when passed inline; use a config file (see release.yml bash note).
+Invoke-Checked { cargo clean -p themis-tray --target $Target } "cargo clean -p themis-tray"
 $TauriConfigFile = (Resolve-Path (Join-Path $Root "scripts\tauri-release-build.json")).Path
 function Invoke-TauriBuild {
     param([string[]]$ExtraArgs, [string]$Label)
@@ -184,16 +184,19 @@ if ((Get-Item $packedTray).Length -ne (Get-Item $builtTray).Length) {
 Remove-Item Env:THEMIS_USE_MOCK_SPEECH -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "Done. Release files:" -ForegroundColor Green
+Write-Host "Done. Portable files: $OutDir" -ForegroundColor Green
+$zipPath = Join-Path "release-assets" "Themis-$Name.zip"
+Write-Host "Release zip (upload this): $zipPath" -ForegroundColor Green
 Get-ChildItem $OutDir | Format-Table Name, Length -AutoSize
+if (Test-Path $zipPath) {
+    Get-ChildItem $zipPath | Format-Table Name, Length -AutoSize
+}
 Write-Host ""
-Write-Host "Next: zip or upload everything in:" -ForegroundColor Cyan
-Write-Host "  $OutDir"
+Write-Host "Next: tag and push to trigger CI, or:" -ForegroundColor Cyan
+Write-Host "  gh release create vX.Y.Z $zipPath packaging/RELEASE-INDEX.md"
 Write-Host ""
 Write-Host "Run tray (use a new terminal, or after build script exits):" -ForegroundColor Cyan
 Write-Host "  cd $OutDir"
 Write-Host "  # optional: copy .env.example .env — or use tray 配置 button after start"
 Write-Host "  taskkill /IM themis-service.exe /F 2>`$null; .\themis-tray.exe"
-Write-Host ""
-Write-Host "Manual GitHub Release (CI assets use windows-x86_64- prefix): gh release create vX.Y.Z ..." -ForegroundColor DarkGray
 Write-Host ""

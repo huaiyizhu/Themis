@@ -59,6 +59,8 @@ Process Tap 不可用时可用 `input` 模式并指定 `THEMIS_AUDIO_INPUT_DEVIC
 
 ## 五、常见问题
 
+**双击 Themis.app 提示「已损坏，无法打开」** → Safari 下载触发了隔离属性。执行 `xattr -cr /Applications/Themis.app` 后打开；或改用 Release 页的 **便携版**（`macos-aarch64-themis-tray` + `themis-service` 同目录）。详见 Release README 或 dmg 内「请先阅读-安装说明.txt」。
+
 **没有字幕** → 检查 `.env`、系统音频录制权限、`./themis-cli audio-probe`。
 
 **Insights 空** → 配置 `FOUNDRY_*`；`doctor` 显示 foundry configured。

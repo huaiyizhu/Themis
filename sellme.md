@@ -64,12 +64,22 @@ Rust 单体仓库、gRPC 本地通信、词表与启发式规则可改、可选 
 
 ### 1. 获取程序
 
-从 GitHub **Releases** 下载对应平台文件：
+从 [GitHub Releases](https://github.com/huaiyizhu/Themis/releases) **按系统下载一个 ZIP**，解压后进入对应文件夹即可：
 
-| 平台 | 推荐 |
-|------|------|
-| Windows x64 | `*-setup.exe` 安装包，或便携 `themis-tray.exe` + `themis-service.exe` |
-| macOS Apple Silicon / Intel | `.dmg` 或便携 bundle |
+| 你的系统 | 下载 |
+|----------|------|
+| **Windows 64 位** | [`Themis-windows-x86_64.zip`](https://github.com/huaiyizhu/Themis/releases/latest) |
+| **macOS Apple Silicon**（M1/M2/M3/M4） | `Themis-macos-aarch64.zip` |
+| **macOS Intel** | `Themis-macos-x86_64.zip` |
+
+解压后文件夹内已包含 **themis-tray**、**themis-service**、**README.md**、**.env.example**；无需再从二十多个平铺文件里挑选。
+
+| 平台 | 解压后运行 |
+|------|------------|
+| Windows | 进入 `Themis-Windows/`，双击 `themis-tray.exe` |
+| macOS | 进入 `Themis-macOS-Apple-Silicon/`（或 `Intel/`），`chmod +x themis-tray themis-service && xattr -cr . && ./themis-tray` |
+
+> **macOS 提示「已损坏」？** Safari 下载隔离，执行 `xattr -cr .`（在解压后的文件夹内）或见文件夹内 `README.md`。
 
 详见 [README §2 安装与使用](README.md#2-安装与使用release-版)。
 

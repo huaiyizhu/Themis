@@ -1165,11 +1165,24 @@ fn find_service_binary() -> Option<std::path::PathBuf> {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join(name));
+            // Themis.app/Contents/MacOS — service staged beside tray in release builds.
+            if dir.ends_with("MacOS") {
+                if let Some(contents) = dir.parent().and_then(|p| p.parent()) {
+                    if let Some(parent) = contents.parent() {
+                        candidates.push(parent.join(name));
+                    }
+                }
+            }
         }
     }
     if let Ok(cwd) = std::env::current_dir() {
-        for sub in ["target/debug", "target/release", "../../target/debug", "../../target/release"]
-        {
+        candidates.push(cwd.join(name));
+        for sub in [
+            "target/debug",
+            "target/release",
+            "../../target/debug",
+            "../../target/release",
+        ] {
             candidates.push(cwd.join(sub).join(name));
         }
     }

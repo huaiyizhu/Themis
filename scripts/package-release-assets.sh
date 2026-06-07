@@ -23,7 +23,16 @@ copy_binaries() {
     return 1
   fi
   echo "Collecting binaries from: ${release_base}"
+
+  if [[ -x "$(dirname "$0")/stage-release-bundle.sh" ]]; then
+    bash "$(dirname "$0")/stage-release-bundle.sh" "$target" "$out"
+  fi
+
   for pattern in themis-service themis-cli themis-tray; do
+    if [[ "$pattern" == "themis-tray" && -f "${out}/themis-tray" ]]; then
+      echo "Using staged themis-tray from .app bundle"
+      continue
+    fi
     for f in "${release_base}/${pattern}"*; do
       [[ -f "$f" ]] || continue
       case "$f" in *.d) continue ;; esac
@@ -104,6 +113,30 @@ if bundle="$(find_bundle_dir)"; then
   copy_installers "$bundle"
 fi
 
+platform_folder_name() {
+  case "$name" in
+    windows-x86_64) echo "Themis-Windows" ;;
+    macos-aarch64) echo "Themis-macOS-Apple-Silicon" ;;
+    macos-x86_64) echo "Themis-macOS-Intel" ;;
+    *) echo "Themis-${name}" ;;
+  esac
+}
+
+create_platform_zip() {
+  local folder zip_path staging root
+  root="$(cd "$(dirname "$0")/.." && pwd)"
+  folder="$(platform_folder_name)"
+  zip_path="${root}/release-assets/Themis-${name}.zip"
+  staging="$(mktemp -d)"
+
+  mkdir -p "${staging}/${folder}"
+  cp -R "${out}/." "${staging}/${folder}/"
+  rm -f "$zip_path"
+  (cd "$staging" && zip -r "$zip_path" "$folder" -q)
+  rm -rf "$staging"
+  echo "Platform zip: ${zip_path}  →  ${folder}/"
+}
+
 shopt -s nullglob
 files=("$out"/*)
 if ((${#files[@]} == 0)); then
@@ -111,5 +144,8 @@ if ((${#files[@]} == 0)); then
   exit 1
 fi
 
-echo "Release assets (${#files[@]} files):"
+create_platform_zip
+
+echo "Release assets (${#files[@]} files in ${out}/):"
 ls -la "$out"
+ls -la "$(dirname "$out")"/Themis-"${name}".zip

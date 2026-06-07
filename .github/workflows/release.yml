@@ -68,7 +68,7 @@ jobs:
           npm run build
 
       - name: Build Rust release binaries
-        run: cargo build --release -p themis-service -p themis-cli -p themis-tray --target ${{ matrix.target }}
+        run: cargo build --release -p themis-service -p themis-cli --target ${{ matrix.target }}
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
 
@@ -76,8 +76,8 @@ jobs:
         working-directory: apps/themis-tray
         shell: bash
         run: |
-          # bash avoids PowerShell stripping JSON quotes in --config on Windows.
-          npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config '{"build":{"beforeBuildCommand":""}}'
+          cargo clean -p themis-tray --target ${{ matrix.target }}
+          npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$(cat ../../scripts/tauri-release-build.json)"
         env:
           CI: "true"
           RUSTFLAGS: ${{ matrix.rustflags }}
@@ -85,17 +85,19 @@ jobs:
       - name: Package release assets (Unix)
         if: runner.os != 'Windows'
         shell: bash
-        run: bash scripts/package-release-assets.sh "${{ matrix.target }}" "${{ matrix.name }}"
+        run: bash scripts/package-release-assets.sh "${{ matrix.target }}" "${{ matrix.name }}" --flat-names
 
       - name: Package release assets (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/package-release-assets.ps1 -Target "${{ matrix.target }}" -Name "${{ matrix.name }}"
+        run: ./scripts/package-release-assets.ps1 -Target "${{ matrix.target }}" -Name "${{ matrix.name }}" -FlatNames
 
       - uses: actions/upload-artifact@v4
         with:
           name: themis-${{ matrix.name }}
-          path: release-assets/${{ matrix.name }}/
+          path: |
+            release-assets/${{ matrix.name }}/
+            release-assets/Themis-${{ matrix.name }}.zip
           if-no-files-found: error
 
   release:
@@ -109,15 +111,11 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Flatten release assets
+      - name: Prepare release upload
         shell: bash
         run: |
           mkdir -p release-upload
-          find artifacts -type f \
-            ! -name '*.zip' \
-            ! -name '*.tar.gz' \
-            ! -name '*.sig' \
-            -exec cp {} release-upload/ \;
+          find artifacts -name 'Themis-*.zip' -exec cp {} release-upload/ \;
           cp packaging/RELEASE-INDEX.md release-upload/README.md
           echo "Uploading:"
           ls -la release-upload/
@@ -125,4 +123,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: release-upload/*
+          body_path: packaging/RELEASE-INDEX.md
           generate_release_notes: true
