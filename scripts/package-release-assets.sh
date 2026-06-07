@@ -101,6 +101,7 @@ copy_docs() {
   if [[ -f ".env.example" ]]; then
     if ((flat_names)); then
       cp ".env.example" "${out}/.env.example"
+      cp ".env.example" "${out}/env.example"
     else
       cp ".env.example" "${out}/${name}-env.example"
     fi

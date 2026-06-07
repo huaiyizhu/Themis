@@ -29,7 +29,7 @@
 | **themis-tray** / **themis-tray.exe** | ✅ 必需 | 主程序：菜单栏/托盘 + 字幕浮层 |
 | **themis-service** / **themis-service.exe** | ✅ 必需 | 后台：音频采集 + Azure 听写（通常由 tray 自动拉起） |
 | **README.md** | 建议阅读 | 本平台安装与按钮说明 |
-| **.env.example** | 参考 | 配置模板；也可启动后在 tray 里点「配置」 |
+| **env.example** / **.env.example** | 参考 | 配置模板；也可启动后在 tray 里点「配置」 |
 | **themis-cli** / **themis-cli.exe** | 可选 | 命令行诊断：`doctor`、`audio-probe` |
 | **\*-setup.exe**（Windows） | 可选 | NSIS 安装包，与便携版二选一 |
 | **\*.dmg**（macOS） | 可选 | 安装镜像；便携版 `./themis-tray` 更简单 |

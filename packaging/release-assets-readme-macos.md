@@ -1,66 +1,72 @@
-# Themis 本地 Release 包（macOS）
+# Themis macOS 版
 
-本目录由 `./scripts/build-release.sh` 生成，所有文件放在**同一文件夹**即可使用。
+你从 GitHub Releases 下载 **`Themis-macos-aarch64.zip`**（Apple Silicon）或 **`Themis-macos-x86_64.zip`**（Intel），解压后进入 **本文件夹**（`Themis-macOS-Apple-Silicon/` 或 `Themis-macOS-Intel/`）。
+
+本文件夹内文件**已齐全**，无需再去 Release 页单独下载其他附件。
 
 ---
 
-## ⚠️ 从 GitHub / Safari 下载后提示「Themis.app 已损坏」？
+## 本文件夹里有什么
 
-这是 **macOS Gatekeeper** 对未 Apple 公证应用的常见提示，**不是文件损坏**。
+| 文件 | 是否必需 | 说明 |
+|------|----------|------|
+| **themis-tray** | ✅ | 主程序：菜单栏 + 字幕/Insights 浮层（**推荐用这个**） |
+| **themis-service** | ✅ | 后台：音频采集与 Azure 听写（通常由 tray 自动拉起） |
+| **themis-cli** | 可选 | 命令行诊断：`./themis-cli doctor` |
+| **\*.dmg** | 可选 | 安装镜像；与便携版二选一即可 |
+| **env.example** | 参考 | 配置模板（可见文件名） |
+| **.env.example** | 参考 | 同上；Finder 默认**不显示**以 `.` 开头的文件 |
+| **README.md** | — | 本说明 |
 
-**任选一种方式：**
+> **看不到 `.env.example`？** 在 Finder 按 **Cmd+Shift+.** 显示隐藏文件，或直接用 **`env.example`**（内容与 `.env.example` 相同）。
+
+---
+
+## 快速开始（便携版，推荐）
 
 ```bash
-# 方法一：解除隔离（推荐）
-xattr -cr /Applications/Themis.app
-open /Applications/Themis.app
-
-# 方法二：便携版（同一 Release 页下载 themis-tray + themis-service 到同一文件夹）
-cd <下载文件夹>
+cd Themis-macOS-Apple-Silicon   # 或 Themis-macOS-Intel
 chmod +x themis-tray themis-service
-xattr -cr .
-./themis-tray
-```
-
-或在 Finder 中 **右键 Themis.app → 打开 → 再次点打开**。
-
-仓库内也可运行：`./scripts/fix-macos-app-quarantine.sh /Applications/Themis.app`
-
----
-
-## 文件说明与运行方式
-
-| 文件 | 作用 | 如何运行 |
-|------|------|----------|
-| **themis-tray** | 主程序：菜单栏图标 + 字幕/Insights 浮层 | 终端：`chmod +x themis-tray && ./themis-tray`；或双击（若已签名/允许） |
-| **themis-service** | 后台服务：音频采集、Azure 听写、Insights（gRPC） | 通常由 tray 自动拉起；也可先 `./themis-service` 再开 tray |
-| **themis-cli** | 命令行诊断（可选） | `./themis-cli doctor` |
-| **.env.example** | 配置说明与示例（可选参考） | 不必手动复制；见下文 |
-| **README.md** | 本说明 | — |
-| **\*.dmg**（若有） | 安装镜像 | 打开 dmg 拖入「应用程序」 |
-
-**推荐启动：**
-
-```bash
-cd <本目录>
-# 若正在跑 ./scripts/themis.sh tray（开发版），先退出并停止后台 service：
-pkill -x themis-tray 2>/dev/null; pkill -x themis-service 2>/dev/null
-chmod +x themis-tray themis-service themis-cli
+xattr -cr .                     # 解除 Safari 下载隔离
 ./themis-tray
 ```
 
 按 **Cmd+Shift+T** 开始/停止采集。首次需授予**系统音频录制**权限。
 
+若正在跑开发版 `./scripts/themis.sh tray`，先退出并：`pkill -x themis-tray; pkill -x themis-service`
+
 ---
 
-## 配置方式（不必先复制 `.env`）
+## 或使用 .dmg 安装（可选）
 
-1. 启动 **themis-tray** 后，查看浮层底部配置检查：未配置项会标红并提示。
-2. 点击 **「配置」**，填写 Azure Speech / Foundry 字段，**保存并重新加载**（自动写入本目录 `.env`）。
-3. 或：`cp .env.example .env` 后编辑。
+1. 双击本文件夹内的 **`Themis_*.dmg`**
+2. 将 **Themis.app** 拖入「应用程序」
+3. 若提示 **「已损坏，无法打开」**（Gatekeeper，不是文件坏了）：
 
-**至少：** `AZURE_SPEECH_KEY`、`AZURE_SPEECH_REGION`  
-**Insights 建议：** `FOUNDRY_*`
+```bash
+xattr -cr /Applications/Themis.app
+open /Applications/Themis.app
+```
+
+或在 Finder **右键 Themis.app → 打开 → 再次点打开**。
+
+便携版（上一节）通常更简单，不必处理 `.app` 隔离。
+
+---
+
+## 配置 Azure
+
+**不必先手动建 `.env`：**
+
+1. 启动 **themis-tray** 后，看浮层底部配置检查（未配置项会标红）
+2. 点 **「配置」**，填写 Speech / Foundry 字段，**保存并重新加载**（自动写入本目录 `.env`）
+
+也可手动：
+
+```bash
+cp env.example .env    # 或 cp .env.example .env
+# 编辑 AZURE_SPEECH_KEY、AZURE_SPEECH_REGION；Insights 建议配置 FOUNDRY_*
+```
 
 未配置时为 Mock 假字幕。
 
@@ -68,7 +74,6 @@ chmod +x themis-tray themis-service themis-cli
 
 ## 常见问题
 
-- 配置变更后若状态仍不对：退出 Themis 后重新 `./themis-tray`。
-- `./themis-cli doctor` 验证配置。
-
-完整说明见 GitHub 仓库 README。
+- 配置改了仍不对：完全退出后重新 `./themis-tray`
+- 诊断：`./themis-cli doctor`
+- 完整文档：GitHub 仓库 README

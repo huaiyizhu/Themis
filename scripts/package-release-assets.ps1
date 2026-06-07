@@ -37,6 +37,9 @@ function Copy-Docs {
     if (Test-Path ".env.example") {
         $envName = if ($FlatNames) { ".env.example" } else { "$Name-env.example" }
         Copy-Item ".env.example" (Join-Path $out $envName) -Force
+        if ($FlatNames) {
+            Copy-Item ".env.example" (Join-Path $out "env.example") -Force
+        }
     }
 }
 
