@@ -64,7 +64,7 @@ sleep 0.5
 pushd apps/themis-tray >/dev/null
 export CI=true
 cargo clean -p themis-tray --target "$TARGET"
-tauri_cfg="$(cat "$ROOT/scripts/tauri-release-build.json")"
+tauri_cfg="$ROOT/scripts/tauri-release-build.json"
 if [[ "$SKIP_INSTALLER" -eq 1 ]]; then
   echo "  (--skip-installer: no dmg, still building tray)"
   npm run tauri build -- --target "$TARGET" --no-bundle --config "$tauri_cfg"

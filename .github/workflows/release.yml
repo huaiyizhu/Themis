@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           cargo clean -p themis-tray --target ${{ matrix.target }}
-          npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$(cat ../../scripts/tauri-release-build.json)"
+          npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config ../../scripts/tauri-release-build.json
         env:
           CI: "true"
           RUSTFLAGS: ${{ matrix.rustflags }}
