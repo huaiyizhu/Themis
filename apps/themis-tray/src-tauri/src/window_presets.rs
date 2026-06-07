@@ -1,3 +1,4 @@
+use crate::macos_window::ensure_overlay_frameless;
 use serde::Serialize;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewWindow};
 
@@ -207,6 +208,7 @@ fn apply_center_third(window: &WebviewWindow) -> Result<(), String> {
 
 pub fn apply_preset(app: &AppHandle, preset_id: &str) -> Result<String, String> {
     let window = overlay_window(app)?;
+    ensure_overlay_frameless(&window);
 
     if preset_id == "fullscreen" {
         window

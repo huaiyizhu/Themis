@@ -22,6 +22,7 @@
         "minHeight": 160,
         "alwaysOnTop": true,
         "decorations": false,
+        "titleBarStyle": "Overlay",
         "transparent": true,
         "shadow": false,
         "resizable": true,

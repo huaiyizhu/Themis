@@ -8,7 +8,7 @@ mod window_wake;
 #[cfg(windows)]
 mod windows_window;
 
-use macos_window::{apply_overlay_transparency, set_mini_circular_clip};
+use macos_window::{apply_overlay_transparency, ensure_overlay_frameless, set_mini_circular_clip};
 #[cfg(target_os = "macos")]
 use macos_mini_panel::{
     install_panel_app, is_mini_panel_visible, set_accessory_activation_policy,
@@ -1434,6 +1434,7 @@ pub fn run() {
 
             if let Some(w) = app.get_webview_window("overlay") {
                 apply_overlay_transparency(&w);
+                ensure_overlay_frameless(&w);
             }
             #[cfg(target_os = "macos")]
             {

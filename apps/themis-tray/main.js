@@ -276,17 +276,19 @@ const STACK_DIVIDER_HEIGHT = 8;
 const MIDDLE_DIVIDER_WIDTH = 8;
 
 /** Programmatic drag avoids Windows WM_NCHITTEST fighting resize after data-tauri-drag-region. */
+function isToolbarDragBlocked(target) {
+  return Boolean(
+    target.closest(
+      "button, a, input, select, textarea, [role='button'], .header-overflow-menu, .header-segment, .ui-mode-switch, .size-preset-buttons, .size-preset-btn, .header-overflow-wrap",
+    ),
+  );
+}
+
 function setupWindowDrag() {
   if (!dragHandle) return;
   dragHandle.addEventListener("mousedown", async (e) => {
     if (e.button !== 0) return;
-    if (
-      e.target.closest(
-        "button, a, input, select, textarea, [role='button'], .header-toolbar, .header-overflow-menu, .header-overflow-wrap",
-      )
-    ) {
-      return;
-    }
+    if (isToolbarDragBlocked(e.target)) return;
     try {
       await getCurrentWindow().startDragging();
     } catch {

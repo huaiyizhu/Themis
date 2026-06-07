@@ -1,4 +1,4 @@
-use crate::macos_window::{apply_overlay_topmost, apply_overlay_transparency};
+use crate::macos_window::{apply_overlay_topmost, apply_overlay_transparency, ensure_overlay_frameless};
 use crate::overlay_ui::OverlayUiState;
 #[cfg(target_os = "macos")]
 use crate::macos_mini_panel::{hide_mini_panel, refresh_mini_panel, show_mini_panel};
@@ -255,6 +255,7 @@ fn restore_overlay(
     saved: &SavedGeometry,
 ) -> Result<(), String> {
     apply_overlay_transparency(overlay);
+    ensure_overlay_frameless(overlay);
     overlay.set_resizable(true).map_err(|e| e.to_string())?;
     overlay
         .set_max_size(None::<LogicalSize<f32>>)

@@ -257,8 +257,13 @@ body:not(.has-pinned-open) .pinned-panel.is-collapsed {
 }
 
 .toolbar-spacer {
+  cursor: grab;
   flex: 1 1 0;
   min-width: 0;
+}
+
+.toolbar-cluster-brand .brand {
+  cursor: grab;
 }
 
 .header-overflow-wrap {

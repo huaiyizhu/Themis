@@ -213,6 +213,43 @@ pub fn apply_overlay_transparency(window: &WebviewWindow) {
     crate::windows_window::apply_overlay_transparency(window);
 }
 
+/// Borderless overlay chrome — re-apply after presets in case the OS re-enables title bars.
+pub fn ensure_overlay_frameless(window: &WebviewWindow) {
+    let _ = window.set_decorations(false);
+    #[cfg(target_os = "macos")]
+    hide_macos_title_bar(window);
+}
+
+#[cfg(target_os = "macos")]
+const NS_WINDOW_STYLE_MASK_FULL_SIZE_CONTENT_VIEW: u64 = 1 << 15;
+#[cfg(target_os = "macos")]
+const NS_WINDOW_TITLE_HIDDEN: u64 = 1;
+
+#[cfg(target_os = "macos")]
+fn hide_macos_title_bar(window: &WebviewWindow) {
+    let _ = window.run_on_main_thread({
+        let window = window.clone();
+        move || {
+            let Ok(ns_window) = window.ns_window() else {
+                return;
+            };
+            use cocoa::base::{id, YES};
+            use objc::{msg_send, sel, sel_impl};
+
+            unsafe {
+                let ns_window = ns_window as id;
+                let _: () = msg_send![ns_window, setTitlebarAppearsTransparent: YES];
+                let _: () = msg_send![ns_window, setTitleVisibility: NS_WINDOW_TITLE_HIDDEN];
+                let mask: u64 = msg_send![ns_window, styleMask];
+                let _: () = msg_send![
+                    ns_window,
+                    setStyleMask: mask | NS_WINDOW_STYLE_MASK_FULL_SIZE_CONTENT_VIEW
+                ];
+            }
+        }
+    });
+}
+
 #[cfg(target_os = "macos")]
 pub fn set_mini_circular_clip(window: &WebviewWindow, active: bool) {
     let Ok(()) = window.run_on_main_thread({
