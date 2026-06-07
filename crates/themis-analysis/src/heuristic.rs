@@ -40,6 +40,8 @@ static COMMON_WORDS: &[&str] = &[
     "year", "people", "person", "thing", "things", "good", "great", "best", "bad", "nice",
     "really", "very", "think", "know", "want", "need", "look", "looking", "talk", "talking", "said",
     "say", "says", "tell", "told", "going", "went", "come", "came", "right", "left", "back", "next",
+    "content", "validity", "question", "cortana", "shine", "call", "yeah", "hey", "hello", "wait",
+    "show", "tell", "mean", "thing", "stuff", "valid", "new", "old",
 ];
 
 pub fn analyze_heuristic(transcript: &str, localize_zh: bool) -> AnalysisResult {
@@ -67,7 +69,7 @@ pub fn analyze_heuristic(transcript: &str, localize_zh: bool) -> AnalysisResult 
     }
 
     for q in extract_questions(text) {
-        if is_substantive_question(&q) {
+        if is_substantive_question(&q, localize_zh) {
             attach_question(&mut result, &q, localize_zh);
         }
     }
@@ -88,6 +90,9 @@ fn is_tech_shaped(word: &str) -> bool {
     if word.len() < 3 {
         return false;
     }
+    if is_common_word(word) {
+        return false;
+    }
     if word.contains('-') || word.contains('_') {
         return true;
     }
@@ -96,8 +101,66 @@ fn is_tech_shaped(word: &str) -> bool {
     }
     let has_lower = word.chars().any(|c| c.is_ascii_lowercase());
     let has_upper = word.chars().any(|c| c.is_ascii_uppercase());
-    // CamelCase / PascalCase, e.g. ChatGPT, PyTorch
-    has_lower && has_upper
+    // CamelCase / PascalCase, e.g. ChatGPT, PyTorch — require mixed case and length
+    has_lower && has_upper && word.len() >= 5
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{4e00}'..='\u{9fff}' | '\u{3400}'..='\u{4dbf}' | '\u{3000}'..='\u{303f}'
+    )
+}
+
+fn script_ratios(text: &str) -> (f32, f32) {
+    let mut cjk = 0usize;
+    let mut latin = 0usize;
+    let mut meaningful = 0usize;
+    for ch in text.chars() {
+        if ch.is_whitespace() || ch.is_ascii_punctuation() {
+            continue;
+        }
+        meaningful += 1;
+        if is_cjk(ch) {
+            cjk += 1;
+        } else if ch.is_ascii_alphabetic() {
+            latin += 1;
+        }
+    }
+    if meaningful == 0 {
+        return (0.0, 0.0);
+    }
+    (
+        cjk as f32 / meaningful as f32,
+        latin as f32 / meaningful as f32,
+    )
+}
+
+fn is_primarily_latin(text: &str) -> bool {
+    let (cjk, latin) = script_ratios(text);
+    latin >= 0.55 && latin > cjk
+}
+
+fn looks_like_stt_english_noise(q: &str) -> bool {
+    let lower = q.to_lowercase();
+    const NOISE: &[&str] = &[
+        "cortana",
+        "validity",
+        "the question",
+        "are you new",
+        "can i have",
+        "what kind of",
+        "what's the",
+        "what is the",
+        "do you mean",
+        "i don't know",
+        "wait wait",
+        "hey cortana",
+        "call ",
+        "shine",
+        "content嘛",
+    ];
+    NOISE.iter().any(|p| lower.contains(p))
 }
 
 fn add_glossary_hit(result: &mut AnalysisResult, raw: &str, localize_zh: bool) {
@@ -191,13 +254,29 @@ fn contains_technical_signal(text: &str) -> bool {
     false
 }
 
-fn is_substantive_question(q: &str) -> bool {
+fn is_substantive_question(q: &str, localize_zh: bool) -> bool {
     let trimmed = q.trim();
     let q_lower = q.to_lowercase();
     let char_count = trimmed.chars().count();
 
-    if char_count < 6 {
+    if char_count < 6 || char_count > 96 {
         return false;
+    }
+
+    if looks_like_stt_english_noise(trimmed) {
+        return false;
+    }
+
+    if localize_zh && is_primarily_latin(trimmed) {
+        if let Some(subject) = subject_from_question(trimmed) {
+            if glossary::lookup(&subject).is_some() || is_tech_shaped(&subject) {
+                // allow English "what is RAG?" style when subject is technical
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
 
     const RHETORICAL: &[&str] = &[
@@ -220,6 +299,9 @@ fn is_substantive_question(q: &str) -> bool {
         "没问题吧",
         "可以理解吗",
         "听懂没有",
+        "是吧",
+        "嘛是吧",
+        "对吧？",
         "isn't it",
         "don't you",
         "you know",
@@ -256,6 +338,14 @@ fn is_substantive_question(q: &str) -> bool {
 
     if !has_question_marker {
         return false;
+    }
+
+    // Chinese sessions: require at least some CJK unless it's an English tech "what is X"
+    if localize_zh {
+        let (cjk, _) = script_ratios(trimmed);
+        if cjk < 0.08 && subject_from_question(trimmed).is_none() {
+            return false;
+        }
     }
 
     // 「X是什么」/ what is X with a technical subject always counts
@@ -312,43 +402,39 @@ fn is_substantive_question(q: &str) -> bool {
         return true;
     }
 
+    if localize_zh {
+        let (cjk, _) = script_ratios(trimmed);
+        const ZH_QUESTION_CUES: &[&str] = &[
+            "什么", "怎么", "为什么", "为何", "如何", "能否", "可不可以", "是否可以", "例子",
+            "哪些", "哪种", "多少", "谁", "哪里", "吗", "呢",
+        ];
+        if cjk >= 0.35
+            && char_count >= 8
+            && ZH_QUESTION_CUES.iter().any(|m| trimmed.contains(m))
+        {
+            return true;
+        }
+    }
+
     false
 }
 
 fn extract_questions(text: &str) -> Vec<String> {
     let mut out = Vec::new();
 
-    for cap in ZH_X_IS_WHAT_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            push_unique(&mut out, m.as_str());
-        }
-    }
-    for cap in ZH_WHAT_IS_X_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            push_unique(&mut out, m.as_str());
-        }
-    }
-    for cap in EN_WHAT_IS_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            push_unique(&mut out, m.as_str());
-        }
-    }
-    for cap in QUESTION_ZH_RE.find_iter(text) {
-        push_unique(&mut out, cap.as_str());
-    }
-    for cap in QUESTION_EN_RE.captures_iter(text) {
-        if let Some(m) = cap.get(1) {
-            push_unique(&mut out, m.as_str());
-        }
-    }
-    let trimmed = text.trim();
-    if (trimmed.ends_with('?') || trimmed.ends_with('？')) && trimmed.len() >= 4 {
-        let whole = trim_question_leading_filler(trimmed);
-        if whole.chars().count() <= 96 {
-            push_unique(&mut out, &whole);
-        } else if let Some(core) = core_question_span(trimmed) {
-            push_unique(&mut out, &core);
-        }
+    let segments: Vec<&str> = text
+        .split(['\n', '。'])
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    let segments = if segments.is_empty() {
+        vec![text.trim()]
+    } else {
+        segments
+    };
+
+    for segment in segments {
+        extract_questions_from_segment(segment, &mut out);
     }
 
     out.iter_mut()
@@ -356,6 +442,41 @@ fn extract_questions(text: &str) -> Vec<String> {
     out.retain(|q| themis_core::question_in_transcript(q, text));
     out.truncate(4);
     out
+}
+
+fn extract_questions_from_segment(text: &str, out: &mut Vec<String>) {
+    for cap in ZH_X_IS_WHAT_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            push_unique(out, m.as_str());
+        }
+    }
+    for cap in ZH_WHAT_IS_X_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            push_unique(out, m.as_str());
+        }
+    }
+    for cap in EN_WHAT_IS_RE.captures_iter(text) {
+        if let Some(m) = cap.get(0) {
+            push_unique(out, m.as_str());
+        }
+    }
+    for cap in QUESTION_ZH_RE.find_iter(text) {
+        push_unique(out, cap.as_str());
+    }
+    for cap in QUESTION_EN_RE.captures_iter(text) {
+        if let Some(m) = cap.get(1) {
+            push_unique(out, m.as_str());
+        }
+    }
+    let trimmed = text.trim();
+    if (trimmed.ends_with('?') || trimmed.ends_with('？')) && trimmed.len() >= 4 {
+        let whole = trim_question_leading_filler(trimmed);
+        if whole.chars().count() <= 96 {
+            push_unique(out, &whole);
+        } else if let Some(core) = core_question_span(trimmed) {
+            push_unique(out, &core);
+        }
+    }
 }
 
 fn trim_question_leading_filler(s: &str) -> String {
@@ -540,6 +661,26 @@ mod tests {
         );
         assert!(
             !r.questions.iter().any(|q| q.question.starts_with("那么")),
+            "questions: {:?}",
+            r.questions
+        );
+    }
+
+    #[test]
+    fn rejects_stt_english_garbage_questions() {
+        let r = analyze_heuristic("Are you new Cortana?", true);
+        assert!(r.questions.is_empty(), "questions: {:?}", r.questions);
+        let r2 = analyze_heuristic("Can I have a validity?", true);
+        assert!(r2.questions.is_empty(), "questions: {:?}", r2.questions);
+        let r3 = analyze_heuristic("The question what's the?", true);
+        assert!(r3.questions.is_empty(), "questions: {:?}", r3.questions);
+    }
+
+    #[test]
+    fn keeps_chinese_interview_question() {
+        let r = analyze_heuristic("那你能举一个例子吗？比如说你们这个产品。", true);
+        assert!(
+            r.questions.iter().any(|q| q.question.contains("举一个例子")),
             "questions: {:?}",
             r.questions
         );

@@ -1210,15 +1210,48 @@ function questionInCommittedTranscript(question) {
   return committedLines.some((line) => questionInTranscriptLine(question, line.text));
 }
 
+function termInTranscriptLine(term, line) {
+  const key = normalizeTranscriptMatch(term);
+  const t = normalizeTranscriptMatch(line);
+  return key.length >= 2 && t.includes(key);
+}
+
+function termInCommittedTranscript(term) {
+  if (termInTranscriptLine(term, partialText)) return true;
+  return committedLines.some((line) => termInTranscriptLine(term, line.text));
+}
+
 function filterInsightsToSourceLine(insights, sourceLine) {
-  if (!insights?.questions?.length) return insights;
-  const questions = insights.questions.filter(
-    (q) =>
-      questionInTranscriptLine(q.question, sourceLine) ||
-      questionInCommittedTranscript(q.question),
-  );
-  if (questions.length === insights.questions.length) return insights;
-  return { ...insights, questions };
+  if (!insights) return insights;
+  let changed = false;
+  let questions = insights.questions;
+  let terms = insights.terms;
+
+  if (questions?.length) {
+    const filtered = questions.filter(
+      (q) =>
+        questionInTranscriptLine(q.question, sourceLine) ||
+        questionInCommittedTranscript(q.question),
+    );
+    if (filtered.length !== questions.length) {
+      questions = filtered;
+      changed = true;
+    }
+  }
+
+  if (terms?.length) {
+    const filtered = terms.filter(
+      (t) =>
+        termInTranscriptLine(t.term, sourceLine) || termInCommittedTranscript(t.term),
+    );
+    if (filtered.length !== terms.length) {
+      terms = filtered;
+      changed = true;
+    }
+  }
+
+  if (!changed) return insights;
+  return { ...insights, questions: questions ?? [], terms: terms ?? [] };
 }
 
 function renderInsights(insights) {

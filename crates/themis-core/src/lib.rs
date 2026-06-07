@@ -11,10 +11,11 @@ mod pipeline;
 mod state;
 
 pub use analysis::{
-    finalize_question_answers, is_placeholder_answer, question_in_transcript,
-    questions_match, retain_questions_in_transcript, AnalysisContext,
-    AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis, QuestionInsight,
-    TermInsight,
+    finalize_question_answers, is_placeholder_answer, keyword_in_transcript,
+    question_in_transcript, questions_match, retain_keywords_in_transcript,
+    retain_questions_in_transcript, retain_terms_in_transcript, term_in_transcript,
+    AnalysisContext, AnalysisDetail, AnalysisMeta, AnalysisProvider, AnalysisResult, NoopAnalysis,
+    QuestionInsight, TermInsight,
 };
 pub use analysis_prefs::AnalysisPrefs;
 pub use analysis_diag::{

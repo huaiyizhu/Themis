@@ -292,15 +292,10 @@ impl LlmAnalyzer {
 }
 
 fn build_analysis_system_prompt(localize_zh: bool, has_detected_questions: bool) -> String {
-    let lang = if localize_zh {
-        "Each explanation and answer MUST be in Chinese (简体中文), 1-3 short sentences, covering when possible: \
-主要用途、核心作用、常见用法/场景、一个简短例子. Keep the original term/question wording from the transcript when possible, \
-but explain in Chinese. \
-Answers: 2-4 sentences in Chinese, factual."
+    let answers_lang = if localize_zh {
+        "Answers MUST be in Chinese (简体中文), 2-4 short factual sentences grounded in the phrase/context."
     } else {
-        "Keep term names and question text in the SAME language as the transcript (do NOT translate English to Chinese). \
-Write explanations and answers in the same language as the source phrase (English in → English out). \
-2-4 concise sentences, factual."
+        "Answers must use the same language as the transcript (English in → English out), 2-4 concise sentences."
     };
 
     let questions_rule = if has_detected_questions {
@@ -328,11 +323,10 @@ technical domains. Include acronyms and product/framework names when domain-spec
 Kubernetes). EXCLUDE generic daily words, sports/entertainment, people's names, places, and obvious \
 business buzzwords without technical meaning. \
 \
-TERMS (max 6): Only jargon that a general audience would NOT already understand well — e.g. RLHF, MoE, \
-KV cache, embedding space, retrieval reranking. {lang} \
-EXCLUDE trivial abbreviations everyone knows (API, CPU, WiFi) unless used in a non-obvious technical sense. \
+TERMS: Return an empty terms array. Term cards come only from the transcript/glossary pipeline, not from LLM inference. \
 \
 QUESTIONS (max 3): {questions_rule} \
+{answers_lang} \
 EXCLUDE rhetorical questions (对吧/是不是/right?), yes/no confirmations, small talk. \
 If nothing meets this bar, return an empty questions array."
     )

@@ -48,11 +48,16 @@ impl AnalysisResult {
         }
     }
 
-    /// Merge LLM keywords/terms and attach LLM answers to existing transcript questions.
-    /// Question text always stays verbatim from the transcript (heuristic extraction); LLM
-    /// must not add or rephrase questions.
-    pub fn merge_llm_supplement(&mut self, other: &AnalysisResult) {
-        self.merge_keywords_and_terms(other);
+    /// Attach LLM answers to transcript questions; optionally add keywords that literally
+    /// appear in the phrase. LLM must not add/rephrase questions or invent terms.
+    pub fn merge_llm_supplement(&mut self, other: &AnalysisResult, transcript: &str) {
+        for kw in &other.keywords {
+            if keyword_in_transcript(kw, transcript)
+                && !self.keywords.iter().any(|k| k.eq_ignore_ascii_case(kw))
+            {
+                self.keywords.push(kw.clone());
+            }
+        }
         attach_llm_question_answers(&mut self.questions, &other.questions);
     }
 
@@ -185,6 +190,31 @@ pub fn retain_questions_in_transcript(result: &mut AnalysisResult, transcript: &
         .retain(|q| question_in_transcript(&q.question, transcript));
 }
 
+pub fn keyword_in_transcript(keyword: &str, transcript: &str) -> bool {
+    let k = normalize_transcript_match(keyword);
+    let t = normalize_transcript_match(transcript);
+    if k.chars().count() < 2 || t.is_empty() {
+        return false;
+    }
+    t.contains(&k)
+}
+
+pub fn term_in_transcript(term: &str, transcript: &str) -> bool {
+    keyword_in_transcript(term, transcript)
+}
+
+pub fn retain_terms_in_transcript(result: &mut AnalysisResult, transcript: &str) {
+    result
+        .terms
+        .retain(|t| term_in_transcript(&t.term, transcript));
+}
+
+pub fn retain_keywords_in_transcript(result: &mut AnalysisResult, transcript: &str) {
+    result
+        .keywords
+        .retain(|k| keyword_in_transcript(k, transcript));
+}
+
 pub fn is_placeholder_answer(answer: &str) -> bool {
     let a = answer.trim();
     a.contains("FOUNDRY")
@@ -311,10 +341,34 @@ mod merge_tests {
             ],
             ..Default::default()
         };
-        base.merge_llm_supplement(&llm);
+        base.merge_llm_supplement(&llm, "What is RAG?");
         assert_eq!(base.questions.len(), 1);
         assert_eq!(base.questions[0].question, "What is RAG?");
         assert!(base.questions[0].answer.contains("retrieves"));
+    }
+
+    #[test]
+    fn merge_llm_supplement_drops_invented_terms() {
+        let mut base = AnalysisResult {
+            terms: vec![TermInsight {
+                term: "RAG".into(),
+                explanation: "from glossary".into(),
+            }],
+            ..Default::default()
+        };
+        let llm = AnalysisResult {
+            terms: vec![TermInsight {
+                term: "危险建模".into(),
+                explanation: "LLM encyclopedia entry".into(),
+            }],
+            keywords: vec!["RAG".into(), "invented-kw".into()],
+            ..Default::default()
+        };
+        base.merge_llm_supplement(&llm, "What is RAG?");
+        assert_eq!(base.terms.len(), 1);
+        assert_eq!(base.terms[0].term, "RAG");
+        assert!(base.keywords.iter().any(|k| k == "RAG"));
+        assert!(!base.keywords.iter().any(|k| k == "invented-kw"));
     }
 
     #[test]

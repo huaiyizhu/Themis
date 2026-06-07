@@ -48,7 +48,7 @@ impl AnalysisProvider for CompositeAnalyzer {
                         "ok".into()
                     };
                     llm_out = Some(llm_result.clone());
-                    merged.merge_llm_supplement(&llm_result);
+                    merged.merge_llm_supplement(&llm_result, transcript);
                 }
                 Ok(Ok(None)) => {
                     llm_ms = Some(l0.elapsed().as_millis() as u32);
@@ -76,6 +76,8 @@ impl AnalysisProvider for CompositeAnalyzer {
         );
 
         themis_core::retain_questions_in_transcript(&mut merged, transcript);
+        themis_core::retain_terms_in_transcript(&mut merged, transcript);
+        themis_core::retain_keywords_in_transcript(&mut merged, transcript);
 
         if merged.is_empty() {
             return Ok(None);
