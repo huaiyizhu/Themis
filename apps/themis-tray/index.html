@@ -21,59 +21,78 @@
     </div>
     <div id="overlay" class="theme-dark-glass">
       <header id="drag-handle" class="overlay-header header-compact" data-tip="拖动标题栏移动窗口">
-        <div class="header-compact-row">
-          <div class="header-brand-block">
-            <span class="brand">Themis</span>
-            <span id="theme-badge" class="theme-badge hidden" data-tip="主题与样式" hidden>dark</span>
+        <div class="header-toolbar">
+          <div class="header-row header-row-main">
+            <div class="toolbar-cluster toolbar-cluster-brand">
+              <span class="brand">Themis</span>
+              <span id="theme-badge" class="theme-badge hidden" data-tip="主题与样式" hidden>dark</span>
+              <div class="ui-mode-switch" role="group" aria-label="界面模式">
+                <button type="button" class="ui-mode-btn is-active" data-ui-mode="meeting" aria-pressed="true">
+                  开会
+                </button>
+                <button type="button" class="ui-mode-btn" data-ui-mode="glance" aria-pressed="false">看课</button>
+              </div>
+            </div>
+            <span class="toolbar-divider" aria-hidden="true"></span>
+            <div class="toolbar-cluster toolbar-cluster-session">
+              <button type="button" id="toggle-capture" class="header-btn header-btn-accent capture-btn">捕捉</button>
+              <button type="button" id="export-transcript" class="header-btn header-btn-sm export-btn">字幕</button>
+              <button type="button" id="export-insights" class="header-btn header-btn-sm export-btn">洞察</button>
+              <button type="button" id="clear-session" class="header-btn header-btn-sm clear-session">清空</button>
+            </div>
+            <span class="toolbar-divider" aria-hidden="true"></span>
+            <div class="toolbar-cluster toolbar-cluster-tools" data-toolbar-slot="tools">
+              <button type="button" id="toggle-mini" class="header-btn header-btn-sm mini-toggle">浮</button>
+              <button
+                type="button"
+                id="toggle-topmost"
+                class="header-btn header-btn-sm topmost-btn header-btn-icon is-topmost"
+                aria-label="窗口置顶"
+                aria-pressed="true"
+              >
+                <svg class="topmost-pin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v7h1.6v-7H18v-2l-2-2z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+              <button type="button" id="toggle-diagnose" class="header-btn header-btn-sm diagnose-btn" aria-pressed="false">诊断</button>
+              <button type="button" id="toggle-settings" class="header-btn header-btn-sm settings-btn" aria-pressed="false">配置</button>
+              <button type="button" id="scroll-latest" class="header-btn header-btn-sm scroll-latest hidden">↓</button>
+            </div>
+            <span class="toolbar-spacer" aria-hidden="true"></span>
+            <div class="toolbar-cluster-pinned-end">
+              <div class="toolbar-cluster toolbar-cluster-window" data-toolbar-slot="window">
+                <button type="button" id="hide-overlay" class="header-btn header-btn-sm hide-window">隐藏</button>
+                <button type="button" id="quit-app" class="header-btn header-btn-sm quit-btn">退出</button>
+              </div>
+              <div class="header-overflow-wrap">
+                <button
+                  type="button"
+                  id="header-overflow-toggle"
+                  class="header-btn header-btn-sm header-overflow-toggle hidden"
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-label="更多操作"
+                >
+                  ⋯
+                </button>
+                <div id="header-overflow-menu" class="header-overflow-menu hidden" role="menu" aria-label="更多操作"></div>
+              </div>
+            </div>
           </div>
-          <div class="ui-mode-switch" role="group" aria-label="界面模式">
-            <button type="button" class="ui-mode-btn is-active" data-ui-mode="meeting" aria-pressed="true">
-              开会
-            </button>
-            <button type="button" class="ui-mode-btn" data-ui-mode="glance" aria-pressed="false">看课</button>
-          </div>
-          <span class="header-compact-spacer" aria-hidden="true"></span>
-          <button type="button" id="toggle-capture" class="header-btn capture-btn">捕捉</button>
-          <button type="button" id="toggle-mini" class="header-btn mini-toggle">浮</button>
-          <button
-            type="button"
-            id="toggle-topmost"
-            class="header-btn topmost-btn header-btn-icon is-topmost"
-            aria-label="窗口置顶"
-            aria-pressed="true"
-          >
-            <svg class="topmost-pin-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path
-                d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v7h1.6v-7H18v-2l-2-2z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-          <div class="header-overflow-wrap">
-            <button
-              type="button"
-              id="header-overflow-toggle"
-              class="header-btn overflow-toggle"
-              aria-expanded="false"
-              aria-haspopup="true"
-            >
-              ⋯
-            </button>
-            <div id="header-overflow-menu" class="header-overflow-menu hidden" role="menu" aria-label="更多操作">
-              <button type="button" id="toggle-diagnose" class="header-btn diagnose-btn" aria-pressed="false">诊断</button>
-              <button type="button" id="toggle-settings" class="header-btn settings-btn" aria-pressed="false">配置</button>
-              <button type="button" id="toggle-localize" class="header-btn localize-btn is-localized" aria-pressed="true">
+          <div class="header-row header-row-tune">
+            <div class="toolbar-tune-items" data-toolbar-slot="tune">
+              <button type="button" id="toggle-localize" class="header-btn header-btn-sm localize-btn is-localized" aria-pressed="true">
                 中文
               </button>
-              <button type="button" id="clear-session" class="header-btn clear-session">清空</button>
-              <button type="button" id="export-transcript" class="header-btn export-btn">导出字幕</button>
-              <button type="button" id="export-insights" class="header-btn export-btn">导出问题术语</button>
-              <div class="header-segment" role="group" aria-label="窗口透明度">
+              <div class="header-segment" id="opacity-segment" role="group" aria-label="窗口透明度">
                 <span class="header-segment-label" aria-hidden="true">透</span>
                 <button type="button" id="opacity-down" class="header-segment-step" aria-label="降低透明度">−</button>
                 <button type="button" id="opacity-up" class="header-segment-step" aria-label="提高透明度">+</button>
               </div>
-              <div class="header-segment" role="group" aria-label="文字大小">
+              <div class="header-segment" id="font-segment" role="group" aria-label="文字大小">
                 <span class="header-segment-label" aria-hidden="true">字</span>
                 <button type="button" id="font-down" class="header-segment-step" aria-label="缩小字号">−</button>
                 <button type="button" id="font-up" class="header-segment-step" aria-label="放大字号">+</button>
@@ -81,17 +100,12 @@
                   ↺
                 </button>
               </div>
-              <div class="size-presets" id="size-presets">
-                <button type="button" id="size-toggle" class="header-btn size-toggle" aria-expanded="false" aria-haspopup="true">
-                  尺寸
-                </button>
-                <div id="size-menu" class="size-menu hidden" role="menu" aria-label="窗口尺寸"></div>
-              </div>
-              <button type="button" id="hide-overlay" class="header-btn hide-window">隐藏</button>
-              <button type="button" id="quit-app" class="header-btn quit-btn">退出</button>
+            </div>
+            <div class="header-segment size-presets-bar" id="size-presets" role="group" aria-label="窗口尺寸">
+              <span class="header-segment-label" aria-hidden="true">尺</span>
+              <div id="size-preset-buttons" class="size-preset-buttons"></div>
             </div>
           </div>
-          <button type="button" id="scroll-latest" class="header-btn scroll-latest hidden">↓ 最新</button>
         </div>
       </header>
       <p id="status" class="status-line">Connecting…</p>

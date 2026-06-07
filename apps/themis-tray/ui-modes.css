@@ -1,10 +1,5 @@
 /* UI modes: meeting (default) + glance */
 
-body.ui-mode-meeting .header-row-secondary,
-body.ui-mode-meeting .header-legacy-secondary {
-  display: none !important;
-}
-
 body.ui-mode-meeting.config-ok #config-status {
   display: none;
 }
@@ -201,15 +196,367 @@ body:not(.has-pinned-open) .pinned-panel.is-collapsed {
   margin-top: 4px;
 }
 
-/* Compact header */
-.header-compact-row {
+/* Compact header — grouped toolbar rows */
+.header-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 6px 4px;
+  width: 100%;
+}
+
+.header-row {
   align-items: center;
   display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 8px;
+  gap: 0;
+  min-height: 28px;
   width: 100%;
+}
+
+.header-row-main {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  padding-top: 4px;
+}
+
+.header-row-tune {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-height: 26px;
+  overflow: hidden;
+  padding-top: 3px;
+}
+
+.toolbar-tune-items {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.toolbar-divider-window {
+  flex-shrink: 0;
+}
+
+.toolbar-cluster-pinned-end {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.toolbar-cluster-brand,
+.toolbar-cluster-session,
+.toolbar-cluster-tools {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.toolbar-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.header-overflow-wrap {
+  flex-shrink: 0;
+  overflow: visible;
+  padding-left: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.toolbar-cluster-pinned-end .toolbar-cluster-window {
+  padding-right: 0;
+}
+
+.header-overflow-toggle {
+  font-size: calc(14px * var(--font-scale, 1));
+  line-height: 1;
+  min-width: 26px;
+  padding: 1px 7px;
+}
+
+.header-overflow-toggle.hidden {
+  display: none;
+}
+
+.header-overflow-menu {
+  background: rgba(14, 14, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  color: #f4f4fa;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 70vh;
+  min-width: 156px;
+  overflow-y: auto;
+  padding: 7px;
+  pointer-events: auto;
+  z-index: 1000;
+}
+
+.header-overflow-menu.hidden {
+  display: none;
+}
+
+.header-overflow-menu .header-btn {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: #f8f8fc;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 550;
+  justify-content: flex-start;
+  line-height: 1.3;
+  min-height: 30px;
+  padding: 6px 11px;
+  width: 100%;
+}
+
+.header-overflow-menu .header-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.header-overflow-menu .header-btn.diagnose-btn.is-open,
+.header-overflow-menu .header-btn.settings-btn.is-open {
+  background: rgba(140, 170, 255, 0.28);
+  border-color: rgba(160, 190, 255, 0.55);
+  color: #fff;
+}
+
+.header-overflow-menu .header-btn.quit-btn:hover {
+  background: rgba(255, 110, 90, 0.32);
+  border-color: rgba(255, 130, 110, 0.55);
+  color: #fff;
+}
+
+.header-overflow-menu .header-segment {
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: #f8f8fc;
+  display: flex;
+  width: 100%;
+}
+
+.header-overflow-menu .header-segment-label,
+.header-overflow-menu .header-segment-step {
+  color: #f8f8fc;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 550;
+}
+
+.header-overflow-menu .header-segment-step {
+  min-height: 28px;
+  min-width: 28px;
+}
+
+.header-overflow-menu .header-segment-step:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.header-overflow-menu .topmost-pin-icon {
+  opacity: 1;
+}
+
+.theme-light-glass .header-overflow-menu,
+.theme-solid-light .header-overflow-menu,
+.theme-paper .header-overflow-menu,
+.theme-cream .header-overflow-menu,
+.theme-high-contrast-light .header-overflow-menu {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    0 12px 36px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.04) inset;
+  color: #101018;
+}
+
+.theme-light-glass .header-overflow-menu .header-btn,
+.theme-solid-light .header-overflow-menu .header-btn,
+.theme-paper .header-overflow-menu .header-btn,
+.theme-cream .header-overflow-menu .header-btn,
+.theme-high-contrast-light .header-overflow-menu .header-btn,
+.theme-light-glass .header-overflow-menu .header-segment,
+.theme-solid-light .header-overflow-menu .header-segment,
+.theme-paper .header-overflow-menu .header-segment,
+.theme-cream .header-overflow-menu .header-segment,
+.theme-high-contrast-light .header-overflow-menu .header-segment {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #101018;
+}
+
+.theme-light-glass .header-overflow-menu .header-btn:hover,
+.theme-solid-light .header-overflow-menu .header-btn:hover,
+.theme-paper .header-overflow-menu .header-btn:hover,
+.theme-cream .header-overflow-menu .header-btn:hover,
+.theme-high-contrast-light .header-overflow-menu .header-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.24);
+  color: #000;
+}
+
+.theme-light-glass .header-overflow-menu .header-segment-label,
+.theme-solid-light .header-overflow-menu .header-segment-label,
+.theme-paper .header-overflow-menu .header-segment-label,
+.theme-cream .header-overflow-menu .header-segment-label,
+.theme-high-contrast-light .header-overflow-menu .header-segment-label,
+.theme-light-glass .header-overflow-menu .header-segment-step,
+.theme-solid-light .header-overflow-menu .header-segment-step,
+.theme-paper .header-overflow-menu .header-segment-step,
+.theme-cream .header-overflow-menu .header-segment-step,
+.theme-high-contrast-light .header-overflow-menu .header-segment-step {
+  color: #101018;
+}
+
+.toolbar-cluster {
+  align-items: center;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+  padding: 0 4px;
+}
+
+.toolbar-cluster-brand {
+  gap: 6px;
+  padding-left: 0;
+}
+
+.toolbar-cluster-brand .brand {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.toolbar-divider {
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  margin: 5px 3px;
+  width: 1px;
+}
+
+.header-btn.header-btn-sm {
+  font-size: calc(10px * var(--font-scale, 1));
+  line-height: 1.2;
+  min-height: 22px;
+  padding: 1px 6px;
+}
+
+.header-btn.header-btn-accent {
+  font-weight: 650;
+  padding: 1px 9px;
+}
+
+.header-btn.header-btn-sm.topmost-btn.header-btn-icon {
+  min-height: 22px;
+  padding: 1px 5px;
+  width: 24px;
+}
+
+.header-row-tune .header-segment {
+  flex-shrink: 0;
+}
+
+.header-row-tune .header-segment-label {
+  font-size: calc(9px * var(--font-scale, 1));
+  min-width: 1.1em;
+  padding: 0 4px;
+}
+
+.header-row-tune .header-segment-step {
+  font-size: calc(10px * var(--font-scale, 1));
+  min-width: 20px;
+  padding: 0 5px;
+}
+
+.size-presets-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.size-presets-bar .header-segment-label {
+  flex-shrink: 0;
+}
+
+.size-preset-buttons {
+  align-items: center;
+  display: inline-flex;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  gap: 1px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.size-preset-buttons::-webkit-scrollbar {
+  display: none;
+}
+
+.size-preset-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: calc(9px * var(--font-scale, 1));
+  line-height: 1.2;
+  min-width: 1.4em;
+  opacity: 0.88;
+  padding: 2px 5px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.size-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 1;
+}
+
+.size-preset-btn.is-active {
+  background: rgba(120, 160, 255, 0.32);
+  color: #c8dcff;
+  font-weight: 650;
+  opacity: 1;
+}
+
+.theme-light-glass .header-row-tune,
+.theme-solid-light .header-row-tune,
+.theme-paper .header-row-tune,
+.theme-cream .header-row-tune,
+.theme-high-contrast-light .header-row-tune {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+.theme-light-glass .toolbar-divider,
+.theme-solid-light .toolbar-divider,
+.theme-paper .toolbar-divider,
+.theme-cream .toolbar-divider,
+.theme-high-contrast-light .toolbar-divider {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.theme-light-glass .size-preset-btn.is-active,
+.theme-solid-light .size-preset-btn.is-active,
+.theme-paper .size-preset-btn.is-active,
+.theme-cream .size-preset-btn.is-active,
+.theme-high-contrast-light .size-preset-btn.is-active {
+  background: rgba(0, 80, 160, 0.12);
+  color: #005a8c;
 }
 
 .ui-mode-switch {
@@ -243,76 +590,12 @@ body:not(.has-pinned-open) .pinned-panel.is-collapsed {
   min-width: 4px;
 }
 
-.header-overflow-wrap {
-  position: relative;
-}
-
 .header-btn,
 .ui-mode-btn,
 .summary-toggle-bar,
 .insight-more-btn,
 .insight-level-btn {
   pointer-events: auto;
-}
-
-.header-overflow-menu {
-  background: rgba(22, 22, 30, 0.98);
-  pointer-events: auto;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 70vh;
-  min-width: 168px;
-  overflow-y: auto;
-  padding: 6px;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 50;
-}
-
-.header-overflow-menu.hidden {
-  display: none;
-}
-
-.header-overflow-menu .header-btn,
-.header-overflow-menu .header-segment {
-  justify-content: flex-start;
-  width: 100%;
-}
-
-.header-overflow-menu .size-presets {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: 100%;
-}
-
-.header-overflow-menu .size-menu {
-  border-radius: 6px;
-  box-shadow: none;
-  margin-top: 0;
-  max-height: none;
-  min-width: 0;
-  position: static;
-  width: 100%;
-}
-
-.header-overflow-menu .size-menu-item {
-  width: 100%;
-}
-
-.theme-light-glass .header-overflow-menu,
-.theme-solid-light .header-overflow-menu,
-.theme-paper .header-overflow-menu,
-.theme-cream .header-overflow-menu,
-.theme-high-contrast-light .header-overflow-menu {
-  background: rgba(255, 255, 255, 0.98);
-  border-color: rgba(0, 0, 0, 0.12);
-  color: #121218;
 }
 
 /* Meeting panels */

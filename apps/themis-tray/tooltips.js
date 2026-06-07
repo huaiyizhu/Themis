@@ -53,6 +53,14 @@ export function dismissTooltip() {
   hideTip();
 }
 
+function isTipDisabled(el) {
+  if (!el) return true;
+  // ⋯ 本身不需要 tooltip（会挡住下拉菜单）
+  if (el.id === "header-overflow-toggle" || el.closest?.("#header-overflow-toggle")) return true;
+  if (el.closest?.("[data-no-tip]")) return true;
+  return false;
+}
+
 function hideTip() {
   clearTimeout(showTimer);
   showTimer = null;
@@ -91,27 +99,6 @@ function positionTip(el, bubble) {
     "is-actions-below",
   );
 
-  const overflowMenu = el.closest?.("#header-overflow-menu");
-  if (overflowMenu) {
-    const menuRect = overflowMenu.getBoundingClientRect();
-    const halfH = bh / 2;
-    let top = rect.top + rect.height / 2;
-    top = Math.max(margin + halfH, Math.min(top, window.innerHeight - margin - halfH));
-
-    const leftAnchor = menuRect.left - margin;
-    if (leftAnchor - bw >= margin) {
-      bubble.classList.add("is-menu-side-left");
-      bubble.style.left = `${leftAnchor}px`;
-      bubble.style.top = `${top}px`;
-      return;
-    }
-
-    bubble.classList.add("is-menu-side-right");
-    bubble.style.left = `${menuRect.right + margin}px`;
-    bubble.style.top = `${top}px`;
-    return;
-  }
-
   const actionsRow = el.closest?.(".insight-actions-row");
   if (actionsRow) {
     const rowRect = actionsRow.getBoundingClientRect();
@@ -143,6 +130,26 @@ function positionTip(el, bubble) {
     const half = bw / 2;
     left = Math.max(margin + half, Math.min(left, window.innerWidth - margin - half));
     bubble.style.left = `${left}px`;
+    bubble.style.top = `${top}px`;
+    return;
+  }
+
+  const overflowMenu = el.closest?.(".header-overflow-menu");
+  if (overflowMenu) {
+    const menuRect = overflowMenu.getBoundingClientRect();
+    let top = rect.top + rect.height / 2;
+    const halfH = bh / 2;
+    top = Math.max(margin + halfH, Math.min(top, window.innerHeight - margin - halfH));
+
+    if (menuRect.left - margin - bw >= margin) {
+      bubble.classList.add("is-menu-side-left");
+      bubble.style.left = `${menuRect.left - margin}px`;
+      bubble.style.top = `${top}px`;
+      return;
+    }
+
+    bubble.classList.add("is-menu-side-right");
+    bubble.style.left = `${menuRect.right + margin}px`;
     bubble.style.top = `${top}px`;
     return;
   }
@@ -188,8 +195,9 @@ export function initTooltips() {
     "mouseover",
     (e) => {
       const el = e.target.closest?.("[data-tip]");
-      if (!el) {
+      if (!el || isTipDisabled(el)) {
         if (tipTarget) hideTip();
+        clearTimeout(showTimer);
         return;
       }
       if (el === tipTarget) return;
@@ -227,9 +235,16 @@ export function initTooltips() {
   document.addEventListener(
     "mousedown",
     (e) => {
-      if (!tipTarget) return;
-      if (e.target.closest?.("[data-tip]") === tipTarget) return;
-      hideTip();
+      clearTimeout(showTimer);
+      if (e.target.closest?.("#header-overflow-toggle")) {
+        hideTip();
+        return;
+      }
+      if (e.target.closest?.("[data-tip]")) {
+        hideTip();
+        return;
+      }
+      if (tipTarget) hideTip();
     },
     true,
   );

@@ -447,7 +447,7 @@ body.adaptive-on .theme-badge::after {
 }
 
 .header-actions-primary {
-  max-width: 55%;
+  max-width: none;
 }
 
 .header-actions-secondary {

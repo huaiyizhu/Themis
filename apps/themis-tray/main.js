@@ -7,9 +7,9 @@ import {
   applyCaptureStatusPending,
 } from "./capture-status.js";
 import { initTooltips, setTip, tipWithHotkey, hotkey } from "./tooltips.js";
+import { initToolbarOverflow, reflowToolbarOverflow } from "./toolbar-overflow.js";
 import {
   clearDismissedTerms,
-  initHeaderOverflow,
   initPinnedCollapse,
   initSummaryCollapse,
   initUiModeSwitch,
@@ -57,9 +57,7 @@ const toggleTopmostBtn = document.getElementById("toggle-topmost");
 const hideOverlayBtn = document.getElementById("hide-overlay");
 const quitAppBtn = document.getElementById("quit-app");
 const miniFloaterEl = document.getElementById("mini-floater");
-const sizePresetsEl = document.getElementById("size-presets");
-const sizeToggleBtn = document.getElementById("size-toggle");
-const sizeMenuEl = document.getElementById("size-menu");
+const sizePresetButtonsEl = document.getElementById("size-preset-buttons");
 const toggleTranscriptBtn = document.getElementById("toggle-transcript");
 const opacityDownBtn = document.getElementById("opacity-down");
 const opacityUpBtn = document.getElementById("opacity-up");
@@ -75,6 +73,7 @@ const OPACITY_STEP = 0.05;
 const FONT_SCALE_STEP = 0.1;
 
 initTooltips();
+initToolbarOverflow();
 
 /** @type {object | null} */
 let insightUiCtx = null;
@@ -98,8 +97,6 @@ function removeQuestionsByKey(question) {
 }
 
 function initHeaderTips() {
-  setTip(document.getElementById("header-overflow-toggle"), "更多：诊断、配置、字号、尺寸等");
-  setTip(sizeToggleBtn, "窗口尺寸预设");
   setTip(clearSessionBtn, "清空字幕、总结与洞察，从零继续监听");
   setTip(exportTranscriptBtn, "导出当前会话的原始字幕到文本文件");
   setTip(exportInsightsBtn, "导出本会话已抓取的全部术语与问题到文本文件");
@@ -285,7 +282,7 @@ function setupWindowDrag() {
     if (e.button !== 0) return;
     if (
       e.target.closest(
-        "button, a, input, select, textarea, [role='button'], .header-overflow-menu, .header-overflow-wrap",
+        "button, a, input, select, textarea, [role='button'], .header-toolbar, .header-overflow-menu, .header-overflow-wrap",
       )
     ) {
       return;
@@ -567,15 +564,9 @@ function initMiddleDivider() {
 initStackDivider();
 initMiddleDivider();
 
-function closeSizeMenu() {
-  sizeMenuEl?.classList.add("hidden");
-  sizeToggleBtn?.setAttribute("aria-expanded", "false");
-  sizeToggleBtn?.classList.remove("is-active");
-}
-
 function markActiveSizePreset(presetId) {
-  if (!sizeMenuEl) return;
-  for (const btn of sizeMenuEl.querySelectorAll("[data-preset]")) {
+  if (!sizePresetButtonsEl) return;
+  for (const btn of sizePresetButtonsEl.querySelectorAll("[data-preset]")) {
     btn.classList.toggle("is-active", btn.dataset.preset === presetId);
   }
 }
@@ -585,14 +576,35 @@ async function applyWindowPreset(presetId) {
     const applied = await invoke("apply_window_preset", { preset: presetId });
     localStorage.setItem(WINDOW_PRESET_STORAGE_KEY, applied);
     markActiveSizePreset(applied);
-    closeSizeMenu();
   } catch (e) {
     setTip(statusEl, String(e));
   }
 }
 
+function presetButtonLabel(p) {
+  const short = {
+    compact: "小",
+    default: "默",
+    medium: "中",
+    large: "大",
+    wide: "宽",
+    tall: "高",
+    "center-third": "⅓",
+    "current-screen": "屏",
+    fullscreen: "满",
+  };
+  return short[p.id] ?? p.label;
+}
+
+function presetButtonTip(p) {
+  if (p.fullscreen) return "全屏";
+  if (p.id === "center-third") return "宽 1/3 屏 × 工作区全高，水平居中";
+  if (p.id === "current-screen") return "铺满当前显示器工作区（保留菜单栏/程序坞区域）";
+  return `${p.label} ${p.width}×${p.height}`;
+}
+
 async function initSizePresets() {
-  if (!sizeMenuEl || !sizeToggleBtn) return;
+  if (!sizePresetButtonsEl) return;
   let presets = [];
   try {
     presets = await invoke("list_window_presets");
@@ -600,46 +612,20 @@ async function initSizePresets() {
     return;
   }
 
-  sizeMenuEl.replaceChildren();
+  sizePresetButtonsEl.replaceChildren();
   for (const p of presets) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "size-menu-item";
+    btn.className = "size-preset-btn";
     btn.dataset.preset = p.id;
-    btn.setAttribute("role", "menuitem");
-    setTip(
-      btn,
-      p.fullscreen
-        ? "全屏"
-        : p.id === "center-third"
-          ? "宽 1/3 屏 × 工作区全高，水平居中"
-          : p.id === "current-screen"
-            ? "铺满当前显示器工作区（保留菜单栏/程序坞区域）"
-            : `${p.width}×${p.height}`,
-    );
-    btn.textContent =
-      p.fullscreen || p.id === "center-third" || p.id === "current-screen"
-        ? p.label
-        : `${p.label} ${p.width}×${p.height}`;
+    btn.textContent = presetButtonLabel(p);
+    setTip(btn, presetButtonTip(p));
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       applyWindowPreset(p.id);
     });
-    sizeMenuEl.appendChild(btn);
+    sizePresetButtonsEl.appendChild(btn);
   }
-
-  sizeToggleBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const open = sizeMenuEl.classList.toggle("hidden");
-    sizeToggleBtn.setAttribute("aria-expanded", open ? "false" : "true");
-    sizeToggleBtn.classList.toggle("is-active", !open);
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!sizePresetsEl?.contains(e.target)) {
-      closeSizeMenu();
-    }
-  });
 
   let saved = localStorage.getItem(WINDOW_PRESET_STORAGE_KEY) || "center-third";
   if (saved === "center-quarter") {
@@ -652,6 +638,7 @@ async function initSizePresets() {
   } catch {
     /* browser preview */
   }
+  reflowToolbarOverflow();
 }
 
 initSizePresets();
@@ -711,7 +698,6 @@ applyTranscriptVisible(getInitialTranscriptVisible());
 
 toggleTranscriptBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
-  closeSizeMenu();
   toggleTranscriptPanel();
 });
 
@@ -792,6 +778,7 @@ scrollEl.addEventListener(
       followLatest = false;
       scrollLatestBtn.classList.remove("hidden");
     }
+    reflowToolbarOverflow();
   },
   { passive: true }
 );
@@ -1588,7 +1575,6 @@ initUiModeSwitch((mode) => {
   }
   renderInsightPanels();
 });
-initHeaderOverflow();
 initSummaryCollapse();
 initPinnedCollapse();
 initInsightUi();

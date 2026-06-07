@@ -2,7 +2,7 @@
  * Meeting / glance UI modes — focused insight rendering.
  */
 import { invoke } from "@tauri-apps/api/core";
-import { dismissTooltip, setTip } from "./tooltips.js";
+import { setTip } from "./tooltips.js";
 import { formatAbsoluteTranscriptTime } from "./transcript-time.js";
 
 export const UI_MODE_STORAGE_KEY = "themis-ui-mode";
@@ -79,28 +79,6 @@ export function initUiModeSwitch(onChange) {
     });
   }
   return mode;
-}
-
-export function initHeaderOverflow() {
-  const toggle = document.getElementById("header-overflow-toggle");
-  const menu = document.getElementById("header-overflow-menu");
-  if (!toggle || !menu) return;
-
-  const close = () => {
-    menu.classList.add("hidden");
-    toggle.setAttribute("aria-expanded", "false");
-    dismissTooltip();
-  };
-
-  toggle.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const open = menu.classList.toggle("hidden");
-    toggle.setAttribute("aria-expanded", open ? "false" : "true");
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!toggle.contains(e.target) && !menu.contains(e.target)) close();
-  });
 }
 
 export function isSummaryCollapsed() {
